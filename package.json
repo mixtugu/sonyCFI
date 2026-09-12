@@ -1,20 +1,26 @@
 {
-    "name":  "between-tides",
-    "version":  "0.1.0",
-    "private":  true,
-    "type":  "module",
-    "scripts":  {
-                    "dev":  "node server/index.js --dev",
-                    "build":  "vite build",
-                    "preview":  "node server/index.js",
-                    "test":  "node --test",
-                    "start":  "node server/index.js"
-                },
-    "devDependencies":  {
-                            "@playwright/test":  "^1.55.0",
-                            "vite":  "^7.1.0"
-                        },
-    "dependencies":  {
-                         "ws":  "^8.21.3"
-                     }
+    "name": "between-tides",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "node server/index.js --dev",
+        "build": "vite build",
+        "preview": "node server/index.js",
+        "test": "node --test",
+        "start": "node server/index.js",
+        "worker:dev": "npm run build && wrangler dev --port 8787",
+        "deploy": "npm run build && wrangler deploy",
+        "worker:check": "npm run build && wrangler deploy --dry-run",
+        "worker:types": "wrangler types"
+    },
+    "devDependencies": {
+        "@playwright/test": "^1.55.0",
+        "@types/node": "^22.20.2",
+        "vite": "^7.1.0",
+        "wrangler": "^4.131.1"
+    },
+    "dependencies": {
+        "ws": "^8.21.3"
+    }
 }

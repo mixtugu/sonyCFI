@@ -1,4 +1,4 @@
-import { chromium, expect } from '@playwright/test';
+﻿import { chromium, expect } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 
@@ -27,7 +27,7 @@ const view = page => page.evaluate(() => window.latestState?.view);
 const playing = page => expect.poll(() => page.evaluate(() => window.latestState?.status)).toBe('playing');
 await mkdir('artifacts', { recursive: true });
 try {
-  await child.goto('http://localhost:5173');
+  await child.goto('http://localhost:5173/?online=1');
   await expect(child.locator('#create-button')).toBeEnabled();
   await child.screenshot({ path: 'artifacts/lobby-ja.png', fullPage: true });
   await child.locator('#create-button').click();
@@ -63,8 +63,10 @@ try {
   assert.ok(Math.abs((await view(child)).child.x - (await view(parent)).child.x) < 10);
   await parent.screenshot({ path: 'artifacts/parent-ja.png', fullPage: true });
   await child.screenshot({ path: 'artifacts/child-ja.png', fullPage: true });
-  await child.waitForTimeout(1600); await child.keyboard.up('d');
-  await expect.poll(async () => (await view(parent)).child.x).toBeGreaterThan(410);
+  // Keep moving until the shared state confirms the breakthrough; screenshots and
+  // browser scheduling should not determine how far a held key travels.
+  await expect.poll(async () => (await view(parent)).child.x, { timeout: 8000 }).toBeGreaterThan(430);
+  await child.keyboard.up('d');
   // Reload reconnects to the same seat; both must explicitly resume.
   const beforeReload = (await view(child)).child.x;
   await child.reload();
@@ -106,3 +108,4 @@ try {
   assert.deepEqual(errors, []);
   console.log('PASS: separate browsers, room links/codes, role-private payloads and UI, third-player rejection, synchronized movement/walls, reconnect, local gamepads, shared review, mutual role swap, mobile touch and Japanese layout.');
 } finally { await browser.close(); }
+

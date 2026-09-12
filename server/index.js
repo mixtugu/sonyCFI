@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { networkInterfaces } from 'node:os';
 import { WebSocketServer } from 'ws';
 import { RoomService } from './rooms.js';
+import { MazeRooms } from './maze-rooms.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json' };
@@ -15,7 +16,7 @@ export async function createApp({ dev = false, port = 5173, host = '0.0.0.0' } =
     if (req.url === '/health') { res.writeHead(200, { 'content-type': 'application/json' }); res.end('{"ok":true}'); return; }
     if (req.url === '/connection-info') {
       const lan = [];
-      if (dev) for (const entries of Object.values(networkInterfaces())) for (const i of entries || []) if (i.family === 'IPv4' && !i.internal) lan.push(`http://${i.address}:${server.address().port}`);
+      for (const entries of Object.values(networkInterfaces())) for (const i of entries || []) if (i.family === 'IPv4' && !i.internal) lan.push(`http://${i.address}:${server.address().port}`);
       res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }); res.end(JSON.stringify({ lan })); return;
     }
     if (vite) return vite.middlewares(req, res, () => { res.writeHead(404); res.end(); });
@@ -34,10 +35,12 @@ export async function createApp({ dev = false, port = 5173, host = '0.0.0.0' } =
     vite = await createServer({ root, server: { middlewareMode: true, hmr: { server } }, appType: 'spa' });
   }
   const rooms = new RoomService();
+  const mazeRooms = new MazeRooms();
   const wss = new WebSocketServer({ noServer: true, maxPayload: 4096 });
   server.on('upgrade', (req, socket, head) => {
-    if (new URL(req.url, 'http://localhost').pathname !== '/socket') { if (!dev) socket.destroy(); return; }
-    wss.handleUpgrade(req, socket, head, ws => wss.emit('connection', ws, req));
+    const endpoint = new URL(req.url, 'http://localhost').pathname;
+    if (!['/socket', '/maze-socket'].includes(endpoint)) { if (!dev) socket.destroy(); return; }
+    wss.handleUpgrade(req, socket, head, ws => { ws.service = endpoint === '/maze-socket' ? mazeRooms : rooms; wss.emit('connection', ws, req); });
   });
   wss.on('connection', socket => {
     socket.alive = true;
@@ -46,15 +49,15 @@ export async function createApp({ dev = false, port = 5173, host = '0.0.0.0' } =
     socket.on('message', raw => {
       if (Date.now() - windowStart > 1000) { budget = 0; windowStart = Date.now(); }
       if (++budget > 100) return;
-      try { rooms.handle(socket, JSON.parse(raw.toString())); } catch { rooms.error(socket, '通信内容を確認できませんでした。'); }
+      try { socket.service.handle(socket, JSON.parse(raw.toString())); } catch { socket.service.error(socket, 'リクエストを確認できません。'); }
     });
-    socket.on('close', () => rooms.disconnect(socket));
-    socket.on('error', () => rooms.disconnect(socket));
+    socket.on('close', () => socket.service.disconnect(socket));
+    socket.on('error', () => socket.service.disconnect(socket));
   });
-  const ticker = setInterval(() => rooms.tick(), 1000 / 30);
+  const ticker = setInterval(() => { rooms.tick(); mazeRooms.tick(); }, 1000 / 30);
   const heartbeat = setInterval(() => { for (const socket of wss.clients) { if (!socket.alive) { socket.terminate(); continue; } socket.alive = false; socket.ping(); } }, 5000);
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, host, resolve); });
-  return { server, rooms, port: server.address().port, close: async () => { clearInterval(ticker); clearInterval(heartbeat); for (const s of wss.clients) s.terminate(); wss.close(); await vite?.close(); await new Promise(resolve => server.close(resolve)); } };
+  return { server, rooms, mazeRooms, port: server.address().port, close: async () => { clearInterval(ticker); clearInterval(heartbeat); for (const s of wss.clients) s.terminate(); wss.close(); await vite?.close(); await new Promise(resolve => server.close(resolve)); } };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
