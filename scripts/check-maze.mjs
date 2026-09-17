@@ -12,10 +12,10 @@ try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1100 } });
   const errors = []; page.on('pageerror', e => errors.push(e.message));
   await page.goto(url); await expect(page.locator('#board-parent')).toBeVisible();
-  await expect(page.locator('#timer')).toHaveText('00:15');
+  await expect(page.locator('#timer')).toHaveText('01:30');
   await mkdir('artifacts', { recursive: true });
   await page.screenshot({ path: 'artifacts/maze-desktop.png', fullPage: true });
-  await page.locator('[name=duration]').fill('5'); await page.locator('#settings button[type=submit]').click();
+  await page.locator('.settings-panel summary').click(); await page.locator('[name=duration]').fill('5'); await page.locator('#settings button[type=submit]').click();
   await page.locator('[data-mode=cpu]').click(); await page.locator('#start').click();
   await expect(page.locator('#phase')).toHaveText('探検中');
   await page.waitForTimeout(800); await page.locator('#start').click();

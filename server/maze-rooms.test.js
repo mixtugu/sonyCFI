@@ -26,6 +26,6 @@ test('disconnect pauses, seat resumes, full rooms reject guests, replay needs bo
   const replacement = socket(); service.handle(replacement, { type: 'resume', code: room.code, token: room.members[1].token });
   service.handle(replacement, { type: 'ready' }); assert.equal(room.game.phase, 'paused'); service.handle(parent, { type: 'ready' }); assert.equal(room.game.phase, 'playing');
   room.game.phase = 'result'; service.handle(parent, { type: 'again' }); assert.equal(room.game.phase, 'result'); service.handle(replacement, { type: 'again' }); assert.equal(room.game.phase, 'ready');
-  service.handle(replacement, { type: 'settings', settings: { duration: 120 } }); assert.equal(room.game.settings.duration, 15);
+  service.handle(replacement, { type: 'settings', settings: { duration: 120 } }); assert.equal(room.game.settings.duration, 90);
   service.handle(parent, { type: 'settings', settings: { duration: 30 } }); assert.equal(room.game.settings.duration, 30);
 });

@@ -11,7 +11,7 @@ try {
   const errors = []; pages.forEach(p => p.on('pageerror', e => errors.push(e.message)));
   const url = `http://127.0.0.1:${app.port}`;
   await parent.goto(url); await expect(parent.locator('#maze-create button')).toBeEnabled();
-  await parent.locator('[name=duration]').fill('30'); await parent.locator('#maze-create button').click();
+  await parent.locator('.settings-panel summary').click(); await parent.locator('[name=duration]').fill('30'); await parent.locator('#maze-create button').click();
   await expect(parent.locator('#maze-code')).toHaveText(/^[A-F0-9]{6}$/);
   const code = await parent.locator('#maze-code').innerText(), room = app.mazeRooms.rooms.get(code);
   await child.goto(`${url}/?maze=${code}`); await expect(child.locator('#maze-join button')).toBeEnabled(); await child.locator('#maze-join button').click();
