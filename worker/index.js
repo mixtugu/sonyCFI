@@ -134,11 +134,12 @@ export default {
       const bytes = new Uint8Array(length); let offset = 0; for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
       const text = new TextDecoder().decode(bytes);
       let data; try { data = JSON.parse(text); } catch { return json({ error: 'Invalid JSON' }, 400); }
-      if (!data || !['parent', 'child'].includes(data.role) || !data.settings || typeof data.settings !== 'object') return json({ error: '設定を確認してください。' }, 400);
+      if (!data || !data.settings || typeof data.settings !== 'object') return json({ error: '設定を確認してください。' }, 400);
       for (let i = 0; i < 5; i++) {
         const codeBytes = crypto.getRandomValues(new Uint8Array(3));
         const code = [...codeBytes].map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
-        const ticket = await env.MAZE_ROOMS.getByName(code).initialize(code, data.settings, data.role);
+        // The host always takes the parent seat; roles swap after every round.
+        const ticket = await env.MAZE_ROOMS.getByName(code).initialize(code, data.settings, 'parent');
         if (ticket) return json(ticket, 201);
       }
       return json({ error: 'もう一度お試しください。' }, 503);

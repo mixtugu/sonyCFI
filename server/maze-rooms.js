@@ -6,22 +6,29 @@ export class MazeRooms {
   send(socket, packet) { if (socket?.readyState === 1 && (socket.bufferedAmount || 0) < 1_000_000) socket.send(JSON.stringify(packet)); }
   error(socket, message, code = 'invalid') { this.send(socket, { type: 'error', message, code }); }
   add(room, role, socket) {
-    const member = { role, socket, token: randomBytes(24).toString('hex'), ready: false, again: false };
+    // `seat` is the role this member opens a match with; `role` alternates between the two legs.
+    const member = { role, seat: role, socket, token: randomBytes(24).toString('hex'), ready: false, again: false };
     room.members.push(member); this.bindings.set(socket, { room, member }); this.session(room, member); this.broadcast(room);
   }
   session(room, member) { this.send(member.socket, { type: 'session', code: room.code, token: member.token }); }
-  reset(room, settings = room.game?.settings) {
+  // A match is two legs: everyone plays parent once and child once, then it is over.
+  reset(room, settings = room.game?.settings, next = false) {
     room.game = createMaze(settings, randomInt(0x7fffffff)); room.game.mode = 'duo'; room.round++;
-    room.members.forEach(m => { m.ready = false; m.again = false; }); room.reason = '二人とも準備完了を押すと始まります。';
+    if (next) { room.leg = 2; room.members.forEach(m => { m.role = m.role === 'parent' ? 'child' : 'parent'; }); }
+    else { room.leg = 1; room.results = []; room.members.forEach(m => { m.role = m.seat; }); }
+    room.members.forEach(m => { m.ready = false; m.again = false; });
+    room.reason = next ? '役割を交代しました。二人とも準備完了を押すと始まります。' : '二人とも準備完了を押すと始まります。';
   }
+  finish(room) { if (room.game.phase === 'result') room.results[room.leg - 1] = { parent: room.game.parentScore, child: room.game.childScore }; }
   handle(socket, data) {
     if (!data || typeof data !== 'object') return;
     const binding = this.bindings.get(socket);
     if (!binding) {
       if (data.type === 'create') {
-        if (!['parent', 'child'].includes(data.role) || this.rooms.size >= 200) return this.error(socket, '部屋を作れません。役割を確認するか、少し待ってからお試しください。');
+        if (this.rooms.size >= 200) return this.error(socket, '部屋を作れません。少し待ってからお試しください。');
         let code; do { code = randomBytes(3).toString('hex').toUpperCase(); } while (this.rooms.has(code));
-        const room = { code, members: [], round: 0, touched: Date.now() }; this.reset(room, data.settings); this.rooms.set(code, room); this.add(room, data.role, socket); return;
+        // The host always starts as the parent and the guest as the child; they swap each round.
+        const room = { code, members: [], round: 0, touched: Date.now() }; this.reset(room, data.settings); this.rooms.set(code, room); this.add(room, 'parent', socket); return;
       }
       const room = this.rooms.get(typeof data.code === 'string' ? data.code.trim().toUpperCase() : '');
       if (!room) return this.error(socket, '部屋が見つかりません。コードを確認するか、新しい部屋を作ってください。', 'missing');
@@ -48,7 +55,8 @@ export class MazeRooms {
     } else if (data.type === 'pause' && g.phase === 'playing') {
       this.pause(room, 'ひと休み中です。二人とも準備ができたら再開します。');
     } else if (data.type === 'again' && g.phase === 'result') {
-      member.again = true; if (room.members.length === 2 && room.members.every(m => m.again && m.socket?.readyState === 1)) this.reset(room);
+      // After the first leg both sides swap; after the second the match restarts from the seats.
+      member.again = true; if (room.members.length === 2 && room.members.every(m => m.again && m.socket?.readyState === 1)) this.reset(room, undefined, room.leg === 1);
     } else if (data.type === 'settings' && g.phase === 'ready' && member === room.members[0]) {
       this.reset(room, data.settings);
     } else if (data.type === 'move' && g.phase === 'playing') {
@@ -68,10 +76,16 @@ export class MazeRooms {
     if (room.game.phase === 'playing') this.pause(room, '相手との接続が切れたため探検を停止しました。再接続を待っています。');
     this.broadcast(room);
   }
+  total(room, member) {
+    const other = role => role === 'parent' ? 'child' : 'parent';
+    return room.results.reduce((sum, leg, i) => sum + (leg ? leg[i === 0 ? member.seat : other(member.seat)] : 0), 0);
+  }
   view(room, member) {
     const g = room.game, review = g.phase === 'result', parent = member.role === 'parent';
+    const partner = room.members.find(m => m !== member);
     // Only send public state plus this role's information; never send the seed or hidden item values.
     return { type: 'state', code: room.code, round: room.round, role: member.role, host: member === room.members[0], ready: member.ready, again: member.again,
+      match: { leg: room.leg, done: review && room.leg === 2, results: room.results, you: this.total(room, member), partner: partner ? this.total(room, partner) : 0 },
       partner: { connected: room.members.some(m => m !== member && m.socket?.readyState === 1), ready: room.members.some(m => m !== member && m.ready), again: room.members.some(m => m !== member && m.again) }, reason: room.reason,
       game: { settings: g.settings, phase: g.phase, time: g.time, avatar: g.avatar, goal: parent || review ? g.goal : null,
         base: [...g.base], walls: [...g.walls], secrets: !parent || review ? [...g.secrets] : [],
@@ -79,7 +93,7 @@ export class MazeRooms {
         parentScore: parent || review ? g.parentScore : null, childScore: !parent || review ? g.childScore : null,
         collected: g.collected, moves: g.moves, trail: g.trail, logs: review ? g.logs : g.logs.filter(l => l.text.startsWith('壁を設置')).map(l => ({ time: l.time, text: '親が壁を置きました。' })) } };
   }
-  broadcast(room) { for (const member of room.members) this.send(member.socket, this.view(room, member)); }
+  broadcast(room) { this.finish(room); for (const member of room.members) this.send(member.socket, this.view(room, member)); }
   tick(dt = 1 / 30) {
     for (const [code, room] of this.rooms) {
       if (!room.members.some(m => m.socket?.readyState === 1) && Date.now() - room.touched > 120_000) { this.rooms.delete(code); continue; }

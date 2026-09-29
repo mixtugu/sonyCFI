@@ -1,5 +1,12 @@
 export function connectMaze({ settings, onState, onLeave, notice }) {
-  document.querySelector('.toolbar').insertAdjacentHTML('beforebegin', `<section class="multiplayer"><p id="net-status" role="status">接続中…</p><div id="net-lobby"><form id="maze-create"><select name="role" aria-label="自分の役割"><option value="parent">親</option><option value="child">子ども</option></select><button class="primary" disabled>部屋をつくる</button></form><form id="maze-join"><input name="code" aria-label="迷路の部屋コード" placeholder="部屋コード" maxlength="6" minlength="6" pattern="[A-Fa-f0-9]{6}" required><button class="secondary" disabled>参加</button></form></div><div id="net-room" hidden><p><strong id="maze-code"></strong> <b id="maze-role"></b> <span id="maze-partner"></span></p><div class="invite-row"><input id="maze-link" readonly aria-label="迷路の招待リンク"><button id="maze-copy" class="secondary">コピー</button><button id="maze-leave" class="text-button">退出</button></div></div></section>`);
+  // Joining a room is the opening screen; the room's own panel lives in the settings dialog,
+  // which stays reachable while the game fills the screen.
+  // Roles are fixed at the start: the host is the parent, the guest the child. They swap every round.
+  const lobbyMarkup = `<p id="net-status" role="status">接続中…</p><div id="net-lobby"><form id="maze-create"><button class="primary wide" disabled>部屋をつくる（親ではじめる）</button></form><form id="maze-join"><input name="code" aria-label="迷路の部屋コード" placeholder="部屋コード" maxlength="6" minlength="6" pattern="[A-Fa-f0-9]{6}" required><button class="secondary" disabled>参加</button></form></div>`;
+  const roomMarkup = `<div id="net-room" hidden><p><strong id="maze-code"></strong> <b id="maze-role"></b> <span id="maze-partner"></span></p><div class="invite-row"><input id="maze-link" readonly aria-label="迷路の招待リンク"><button id="maze-copy" class="secondary">コピー</button><button id="maze-leave" class="text-button">退出</button></div></div>`;
+  const lobbyMount = document.getElementById('net-lobby-mount'), roomMount = document.getElementById('net-room-mount');
+  if (lobbyMount && roomMount) { lobbyMount.innerHTML = lobbyMarkup; roomMount.innerHTML = roomMarkup; }
+  else document.querySelector('.toolbar').insertAdjacentHTML('beforebegin', `<section class="multiplayer">${lobbyMarkup}${roomMarkup}</section>`);
   const $ = id => document.getElementById(id);
   const client = { active: false, connected: false, state: null, send: data => { if (socket?.readyState === 1) socket.send(JSON.stringify(data)); } };
   let socket, ticket = null, stopped = false, shareOrigin = location.origin, durable = false, pending = null, targetCode = '', retry;
@@ -34,7 +41,7 @@ export function connectMaze({ settings, onState, onLeave, notice }) {
   }
   function leave() { if (durable) { const previous = socket; socket = null; previous?.close(); clearTimeout(retry); pending = null; client.connected = true; } ticket = null; persist(); client.active = false; client.state = null; $('net-lobby').hidden = false; $('net-room').hidden = true; history.replaceState(null, '', '/'); connection(); onLeave(); }
   $('maze-create').onsubmit = async event => {
-    event.preventDefault(); const data = { type: 'create', role: event.target.elements.role.value, settings: settings() };
+    event.preventDefault(); const data = { type: 'create', role: 'parent', settings: settings() };
     if (!durable) { client.send(data); return; }
     client.connected = false; connection();
     try {
@@ -50,7 +57,7 @@ export function connectMaze({ settings, onState, onLeave, notice }) {
     durable = !!data.durable;
     if (['localhost', '127.0.0.1', '[::1]'].includes(location.hostname) && data.lan?.[0]) shareOrigin = data.lan[0]; link();
     if (durable) {
-      document.querySelector('a[href="?online=1"]').hidden = true;
+      document.querySelectorAll('a[href="?online=1"]').forEach(a => { a.hidden = true; });
       if (!ticket) { client.connected = true; connection(); return; }
     }
     connect();

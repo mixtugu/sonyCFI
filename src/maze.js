@@ -1,4 +1,4 @@
-export const DEFAULTS = Object.freeze({ cols: 14, rows: 10, duration: 90, wallLimit: 12, wallCost: 1, moveMs: 500, redMin: 14, redMax: 18, yellowMin: 8, yellowMax: 13, greenMin: 3, greenMax: 7, rewardMin: 3, rewardMax: 18 });
+export const DEFAULTS = Object.freeze({ cols: 14, rows: 10, duration: 30, wallLimit: 12, wallCost: 1, moveMs: 500, redMin: 14, redMax: 18, yellowMin: 8, yellowMax: 13, greenMin: 3, greenMax: 7, rewardMin: 3, rewardMax: 18 });
 export const LIMITS = { cols: [10, 28], rows: [8, 18], duration: [5, 120], wallLimit: [0, 30], wallCost: [0, 20], moveMs: [100, 1200], redMin: [1, 50], redMax: [1, 50], yellowMin: [1, 50], yellowMax: [1, 50], greenMin: [1, 50], greenMax: [1, 50], rewardMin: [1, 50], rewardMax: [1, 50] };
 export const DIRS = [[1, 0], [0, 1], [-1, 0], [0, -1]];
 export const edge = (a, b) => a < b ? `${a}:${b}` : `${b}:${a}`;

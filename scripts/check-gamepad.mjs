@@ -16,7 +16,7 @@ const app = await createApp({ port: 0, host: '127.0.0.1' });
 let browser;
 try {
   browser = await chromium.launch(); const page = await browser.newPage(); const errors = []; page.on('pageerror', e => errors.push(e.message));
-  await page.addInitScript(fakePad); await page.goto(`http://127.0.0.1:${app.server.address().port}`);
+  await page.addInitScript(fakePad); await page.goto(`http://127.0.0.1:${app.server.address().port}/test`);
   const press = async (buttons, axes) => { await page.evaluate(([b, a]) => { window.__pad = { buttons: b, axes: a }; }, [buttons, axes]); await page.waitForTimeout(120); await page.evaluate(() => { window.__pad = { buttons: [] }; }); await page.waitForTimeout(120); };
   await press([]); await expect(page.locator('#pad-status')).toBeVisible();
   await press([9]); await expect(page.locator('#phase')).toHaveText('探検中');             // OPTIONS starts
@@ -31,7 +31,9 @@ try {
   await press([5]); await expect(page.locator('[data-mode=child]')).toHaveAttribute('aria-pressed', 'true'); // R1 next mode
   await press([8]); await expect(page.locator('#phase')).toHaveText('開始前');              // CREATE resets
   // No CPU walls in child mode, so any board change below comes from the child moving.
-  await page.locator('.settings-panel summary').click(); await page.locator('[name=wallLimit]').fill('0'); await page.locator('#settings button[type=submit]').click();
+  await press([2]); await expect(page.locator('#settings-dialog')).toBeVisible();          // □ opens the settings dialog
+  await page.locator('[name=wallLimit]').fill('0'); await page.locator('#settings button[type=submit]').click();
+  await expect(page.locator('#settings-dialog')).toBeHidden();
   await press([9]); await expect(page.locator('#phase')).toHaveText('探検中');
   const snapshot = () => page.evaluate(() => document.querySelector('#board-child').toDataURL());
   const start = await snapshot(); let moved = false;
@@ -44,5 +46,5 @@ try {
   await press([3]); await expect(page.locator('body')).toHaveClass(/immersive/); await press([3]); await expect(page.locator('body')).not.toHaveClass(/immersive/); // △ fullscreen
   await press([4]); await expect(page.locator('[data-mode=parent]')).toHaveAttribute('aria-pressed', 'true'); // L1 previous mode
   assert.deepEqual(errors, []);
-  console.log('Gamepad: connect indicator, OPTIONS start/pause, ○ rotate, × wall + rumble, L1/R1 modes, CREATE reset, △ fullscreen, stick movement passed.');
+  console.log('Gamepad: connect indicator, OPTIONS start/pause, ○ rotate, × wall + rumble, L1/R1 modes, CREATE reset, □ settings, △ fullscreen, stick movement passed.');
 } finally { await browser?.close(); await app.close(); }

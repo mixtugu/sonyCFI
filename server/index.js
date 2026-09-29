@@ -25,7 +25,8 @@ export async function createApp({ dev = false, port = 5173, host = '0.0.0.0' } =
       const target = path.resolve(root, 'dist', '.' + pathname);
       const dist = path.join(root, 'dist');
       if (target !== dist && !target.startsWith(dist + path.sep)) { res.writeHead(403); res.end(); return; }
-      const file = pathname === '/' ? path.join(dist, 'index.html') : target;
+      // Routes without a file extension (such as /test) are client-side; they load the same page.
+      const file = pathname === '/' || !path.extname(pathname) ? path.join(dist, 'index.html') : target;
       if (!(await stat(file)).isFile()) throw new Error('not file');
       res.writeHead(200, { 'content-type': mime[path.extname(file)] || 'application/octet-stream' }); res.end(await readFile(file));
     } catch { res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' }); res.end('ページが見つかりません。先に npm run build を実行してください。'); }
