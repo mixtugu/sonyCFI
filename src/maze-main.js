@@ -2,14 +2,15 @@ import './maze.css';
 import { DEFAULTS, LIMITS, createMaze, start, tick, move, placeWall, neighbor } from './maze.js';
 import { drawMaze, pointerCell } from './maze-renderer.js';
 import { connectMaze } from './maze-network.js';
+import { createPadReader, firstPad, rumble } from './gamepad.js';
 
 const fields = [['cols', '横のマス数'], ['rows', '縦のマス数'], ['duration', '制限時間（秒）'], ['wallLimit', '壁の枚数'], ['wallCost', '親の壁コスト'], ['moveMs', '移動間隔（ms）']];
 const ranges = [['red', '高リスク', 'redMin', 'redMax'], ['yellow', '中リスク', 'yellowMin', 'yellowMax'], ['green', '低リスク', 'greenMin', 'greenMax'], ['gold', '子どもの報酬', 'rewardMin', 'rewardMax']];
 const input = (key, label) => `<input type="number" name="${key}" aria-label="${label}" min="${LIMITS[key][0]}" max="${LIMITS[key][1]}" step="${key === 'moveMs' ? 50 : 1}" value="${DEFAULTS[key]}" required>`;
 document.querySelector('#app').innerHTML = `
-<header class="top"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">〰</span>ふたりのあいだの海</a><nav><a href="?online=1">海のゲーム ↗</a><button id="help-open" class="text-button">遊び方</button></nav></header>
+<header class="top"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">〰</span>ふたりのあいだの海</a><nav><span id="pad-status" class="pad-status" hidden>🎮 コントローラー</span><a href="?online=1">海のゲーム ↗</a><button id="help-open" class="text-button">遊び方</button></nav></header>
 <main class="workspace">
-<section class="toolbar" aria-label="ゲーム操作"><div class="mode-group" aria-label="プレイモード"><button data-mode="parent" class="selected" aria-pressed="true">親</button><button data-mode="child" aria-pressed="false">子ども</button><button data-mode="cpu" aria-pressed="false">CPU</button></div><div class="status"><i id="phase-dot"></i><b id="phase">開始前</b><div class="oxygen" id="oxygen" role="meter" aria-label="残りの酸素" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span class="oxygen-bubbles" aria-hidden="true"><i></i><i></i><i></i></span><span class="oxygen-valve" aria-hidden="true"><i class="oxygen-knob"></i><i class="oxygen-neck"></i></span><span class="oxygen-body"><span class="oxygen-track"><span class="oxygen-fill" id="oxygen-fill"></span><span class="oxygen-ticks" aria-hidden="true"></span></span><span class="oxygen-band" aria-hidden="true"></span><span class="oxygen-band" aria-hidden="true"></span><strong id="timer">01:30</strong><span class="oxygen-label" aria-hidden="true">O₂</span></span></div></div><div class="run-controls"><button id="reset" class="secondary" aria-label="リセット">↺</button><button id="start" class="primary">スタート</button></div></section>
+<section class="toolbar" aria-label="ゲーム操作"><div class="mode-group" aria-label="プレイモード"><button data-mode="parent" class="selected" aria-pressed="true">親</button><button data-mode="child" aria-pressed="false">子ども</button><button data-mode="cpu" aria-pressed="false">CPU</button></div><div class="status"><i id="phase-dot"></i><b id="phase">開始前</b><div class="oxygen" id="oxygen" role="meter" aria-label="残りの酸素" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span class="oxygen-bubbles" aria-hidden="true"><i></i><i></i><i></i></span><span class="oxygen-valve" aria-hidden="true"><i class="oxygen-knob"></i><i class="oxygen-neck"></i></span><span class="oxygen-body"><span class="oxygen-track"><span class="oxygen-fill" id="oxygen-fill"></span><span class="oxygen-ticks" aria-hidden="true"></span></span><span class="oxygen-band" aria-hidden="true"></span><span class="oxygen-band" aria-hidden="true"></span><strong id="timer">01:30</strong><span class="oxygen-label" aria-hidden="true">O₂</span></span></div></div><div class="run-controls"><button id="reset" class="secondary" aria-label="リセット">↺</button><button id="start" class="primary">スタート</button><button id="fullscreen" class="secondary" aria-label="全画面" aria-pressed="false" title="全画面 (F)">⛶</button></div></section>
 <p id="mode-description" class="hint"></p>
 <div class="boards">
 ${['parent', 'child'].map(role => `<section class="board-card ${role}"><div class="board-heading"><h2>${role === 'parent' ? '親' : '子ども'} <span class="role-badge" id="badge-${role}"></span></h2><span class="score"><strong id="score-${role}">${role === 'parent' ? '100' : '0'}</strong><small id="detail-${role}">0 / 12</small></span></div><div class="board-surface"><canvas id="board-${role}" tabindex="0" aria-label="${role === 'parent' ? '親の迷路。マスの端をクリックして壁を設置' : '子どもの迷路。矢印キーで移動'}"></canvas></div></section>`).join('')}
@@ -19,7 +20,7 @@ ${['parent', 'child'].map(role => `<section class="board-card ${role}"><div clas
 </main>
 <div id="notice" role="status"></div>
 <dialog id="result"><h2>探検完了</h2><div class="result-scores"><div>親<strong id="final-parent"></strong></div><div>子ども<strong id="final-child"></strong></div></div><p id="final-stats"></p><div class="dialog-actions"><button id="close-result" class="secondary">閉じる</button><button id="again" class="primary">もう一度</button></div></dialog>
-<dialog id="help"><h2>遊び方</h2><p>親は100点から。子どもがアイテムを取ると、隠れたリスク分だけ親の点が減り、子どもは報酬を得ます。</p><p>親は通路に壁を置けます。道がふさがると、子どもだけの秘密の通路が開きます。</p><p>矢印キー/WASDで操作。親はTabで向き、Spaceで設置。Escで一時停止。</p><button id="help-close" class="primary">OK</button></dialog>`;
+<dialog id="help"><h2>遊び方</h2><p>親は100点から。子どもがアイテムを取ると、隠れたリスク分だけ親の点が減り、子どもは報酬を得ます。</p><p>親は通路に壁を置けます。壁1枚ごとに親は設定したコスト、子どもは1点を失うので、アイテムを取る前でも子どもの点はマイナスになることがあります。道がふさがると、子どもだけの秘密の通路が開きます。</p><p>矢印キー/WASDで操作。親はTabで向き、Spaceで設置。Escで一時停止。Fで全画面。</p><p class="pad-help"><b>🎮 PS5コントローラー</b><br>方向キー/左スティック 移動・位置選択 · × 壁を置く · 右スティック/○ 壁の向き · OPTIONS スタート/一時停止 · CREATE リセット · L1/R1 モード切替 · △ 全画面</p><button id="help-close" class="primary">OK</button></dialog>`;
 
 const $ = id => document.getElementById(id);
 let game = createMaze(), cursor = game.avatar, direction = 0, seed = 260830, keys = new Set(), last = 0, uiClock = 0, resultShown = false;
@@ -48,6 +49,17 @@ function rotate() { direction = (direction + 1) % 4; update(); }
 $('start').onclick = toggle; $('reset').onclick = () => { if (!network.active) reset(); }; $('again').onclick = () => { if (network.active) { network.send({ type: 'again' }); return; } reset(); start(game); update(); }; $('close-result').onclick = () => $('result').close();
 document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => setMode(b.dataset.mode));
 document.querySelectorAll('[data-dir]').forEach(b => b.onclick = () => control(+b.dataset.dir));
+// Immersive mode keeps only the boards, timer and start button. The class works on its own
+// (e.g. iPhone Safari has no element fullscreen); the Fullscreen API is used where available.
+function setImmersive(on) {
+  document.body.classList.toggle('immersive', on); $('fullscreen').setAttribute('aria-pressed', on); $('fullscreen').textContent = on ? '✕' : '⛶';
+  $('fullscreen').setAttribute('aria-label', on ? '全画面を終了' : '全画面');
+  if (on && !document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {});
+  if (!on && document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+}
+const toggleImmersive = () => setImmersive(!document.body.classList.contains('immersive'));
+$('fullscreen').onclick = toggleImmersive;
+document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && document.body.classList.contains('immersive')) setImmersive(false); });
 $('rotate').onclick = rotate; $('place').onclick = wall;
 $('help-open').onclick = () => { suspend(); $('help').showModal(); };
 $('help-close').onclick = () => $('help').close();
@@ -62,6 +74,8 @@ window.addEventListener('keydown', event => {
   if (game.mode === 'parent' && (event.key === 'Tab' && event.target.tagName === 'CANVAS')) { event.preventDefault(); rotate(); }
   if (event.code === 'Space' && event.target.tagName !== 'BUTTON') { event.preventDefault(); if (!event.repeat) wall(); }
   if (event.key === 'Escape' && game.phase === 'playing') suspend();
+  if (event.key === 'Escape' && document.body.classList.contains('immersive')) setImmersive(false);
+  if ((event.key === 'f' || event.key === 'F') && !event.repeat && !event.metaKey && !event.ctrlKey) toggleImmersive();
 });
 window.addEventListener('keyup', event => keys.delete(event.key));
 function suspend() { keys.clear(); if (game.phase === 'playing') { if (network.active) network.send({ type: 'pause' }); else game.phase = 'paused'; update(); } }
@@ -97,5 +111,35 @@ function update() {
 }
 function render() { for (const role of ['parent', 'child']) if (!network.active || game.mode === role) drawMaze($('board-' + role), game, role, cursor, direction); }
 let networkClock = 0;
-function frame(now) { const dt = last ? Math.min((now - last) / 1000, .1) : 0; last = now; const held = [...keys].at(-1); if (!network.active) tick(game, dt, held === undefined ? -1 : keyDirection[held]); else { networkClock += dt; if (networkClock >= .06) { networkClock = 0; if (held !== undefined && game.mode === 'child' && game.phase === 'playing') network.send({ type: 'move', direction: keyDirection[held] }); } } uiClock += dt; if (uiClock >= .08 || game.phase === 'result' && !resultShown) { update(); uiClock = 0; } render(); requestAnimationFrame(frame); }
+// Game time advances from wall-clock deltas; rAF only paces drawing. A watchdog keeps the round
+// moving when the browser stops painting the tab without firing blur/visibilitychange.
+function step(now) {
+  const dt = last ? Math.max(0, Math.min((now - last) / 1000, 1)) : 0; last = now; const padDir = pollPad(now), key = [...keys].at(-1), held = key !== undefined ? keyDirection[key] : padDir >= 0 ? padDir : undefined;
+  if (!network.active) { for (let left = dt; left > 0; left -= .1) tick(game, Math.min(left, .1), held === undefined ? -1 : held); }
+  else { networkClock += dt; if (networkClock >= .06) { networkClock = 0; if (held !== undefined && game.mode === 'child' && game.phase === 'playing') network.send({ type: 'move', direction: held }); } }
+  uiClock += dt; if (uiClock >= .08 || game.phase === 'result' && !resultShown) { update(); uiClock = 0; }
+}
+const readPad = createPadReader(); let padSeen = false, feltWalls = 0, feltItems = 0, feltPhase = '';
+function pollPad(now) {
+  const pad = firstPad(), input = readPad(pad, now);
+  if (!!pad !== padSeen) { padSeen = !!pad; $('pad-status').hidden = !pad; if (pad) notice('コントローラーを接続しました 🎮'); }
+  if (!pad) return -1;
+  const on = name => input.pressed.has(name);
+  if ($('help').open) { if (on('cross') || on('circle')) $('help').close(); return -1; }
+  if ($('result').open) { if (on('cross')) $('again').click(); if (on('circle')) $('result').close(); return -1; }
+  if (on('options')) toggle();
+  if (on('triangle')) toggleImmersive();
+  if (on('create') && !network.active) reset();
+  if ((on('l1') || on('r1')) && !network.active) { const modes = ['parent', 'child', 'cpu']; setMode(modes[(modes.indexOf(game.mode) + (on('r1') ? 1 : 2)) % 3]); }
+  if (game.mode === 'parent') { if (input.step >= 0) control(input.step); if (input.aim >= 0) { direction = input.aim; update(); } if (on('circle')) rotate(); if (on('cross')) wall(); }
+  // Haptics follow the game state, so they also fire for moves the server applied.
+  if (game.walls.size > feltWalls) rumble(pad, .2, .6, 60);
+  if (game.collected > feltItems) rumble(pad, .8, .4, 140);
+  if (game.phase === 'result' && feltPhase !== 'result') rumble(pad, 1, 1, 400);
+  feltWalls = game.walls.size; feltItems = game.collected; feltPhase = game.phase;
+  return game.mode === 'child' ? input.dir : -1;
+}
+let lastFrame = 0;
+function frame(now) { lastFrame = performance.now(); step(now); render(); requestAnimationFrame(frame); }
+setInterval(() => { const now = performance.now(); if (now - lastFrame > 150) { step(now); render(); } }, 100);
 update(); render(); requestAnimationFrame(frame);

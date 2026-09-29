@@ -23,7 +23,7 @@ try {
   await child.locator(`[data-dir="${dir}"]`).click(); await expect.poll(() => room.game.avatar).not.toBe(pos);
   for (let cell = 0; cell < 240; cell++) { const b = neighbor(room.game, cell, 0); if (b >= 0 && !room.game.base.has(edge(cell, b))) {
     const canvas = parent.locator('#board-parent'); await canvas.scrollIntoViewIfNeeded(); const box = await canvas.boundingBox();
-    await parent.mouse.click(box.x + ((cell % 20 + 1) * 36 + 13) / 748 * box.width, box.y + ((Math.floor(cell / 20) + .5) * 36 + 14) / 460 * box.height); break;
+    const { cols, rows } = room.game.settings; await parent.mouse.click(box.x + ((cell % cols + 1) * 36 + 13) / (cols * 36 + 28) * box.width, box.y + ((Math.floor(cell / cols) + .5) * 36 + 14) / (rows * 36 + 28) * box.height); break;
   } }
   await expect(parent.locator('#detail-parent')).toHaveText('1 / 12'); assert.equal(room.game.walls.size, 1);
   await child.reload(); await expect(parent.locator('#phase')).toHaveText('ひと休み中'); await expect(child.locator('#maze-role')).toHaveText('子ども役');

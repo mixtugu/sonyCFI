@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createMaze, reachable, start, tick, move, placeWall, neighbor, autoDirection, DEFAULTS } from './maze.js';
 
 test('seeded mazes are connected at every supported board size', () => {
-  for (const [cols, rows] of [[10, 8], [20, 12], [28, 18]]) {
+  for (const [cols, rows] of [[10, 8], [14, 10], [20, 12], [28, 18]]) {
     const s = createMaze({ cols, rows });
     assert.equal(reachable(s).size, cols * rows);
     assert.deepEqual([...s.base], [...createMaze({ cols, rows }).base]);
@@ -13,7 +13,8 @@ test('seeded mazes are connected at every supported board size', () => {
 });
 test('every parent wall preserves child reachability and charges both scores', () => {
   const s = createMaze({ wallLimit: 30 }); start(s);
-  for (let a = 0; a < 240; a++) for (let d = 0; d < 4; d++) if (placeWall(s, a, d)) assert.equal(reachable(s).size, 240);
+  const count = s.settings.cols * s.settings.rows;
+  for (let a = 0; a < count; a++) for (let d = 0; d < 4; d++) if (placeWall(s, a, d)) assert.equal(reachable(s).size, count);
   assert.equal(s.walls.size, 30); assert.equal(s.parentScore, 70); assert.equal(s.childScore, -30); assert.ok(s.secrets.size > 0);
 });
 test('items award independent rewards once and reveal their risk by collection', () => {

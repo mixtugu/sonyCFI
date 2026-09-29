@@ -15,7 +15,7 @@ try {
   await expect(page.locator('#timer')).toHaveText('01:30');
   await mkdir('artifacts', { recursive: true });
   await page.screenshot({ path: 'artifacts/maze-desktop.png', fullPage: true });
-  await page.locator('.settings-panel summary').click(); await page.locator('[name=duration]').fill('5'); await page.locator('#settings button[type=submit]').click();
+  await page.locator('.settings-panel summary').click(); await page.locator('[name=duration]').fill('5'); await page.locator('[name=moveMs]').fill('1200'); await page.locator('#settings button[type=submit]').click();
   await page.locator('[data-mode=cpu]').click(); await page.locator('#start').click();
   await expect(page.locator('#phase')).toHaveText('探検中');
   await page.waitForTimeout(800); await page.locator('#start').click();
@@ -26,18 +26,27 @@ try {
   await page.locator('#close-result').click(); await page.locator('#reset').click();
   await page.locator('[data-mode=parent]').click(); await page.locator('#start').click();
   // Find an open edge through the same public module, then exercise actual pointer placement.
-  const target = (() => { const s = createMaze({ duration: 5 }, 260831); for (let a = 0; a < 240; a++) { const b = neighbor(s, a, 0); if (b >= 0 && !s.base.has(edge(a, b))) return { x: (a % 20 + 1) * 36 + 13, y: (Math.floor(a / 20) + .5) * 36 + 14 }; } })();
+  const target = (() => { const s = createMaze({ duration: 5 }, 260831); const { cols, rows } = s.settings; for (let a = 0; a < cols * rows; a++) { const b = neighbor(s, a, 0); if (b >= 0 && !s.base.has(edge(a, b))) return { x: (a % cols + 1) * 36 + 13, y: (Math.floor(a / cols) + .5) * 36 + 14, w: cols * 36 + 28, h: rows * 36 + 28 }; } })();
   const box = await page.locator('#board-parent').boundingBox();
-  await page.mouse.click(box.x + target.x / 748 * box.width, box.y + target.y / 460 * box.height);
+  await page.mouse.click(box.x + target.x / target.w * box.width, box.y + target.y / target.h * box.height);
   await expect(page.locator('#detail-parent')).toHaveText('1 / 12');
   await expect(page.locator('#score-parent')).toHaveText('99');
   await page.locator('#reset').click();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: 'artifacts/maze-mobile.png', fullPage: true });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.keyboard.press('f'); await expect(page.locator('body')).toHaveClass(/immersive/);
+  for (const hidden of ['.top', '.multiplayer', '.settings-panel', '.mode-group', '#control-hint']) await expect(page.locator(hidden)).toBeHidden();
+  for (const shown of ['#board-parent', '#board-child', '#oxygen', '#start']) await expect(page.locator(shown)).toBeVisible();
+  const fits = await page.evaluate(() => [...document.querySelectorAll('canvas')].every(c => c.getBoundingClientRect().bottom <= innerHeight) && document.documentElement.scrollHeight <= innerHeight);
+  assert.equal(fits, true, 'immersive boards fit the viewport');
+  await page.screenshot({ path: 'artifacts/maze-fullscreen.png' });
+  await page.locator('#fullscreen').click(); await expect(page.locator('body')).not.toHaveClass(/immersive/); await expect(page.locator('.top')).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.locator('#help-open').click(); await expect(page.locator('#help')).toBeVisible(); await page.locator('#help-close').click();
   await page.goto(`${url}/?online=1`); await expect(page.locator('#create-button')).toBeEnabled();
   assert.deepEqual(errors, []);
-  console.log('Maze desktop/mobile, CPU, pause, result, wall pointer, help and legacy entry passed.');
+  console.log('Maze desktop/mobile, CPU, pause, result, wall pointer, help, fullscreen and legacy entry passed.');
 } finally { await browser?.close(); await app.close(); }
 

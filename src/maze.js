@@ -1,4 +1,4 @@
-export const DEFAULTS = Object.freeze({ cols: 20, rows: 12, duration: 90, wallLimit: 12, wallCost: 1, moveMs: 500, redMin: 14, redMax: 18, yellowMin: 8, yellowMax: 13, greenMin: 3, greenMax: 7, rewardMin: 3, rewardMax: 18 });
+export const DEFAULTS = Object.freeze({ cols: 14, rows: 10, duration: 90, wallLimit: 12, wallCost: 1, moveMs: 500, redMin: 14, redMax: 18, yellowMin: 8, yellowMax: 13, greenMin: 3, greenMax: 7, rewardMin: 3, rewardMax: 18 });
 export const LIMITS = { cols: [10, 28], rows: [8, 18], duration: [5, 120], wallLimit: [0, 30], wallCost: [0, 20], moveMs: [100, 1200], redMin: [1, 50], redMax: [1, 50], yellowMin: [1, 50], yellowMax: [1, 50], greenMin: [1, 50], greenMax: [1, 50], rewardMin: [1, 50], rewardMax: [1, 50] };
 export const DIRS = [[1, 0], [0, 1], [-1, 0], [0, -1]];
 export const edge = (a, b) => a < b ? `${a}:${b}` : `${b}:${a}`;
@@ -35,11 +35,14 @@ export function createMaze(settings = {}, seed = 260830) {
   // A few loops offer choices without losing the character of a carved maze.
   const closed = [...s.base];
   for (let i = 0; i < Math.floor(count / 32); i++) s.base.delete(closed.splice(Math.floor(random() * closed.length), 1)[0]);
-  const cells = Array.from({ length: count }, (_, i) => i).filter(i => i !== s.avatar && i !== s.goal);
   const roll = (lo, hi) => Math.min(lo, hi) + Math.floor(random() * (Math.abs(hi - lo) + 1));
+  // One item per zone of a 4×3 grid keeps them spread evenly, so no item is far from the next;
+  // none sits within two steps of the start, where the child would grab it instantly.
   for (let i = 0; i < 12; i++) {
-    const category = ['green', 'yellow', 'red'][i % 3];
-    const cell = cells.splice(Math.floor(random() * cells.length), 1)[0];
+    const category = ['green', 'yellow', 'red'][i % 3], zx = i % 4, zy = Math.floor(i / 4), cells = [];
+    for (let y = Math.floor(zy * config.rows / 3); y < Math.floor((zy + 1) * config.rows / 3); y++)
+      for (let x = Math.floor(zx * config.cols / 4); x < Math.floor((zx + 1) * config.cols / 4); x++) { const n = y * config.cols + x; if (n !== s.goal && x + (config.rows - 1 - y) > 2) cells.push(n); }
+    const cell = cells[Math.floor(random() * cells.length)];
     s.items.push({ cell, category, risk: roll(config[category + 'Min'], config[category + 'Max']), reward: roll(config.rewardMin, config.rewardMax), taken: false });
   }
   s.trail.push(s.avatar);
