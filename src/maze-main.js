@@ -34,7 +34,7 @@ ${['parent', 'child'].map(role => `<section class="board-card ${role}"><div clas
 <dialog id="help"><h2>遊び方</h2><p>親は100点から。子どもがアイテムを取ると、隠れたリスク分だけ親の点が減り、子どもは報酬を得ます。</p><p>親は通路に壁を置けます。壁1枚ごとに親は設定したコスト、子どもは1点を失うので、アイテムを取る前でも子どもの点はマイナスになることがあります。道がふさがると、子どもだけの秘密の通路が開きます。</p><p>矢印キー/WASDで操作。親はTabで向き、Spaceで設置。Escで一時停止。Fで全画面。</p><p class="pad-help"><b>🎮 PS5コントローラー</b><br>方向キー/左スティック 移動・位置選択 · × 壁を置く · 右スティック/○ 壁の向き · OPTIONS スタート/一時停止 · CREATE リセット · L1/R1 モード切替 · □ 設定 · △ 全画面</p><button id="help-close" class="primary">OK</button></dialog>`;
 
 const $ = id => document.getElementById(id);
-let game = createMaze(), cursor = game.avatar, direction = 0, seed = 260830, keys = new Set(), last = 0, uiClock = 0, resultShown = false;
+let game = createMaze(), cursor = game.avatar, direction = 0, seed = 260830, keys = new Set(), last = 0, uiClock = 0, resultShown = false, lastPhase = null;
 const keyDirection = { ArrowRight: 0, d: 0, ArrowDown: 1, s: 1, ArrowLeft: 2, a: 2, ArrowUp: 3, w: 3 };
 const descriptions = { parent: '壁を置いて子どもCPUを導こう', child: 'アイテムを集めよう', cpu: 'CPU同士を観察' };
 function showLobby(on) { $('lobby').hidden = !on; document.querySelector('.workspace').hidden = on; if (on) lobbySummary(); }
@@ -62,7 +62,7 @@ function readyPrompt() {
   $('ready-eyebrow').textContent = `${paused ? 'ひと休み中' : `第${match.leg}ラウンド / 全2ラウンド`} · ${partnerLine}`;
   $('ready-title').textContent = game.mode === 'parent' ? 'あなたは親です。' : 'あなたは子どもです。';
   $('ready-note').textContent = network.state.reason || '二人とも準備完了を押すと始まります。';
-  if (!$('ready').open) { $('ready').showModal(); if (paused) tutorial.stop(); else tutorial.start(game.mode, game.settings); }
+  if (!$('ready').open) { $('ready').showModal(); if (paused) tutorial.stop(); else { tutorial.start(game.mode, game.settings); setImmersive(true); } }
   // The briefing is the whole prompt until it is closed or finished; its last step confirms.
   const briefing = !paused && !ready && tutorial.running;
   $('ready').classList.toggle('briefing', briefing);
@@ -127,6 +127,9 @@ window.addEventListener('keyup', event => keys.delete(event.key));
 function suspend() { keys.clear(); if (game.phase === 'playing') { if (network.active) network.send({ type: 'pause' }); else game.phase = 'paused'; update(); } }
 window.addEventListener('blur', suspend); document.addEventListener('visibilitychange', () => { if (document.hidden) suspend(); });
 function update() {
+  // Playing defaults to fullscreen; leaving 'playing' does not force it back off (the user may toggle it off mid-round).
+  if (game.phase === 'playing' && lastPhase !== 'playing') setImmersive(true);
+  lastPhase = game.phase;
   document.querySelector('.mode-group').hidden = network.active; $('reset').hidden = network.active;
   const editable = !network.active || network.state?.host && game.phase === 'ready';
   document.querySelectorAll('#settings input, #settings button').forEach(b => b.disabled = !editable);
