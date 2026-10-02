@@ -24,10 +24,9 @@ npm run deploy
 ## 상태와 비용
 
 - 방 상태, 난수 상태, 점수, 참가 토큰을 Durable Objects의 SQLite에 저장합니다. 연결이 끊기면 일시정지하고 같은 브라우저의 참여 정보를 이용해 복귀합니다.
-- WebSocket Hibernation API를 사용합니다. CPU 없는 2인 게임은 입력 시 상태를 갱신하고, 진행 중에는 약 1초 간격의 alarm으로 시간을 동기화합니다. 대기 중 상시 타이머는 없습니다.
+- WebSocket Hibernation API를 사용합니다. CPU 없는 2인 게임은 입력 시 상태를 갱신하고, 진행 중에는 약 1초 간격의 alarm으로 시간을 동기화합니다. 3초 카운트다운 동안에는 100ms 간격으로 상태를 확인하며, 카운트다운은 게임 제한 시간에 포함되지 않습니다. 대기 중 상시 타이머는 없습니다.
 - 마지막 활동 이후 24시간이 지나면 방 데이터와 연결을 정리합니다. 만료된 방은 새로 만들어 주세요.
 - SQLite 기반 Durable Objects는 Workers Free에서도 지원됩니다. 무료 사용량 한도를 넘으면 해당 작업이 실패하며, 유료 플랜 계정은 해당 플랜의 과금 규칙을 따릅니다. 이 배포 과정에서 플랜 변경은 하지 않습니다.
-- 공개 Workers 배포는 새 미로 게임을 제공합니다. 이전 바다 프로토타입은 Node 로컬 서버의 `/?online=1`에 남아 있습니다.
 
 공식 안내: https://developers.cloudflare.com/durable-objects/platform/pricing/
 

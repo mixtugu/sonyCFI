@@ -52,10 +52,10 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
 <div class="practice-feedback" role="status" aria-live="polite"></div></div>
 <div class="briefing-copy"><div class="briefing-count"></div><h3 class="briefing-title"></h3><p class="briefing-description"></p><div class="briefing-controls"></div></div>
 </div>
-<div class="briefing-footer"><button type="button" class="secondary briefing-previous">戻る</button><div class="briefing-nav"><button type="button" class="secondary briefing-next">次へ</button><button type="button" class="primary briefing-launch" hidden>準備完了</button></div></div>`;
+<div class="briefing-footer"><button type="button" class="secondary briefing-previous">戻る</button><div class="briefing-nav"><button type="button" class="secondary briefing-next">次へ</button><button type="button" class="primary briefing-launch" hidden>確認して待機へ</button></div></div>`;
   const find = selector => container.querySelector(selector);
-  const art = find('.briefing-art'), board = find('.briefing-board'), feedback = find('.practice-feedback'), controls = find('.briefing-controls');
-  let running = false, role = 'parent', settings = {}, step = 0, keyTimer = 0;
+  const art = find('.briefing-art'), board = find('.briefing-board'), feedback = find('.practice-feedback'), controls = find('.briefing-controls'), layout = find('.briefing-layout');
+  let running = false, role = 'parent', settings = {}, step = 0, keyTimer = 0, shownStep = -1, loop = 0, painted = 0;
   const practice = { cursor: { x: 2, y: 2 }, direction: 1, child: { x: 0, y: 3 }, placed: new Set(), fixed: new Set(FIXED_WALLS), passages: new Set(PASSAGES), feedback: '' };
 
   const parent = () => role === 'parent';
@@ -69,9 +69,18 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
     role = nextRole === 'parent' ? 'parent' : 'child'; settings = nextSettings; step = 0; running = true;
     practice.cursor = { x: 2, y: 2 }; practice.direction = 1; practice.child = { x: 0, y: 3 }; practice.placed.clear();
     practice.feedback = parent() ? '矢印キーでカーソルを動かしてみましょう' : '矢印キーで子どもを1マス動かしてみましょう';
+    shownStep = -1;
     update();
     // Keys go to the practice board rather than to whichever button the dialog focused first.
     art.focus({ preventScroll: true });
+    cancelAnimationFrame(loop); loop = requestAnimationFrame(tick);
+  }
+  // Water on the practice board keeps moving while the briefing is on screen.
+  function tick(now) {
+    loop = 0;
+    if (!running) return;
+    if (now - painted > 33 && container.offsetParent !== null) { painted = now; paint(); }
+    loop = requestAnimationFrame(tick);
   }
   function stop() { running = false; }
   function close() { if (!running) return; running = false; onClose?.(); }
@@ -98,6 +107,11 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
     find('.briefing-previous').disabled = step === 0;
     find('.briefing-next').hidden = last();
     find('.briefing-launch').hidden = !last();
+    if (shownStep !== step) {
+      layout.dataset.dir = step < shownStep ? 'prev' : 'next';
+      layout.classList.remove('is-entering'); void layout.offsetWidth; layout.classList.add('is-entering');
+      shownStep = step;
+    }
     onStep?.(step, last());
     drawBoard();
   }
@@ -108,8 +122,7 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
     return practice.fixed.has(e) || practice.placed.has(e);
   }
   // Share the round renderer, including its role-specific symbols and colors.
-  function drawBoard() {
-    const interactive = cursorStep() || moveStep();
+  function paint() {
     const scoreExample = parent() && step === 1;
     const avatar = practice.child.y * COLS + practice.child.x;
     const convertEdges = edges => new Set([...edges].map(value => {
@@ -133,7 +146,12 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
         { cell: 3, category: 'yellow', taken: false },
         { cell: 13, category: 'green', taken: false },
       ],
-    }, role, practice.cursor.y * COLS + practice.cursor.x, (practice.direction + 3) % 4);
+    }, role, practice.cursor.y * COLS + practice.cursor.x, (practice.direction + 3) % 4, { ambient: performance.now() / 1000 });
+  }
+  function drawBoard() {
+    const interactive = cursorStep() || moveStep();
+    const scoreExample = parent() && step === 1;
+    paint();
     board.classList.toggle('is-visible', interactive);
     find('.briefing-example').textContent = interactive ? '練習' : '表示例';
     const oxygen = find('.briefing-oxygen');

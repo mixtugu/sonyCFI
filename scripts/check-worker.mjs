@@ -24,12 +24,15 @@ try {
   await expect(child.locator('#maze-role')).toHaveText('子ども役');
   await expect(parent.locator('#board-child')).toBeHidden(); await expect(child.locator('#board-parent')).toBeHidden();
   await expect(parent.locator('#ready-title')).toHaveText('あなたは親です。'); await expect(child.locator('#ready-title')).toHaveText('あなたは子どもです。');
-  for (const page of [parent, child]) { await page.locator('.briefing-close').click(); await page.locator('#ready-start').click(); }
+  const prepare = async page => { await page.locator('.briefing-next').click(); await page.locator('.briefing-next').click(); await page.locator('.briefing-launch').click(); await page.locator('#ready-start').click(); };
+  const countdown = async () => { for (const n of ['3', '2', '1']) { await expect(parent.locator('#countdown-number')).toHaveText(n); await expect(child.locator('#countdown-number')).toHaveText(n); assert.equal(await parent.evaluate(() => window.packet.game.time), 0); } };
+  for (const page of [parent, child]) await prepare(page);
+  await countdown();
   await expect(parent.locator('#phase')).toHaveText('探検中');
   const initial = await child.evaluate(() => window.packet.game);
   const direction = [0, 1, 2, 3].find(d => { const b = neighbor(initial, initial.avatar, d); return b >= 0 && !initial.base.includes(edge(initial.avatar, b)); });
-  await child.locator(`[data-dir="${direction}"]`).click();
-  await expect.poll(() => parent.evaluate(() => window.packet.game.avatar)).not.toBe(initial.avatar);
+  const key = ['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'][direction];
+  await child.keyboard.down(key); await expect.poll(() => parent.evaluate(() => window.packet.game.avatar)).not.toBe(initial.avatar); await child.keyboard.up(key);
   const g = await parent.evaluate(() => window.packet.game);
   for (let cell = 0; cell < g.settings.cols * g.settings.rows; cell++) {
     const b = neighbor(g, cell, 0); if (b < 0 || g.base.includes(edge(cell, b))) continue;
@@ -42,14 +45,27 @@ try {
   await child.reload(); await expect(child.locator('#maze-role')).toHaveText('子ども役'); await expect(parent.locator('#phase')).toHaveText('ひと休み中');
   await expect(parent.locator('#detail-parent')).toHaveText('1 / 12');
   await parent.locator('#ready-start').click(); await child.locator('#ready-start').click();
-  await expect(parent.locator('#result')).toBeVisible({ timeout: 15000 }); await expect(child.locator('#result')).toBeVisible();
-  await parent.locator('#again').click(); await child.locator('#again').click(); await expect(parent.locator('#phase')).toHaveText('開始前');
+  await expect(parent.locator('.briefing-title')).toHaveText('移動してアイテムを探し、報酬を獲得', { timeout: 18000 });
+  await expect(child.locator('.briefing-title')).toHaveText('壁を立てて子どもを守る');
+  await expect(parent.locator('#result')).toBeHidden();
+  assert.equal(await parent.evaluate(() => window.packet.match.leg), 2);
+  assert.equal(await parent.evaluate(() => window.packet.tutorialComplete), false);
+  for (const page of [parent, child]) await prepare(page);
+  await countdown();
+  await expect(parent.locator('#phase')).toHaveText('探検中');
+  await expect(parent.locator('#result')).toBeVisible({ timeout: 15000 });
+  await expect(parent.locator('#result-rounds')).toContainText('第2ラウンド');
+  await expect(parent.locator('body')).toHaveAttribute('data-ocean-phase', 'summary');
   await mkdir('artifacts', { recursive: true }); await parent.screenshot({ path: 'artifacts/worker-parent.png', fullPage: true });
+  await child.evaluate(async () => { if (document.fullscreenElement) await document.exitFullscreen(); });
   await child.setViewportSize({ width: 390, height: 844 }); await child.screenshot({ path: 'artifacts/worker-mobile.png', fullPage: true });
   assert.equal(await child.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
-  await child.locator('#ready-settings').click(); await child.locator('#maze-leave').click();
-  await expect(child.locator('#lobby')).toBeVisible(); await expect(parent.locator('#maze-partner')).toHaveText('相手を待っています');
-  await parent.locator('#ready-settings').click(); await parent.locator('#maze-leave').click();
+  const totals = await parent.evaluate(() => window.packet.match);
+  await child.locator('#close-result').click(); await expect(child.locator('#ending')).toBeVisible(); await child.locator('#ending-finish').click();
+  await expect(child.locator('#lobby')).toBeVisible(); await expect(parent.locator('#result')).toBeVisible();
+  assert.deepEqual(await parent.evaluate(() => window.packet.match), totals);
+  await parent.locator('#close-result').click(); await expect(parent.locator('#ending')).toBeVisible();
+  await expect(parent.locator('#lobby')).toBeVisible({ timeout: 6000 });
   assert.deepEqual(errors, []);
-  console.log(`PASS: Workers two-browser room, private state, moves/walls, refresh recovery, timer, replay, mobile, leave (${url})`);
+  console.log(`PASS: Workers two-browser room, private state, moves/walls, refresh recovery, two briefings/countdowns, automatic swap, final report/ending, mobile, independent exits (${url})`);
 } finally { await browser.close(); }

@@ -4,7 +4,6 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { networkInterfaces } from 'node:os';
 import { WebSocketServer } from 'ws';
-import { RoomService } from './rooms.js';
 import { MazeRooms } from './maze-rooms.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -35,13 +34,12 @@ export async function createApp({ dev = false, port = 5173, host = '0.0.0.0' } =
     const { createServer } = await import('vite');
     vite = await createServer({ root, server: { middlewareMode: true, hmr: { server } }, appType: 'spa' });
   }
-  const rooms = new RoomService();
   const mazeRooms = new MazeRooms();
   const wss = new WebSocketServer({ noServer: true, maxPayload: 4096 });
   server.on('upgrade', (req, socket, head) => {
     const endpoint = new URL(req.url, 'http://localhost').pathname;
-    if (!['/socket', '/maze-socket'].includes(endpoint)) { if (!dev) socket.destroy(); return; }
-    wss.handleUpgrade(req, socket, head, ws => { ws.service = endpoint === '/maze-socket' ? mazeRooms : rooms; wss.emit('connection', ws, req); });
+    if (endpoint !== '/maze-socket') { if (!dev) socket.destroy(); return; }
+    wss.handleUpgrade(req, socket, head, ws => { ws.service = mazeRooms; wss.emit('connection', ws, req); });
   });
   wss.on('connection', socket => {
     socket.alive = true;
@@ -55,10 +53,10 @@ export async function createApp({ dev = false, port = 5173, host = '0.0.0.0' } =
     socket.on('close', () => socket.service.disconnect(socket));
     socket.on('error', () => socket.service.disconnect(socket));
   });
-  const ticker = setInterval(() => { rooms.tick(); mazeRooms.tick(); }, 1000 / 30);
+  const ticker = setInterval(() => { mazeRooms.tick(); }, 1000 / 30);
   const heartbeat = setInterval(() => { for (const socket of wss.clients) { if (!socket.alive) { socket.terminate(); continue; } socket.alive = false; socket.ping(); } }, 5000);
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, host, resolve); });
-  return { server, rooms, mazeRooms, port: server.address().port, close: async () => { clearInterval(ticker); clearInterval(heartbeat); for (const s of wss.clients) s.terminate(); wss.close(); await vite?.close(); await new Promise(resolve => server.close(resolve)); } };
+  return { server, mazeRooms, port: server.address().port, close: async () => { clearInterval(ticker); clearInterval(heartbeat); for (const s of wss.clients) s.terminate(); wss.close(); await vite?.close(); await new Promise(resolve => server.close(resolve)); } };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

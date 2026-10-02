@@ -12,7 +12,7 @@ function snapshot(room) {
     members: room.members.map(({ socket, ...m }) => m) };
 }
 function hydrate(saved) {
-  return { ...saved, members: saved.members.map(m => ({ ...m, socket: null })), game: { ...saved.game,
+  return { ...saved, members: saved.members.map(m => ({ tutorialComplete: saved.game.phase !== 'ready', ...m, socket: null })), game: { ...saved.game,
     base: new Set(saved.game.base), walls: new Set(saved.game.walls), secrets: new Set(saved.game.secrets), random: rng(saved.game.randomState) } };
 }
 
@@ -35,25 +35,20 @@ export class MazeRoom extends DurableObject {
       const attachment = ws.deserializeAttachment();
       const adapter = { get readyState() { return ws.readyState; }, send: raw => ws.send(raw), close: (code, reason) => { ws.serializeAttachment({ ...ws.deserializeAttachment(), token: null }); ws.close(code, reason); }, ws };
       adapters.set(ws, adapter);
-      const member = room.members.find(m => m.token === attachment?.token);
+      const member = room.members.find(m => m.token && m.token === attachment?.token);
       if (member) { member.socket = adapter; service.bindings.set(adapter, { room, member }); }
     }
     return { service, outbox, adapters };
   }
   advance(room) {
     const now = Date.now();
-    if (room.game.phase === 'playing') {
-      const elapsed = Math.max(0, (now - room.updatedAt) / 1000);
-      room.game.time = Math.min(room.game.settings.duration, room.game.time + elapsed);
-      room.game.cooldown = Math.max(0, room.game.cooldown - elapsed);
-      if (room.game.time >= room.game.settings.duration) room.game.phase = 'result';
-    }
+    new MazeRooms().advance(room, Math.max(0, (now - (room.updatedAt ?? now)) / 1000));
     room.updatedAt = now;
   }
   async commit(room, outbox = []) {
     // Output is only released after the durable checkpoint succeeds.
     this.ctx.storage.sql.exec('INSERT INTO room_state (id, data) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data', JSON.stringify(snapshot(room)));
-    await this.ctx.storage.setAlarm(room.game.phase === 'playing' ? Date.now() + 1000 : room.touched + TTL);
+    await this.ctx.storage.setAlarm(['playing', 'countdown'].includes(room.game.phase) ? Date.now() + (room.game.phase === 'countdown' ? 100 : 1000) : room.touched + TTL);
     for (const [socket, packet] of outbox) { try { socket.send(JSON.stringify(packet)); } catch { /* Close event handles disconnection. */ } }
   }
   async initialize(code, settings, role) {
@@ -85,7 +80,7 @@ export class MazeRoom extends DurableObject {
     ws.serializeAttachment(attachment);
     const room = this.load(); if (!room) { ws.close(1008, 'Room expired'); return; }
     const { service, outbox, adapters } = this.service(room), adapter = adapters.get(ws);
-    this.advance(room);
+    this.advance(room); service.finish(room);
     // The URL chooses the room; a packet cannot create or jump to another one.
     if (data.type === 'create' || ['join', 'resume'].includes(data.type) && data.code?.toUpperCase() !== room.code) return;
     service.handle(adapter, data);
@@ -100,12 +95,12 @@ export class MazeRoom extends DurableObject {
     this.advance(room);
     const { service, outbox, adapters } = this.service(room);
     // Closed sockets might already be absent from getWebSockets().
-    const member = room.members.find(m => m.token === ws.deserializeAttachment()?.token);
+    const member = room.members.find(m => m.token && m.token === ws.deserializeAttachment()?.token);
     const adapter = adapters.get(ws);
     if (adapter && service.bindings.has(adapter)) service.disconnect(adapter);
     else if (member && !member.socket) {
       member.ready = false; member.again = false; room.touched = Date.now();
-      if (room.game.phase === 'playing') service.pause(room, '相手との接続が切れました。再接続を待っています。');
+      if (['playing', 'countdown'].includes(room.game.phase)) service.pause(room, '相手との接続が切れました。再接続を待っています。');
     }
     service.broadcast(room); await this.commit(room, outbox);
   }
@@ -150,8 +145,6 @@ export default {
       if (!/^[A-F0-9]{6}$/.test(code || '')) return json({ error: 'Invalid room code' }, 400);
       return env.MAZE_ROOMS.getByName(code).fetch(request);
     }
-    // The legacy Node-only sea prototype remains available in local development.
-    if (url.pathname === '/socket' || url.searchParams.has('online') || url.searchParams.has('room')) return Response.redirect(url.origin, 302);
     return env.ASSETS.fetch(request);
   }
 };
