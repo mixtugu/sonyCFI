@@ -1,5 +1,5 @@
 import { randomBytes, randomInt } from 'node:crypto';
-import { createMaze, start, tick, move, placeWall } from '../src/maze.js';
+import { createMaze, move, placeWall } from '../src/maze.js';
 
 export class MazeRooms {
   constructor() { this.rooms = new Map(); this.bindings = new Map(); }
@@ -7,7 +7,7 @@ export class MazeRooms {
   error(socket, message, code = 'invalid') { this.send(socket, { type: 'error', message, code }); }
   add(room, role, socket) {
     // `seat` is the role this member opens a match with; `role` alternates between the two legs.
-    const member = { role, seat: role, socket, token: randomBytes(24).toString('hex'), ready: false, again: false };
+    const member = { role, seat: role, socket, token: randomBytes(24).toString('hex'), ready: false, tutorialComplete: false, again: false };
     room.members.push(member); this.bindings.set(socket, { room, member }); this.session(room, member); this.broadcast(room);
   }
   session(room, member) { this.send(member.socket, { type: 'session', code: room.code, token: member.token }); }
@@ -16,10 +16,31 @@ export class MazeRooms {
     room.game = createMaze(settings, randomInt(0x7fffffff)); room.game.mode = 'duo'; room.round++;
     if (next) { room.leg = 2; room.members.forEach(m => { m.role = m.role === 'parent' ? 'child' : 'parent'; }); }
     else { room.leg = 1; room.results = []; room.members.forEach(m => { m.role = m.seat; }); }
-    room.members.forEach(m => { m.ready = false; m.again = false; });
-    room.reason = next ? '役割を交代しました。二人とも準備完了を押すと始まります。' : '二人とも準備完了を押すと始まります。';
+    room.members.forEach(m => { m.ready = false; m.tutorialComplete = false; m.again = false; });
+    room.countdown = 0;
+    room.reason = next ? '役割を交代しました。新しい役割のチュートリアルを確認し、二人とも準備完了を押すと3秒後に始まります。' : 'チュートリアルを確認し、二人とも準備完了を押すと3秒後に始まります。';
   }
-  finish(room) { if (room.game.phase === 'result') room.results[room.leg - 1] = { parent: room.game.parentScore, child: room.game.childScore }; }
+  finish(room) {
+    if (room.game.phase !== 'result') return;
+    room.results[room.leg - 1] = { parent: room.game.parentScore, child: room.game.childScore };
+    // Only the completed match has a results screen. The first leg goes straight to a new briefing.
+    if (room.leg === 1) this.reset(room, undefined, true);
+  }
+  advance(room, elapsed) {
+    if (room.game.phase === 'countdown') {
+      const remaining = Math.max(0, room.countdown - elapsed);
+      elapsed = Math.max(0, elapsed - room.countdown); room.countdown = remaining;
+      if (remaining > 1e-9) return;
+      room.countdown = 0; room.game.phase = 'playing';
+    }
+    if (room.game.phase === 'playing' && elapsed > 0) {
+      // Duo rooms have no CPU simulation; consume the complete wall-clock delta (also after Worker hibernation).
+      const g = room.game;
+      g.time = Math.min(g.settings.duration, g.time + elapsed);
+      g.cooldown = Math.max(0, g.cooldown - elapsed);
+      if (g.time >= g.settings.duration) g.phase = 'result';
+    }
+  }
   handle(socket, data) {
     if (!data || typeof data !== 'object') return;
     const binding = this.bindings.get(socket);
@@ -37,7 +58,7 @@ export class MazeRooms {
         this.add(room, room.members[0].role === 'parent' ? 'child' : 'parent', socket); return;
       }
       if (data.type === 'resume') {
-        const member = room.members.find(m => m.token === data.token);
+        const member = room.members.find(m => m.token && m.token === data.token);
         if (!member) return this.error(socket, '参加情報の有効期限が切れました。参加し直してください。', 'missing');
         if (member.socket) { this.bindings.delete(member.socket); member.socket.close(4001, 'replaced'); }
         member.socket = socket; this.bindings.set(socket, { room, member }); this.session(room, member); this.broadcast(room); return;
@@ -46,18 +67,27 @@ export class MazeRooms {
     }
     const { room, member } = binding, g = room.game; room.touched = Date.now();
     if (data.type === 'leave') {
-      this.bindings.delete(socket); room.members = room.members.filter(m => m !== member); this.reset(room);
+      this.bindings.delete(socket);
+      if (g.phase === 'result' && room.leg === 2) {
+        // Keep both scores readable for the partner who is still reviewing the match.
+        member.socket = null; member.token = null; member.ready = false; member.again = false;
+      } else { room.members = room.members.filter(m => m !== member); this.reset(room); }
       this.send(socket, { type: 'left' }); this.broadcast(room); return;
     }
-    if (data.type === 'ready' && ['ready', 'paused'].includes(g.phase)) {
+    if (data.type === 'tutorial' && g.phase === 'ready') {
+      member.tutorialComplete = true;
+    } else if (data.type === 'ready' && ['ready', 'paused'].includes(g.phase)) {
+      if (!member.tutorialComplete) return this.error(socket, 'チュートリアルを最後まで確認してください。', 'tutorial');
       member.ready = true;
-      if (room.members.length === 2 && room.members.every(m => m.ready && m.socket?.readyState === 1)) { start(g); room.reason = ''; }
-    } else if (data.type === 'pause' && g.phase === 'playing') {
+      if (room.members.length === 2 && room.members.every(m => m.tutorialComplete && m.ready && m.socket?.readyState === 1)) {
+        g.phase = 'countdown'; room.countdown = 3; room.reason = '';
+      }
+    } else if (data.type === 'pause' && ['playing', 'countdown'].includes(g.phase)) {
       this.pause(room, 'ひと休み中です。二人とも準備ができたら再開します。');
     } else if (data.type === 'again' && g.phase === 'result') {
-      // After the first leg both sides swap; after the second the match restarts from the seats.
+      // A completed match restarts only after both players ask to play again.
       member.again = true; if (room.members.length === 2 && room.members.every(m => m.again && m.socket?.readyState === 1)) this.reset(room, undefined, room.leg === 1);
-    } else if (data.type === 'settings' && g.phase === 'ready' && member === room.members[0]) {
+    } else if (data.type === 'settings' && g.phase === 'ready' && room.leg === 1 && member === room.members[0]) {
       this.reset(room, data.settings);
     } else if (data.type === 'move' && g.phase === 'playing') {
       if (member.role !== 'child') return this.error(socket, '子ども役だけが移動できます。', 'role');
@@ -69,11 +99,11 @@ export class MazeRooms {
     }
     this.broadcast(room);
   }
-  pause(room, reason) { room.game.phase = 'paused'; room.reason = reason; room.members.forEach(m => m.ready = false); }
+  pause(room, reason) { room.game.phase = 'paused'; room.countdown = 0; room.reason = reason; room.members.forEach(m => m.ready = false); }
   disconnect(socket) {
     const binding = this.bindings.get(socket); if (!binding) return;
     this.bindings.delete(socket); const { room, member } = binding; member.socket = null; member.ready = false; member.again = false; room.touched = Date.now();
-    if (room.game.phase === 'playing') this.pause(room, '相手との接続が切れたため探検を停止しました。再接続を待っています。');
+    if (['playing', 'countdown'].includes(room.game.phase)) this.pause(room, '相手との接続が切れたため探検を停止しました。再接続を待っています。');
     this.broadcast(room);
   }
   total(room, member) {
@@ -84,9 +114,9 @@ export class MazeRooms {
     const g = room.game, review = g.phase === 'result', parent = member.role === 'parent';
     const partner = room.members.find(m => m !== member);
     // Only send public state plus this role's information; never send the seed or hidden item values.
-    return { type: 'state', code: room.code, round: room.round, role: member.role, host: member === room.members[0], ready: member.ready, again: member.again,
+    return { type: 'state', code: room.code, round: room.round, role: member.role, host: member === room.members[0], ready: member.ready, tutorialComplete: !!member.tutorialComplete, countdown: Math.ceil(room.countdown || 0), again: member.again,
       match: { leg: room.leg, done: review && room.leg === 2, results: room.results, you: this.total(room, member), partner: partner ? this.total(room, partner) : 0 },
-      partner: { connected: room.members.some(m => m !== member && m.socket?.readyState === 1), ready: room.members.some(m => m !== member && m.ready), again: room.members.some(m => m !== member && m.again) }, reason: room.reason,
+      partner: { connected: room.members.some(m => m !== member && m.socket?.readyState === 1), ready: room.members.some(m => m !== member && m.ready), tutorialComplete: room.members.some(m => m !== member && m.tutorialComplete), again: room.members.some(m => m !== member && m.again) }, reason: room.reason,
       game: { settings: g.settings, phase: g.phase, time: g.time, avatar: g.avatar, goal: parent || review ? g.goal : null,
         base: [...g.base], walls: [...g.walls], secrets: !parent || review ? [...g.secrets] : [],
         items: g.items.map(i => ({ cell: i.cell, taken: i.taken, ...(i.taken && (parent || review) ? { category: i.category, risk: i.risk } : {}), ...(i.taken && (!parent || review) ? { reward: i.reward } : {}) })),
@@ -97,7 +127,7 @@ export class MazeRooms {
   tick(dt = 1 / 30) {
     for (const [code, room] of this.rooms) {
       if (!room.members.some(m => m.socket?.readyState === 1) && Date.now() - room.touched > 120_000) { this.rooms.delete(code); continue; }
-      if (room.game.phase === 'playing') { tick(room.game, dt); this.broadcast(room); }
+      if (['playing', 'countdown'].includes(room.game.phase)) { this.advance(room, dt); this.broadcast(room); }
     }
   }
 }

@@ -17,6 +17,18 @@ try {
   await expect(parent.locator('#lobby')).toBeHidden(); await expect(parent.locator('.workspace')).toBeVisible();
   await expect(parent.locator('#maze-code')).toHaveText(/^[A-F0-9]{6}$/);
   const code = await parent.locator('#maze-code').innerText(), room = app.mazeRooms.rooms.get(code);
+  // An open dialog may still be behind the fullscreen root. Test actual hit visibility
+  // before a partner joins or any other click happens to re-open/promote a dialog.
+  await expect(parent.locator('body')).toHaveClass(/immersive/);
+  await expect.poll(() => parent.evaluate(() => !!document.fullscreenElement)).toBe(true);
+  await expect(parent.locator('.briefing-title')).toHaveText('壁を立てて子どもを守る');
+  await expect.poll(() => parent.evaluate(() => {
+    const dialog = document.getElementById('ready'), title = dialog.querySelector('.briefing-title');
+    const rect = title.getBoundingClientRect();
+    return dialog.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2));
+  })).toBe(true);
+  await parent.screenshot({ path: 'artifacts/room-created.png' });
+
   await expect(parent.locator('#room-chip-code')).toHaveText(code);
   await child.goto(`${url}/?maze=${code}`); await expect(child.locator('#maze-join button')).toBeEnabled(); await child.locator('#maze-join button').click();
   await expect(child.locator('#maze-role')).toHaveText('子ども役'); await expect(child.locator('#lobby')).toBeHidden();
@@ -44,14 +56,18 @@ try {
   await parent.locator('.briefing-next').click(); await parent.locator('.briefing-next').click();
   await expect(parent.locator('.briefing-count')).toHaveText('03 / 03');
   await expect(parent.locator('.briefing-board')).toBeHidden(); await expect(parent.locator('.briefing-next')).toBeHidden();
-  // The last step confirms; closing the briefing instead leaves the plain ready button.
-  await parent.locator('.briefing-launch').click(); await expect(parent.locator('#ready-start')).toHaveText('相手の準備を待っています');
+  // Tutorial confirmation and ready are separate steps; closing early cannot skip confirmation.
+  await parent.locator('.briefing-launch').click(); await expect(parent.locator('#ready-start')).toBeEnabled(); await parent.locator('#ready-start').click(); await expect(parent.locator('#ready-start')).toHaveText('相手の準備を待っています');
   await expect(parent.locator('#phase')).toHaveText('開始前');
-  await child.keyboard.press('Escape'); await expect(child.locator('#ready-tutorial')).toBeHidden(); await child.locator('#ready-start').click();
+  await child.keyboard.press('Escape'); await expect(child.locator('#ready-tutorial')).toBeHidden(); await expect(child.locator('#ready-start')).toBeDisabled();
+  await child.locator('#ready-review').click(); await child.locator('.briefing-next').click(); await child.locator('.briefing-next').click(); await child.locator('.briefing-launch').click(); await child.locator('#ready-start').click();
+  for (const n of ['3', '2', '1']) { await expect(parent.locator('#countdown-number')).toHaveText(n); await expect(child.locator('#countdown-number')).toHaveText(n); assert.equal(room.game.time, 0); }
+  await expect(parent.locator('#countdown')).toBeHidden();
   await expect(parent.locator('#phase')).toHaveText('探検中'); await expect(child.locator('#phase')).toHaveText('探検中');
   await expect(parent.locator('#ready')).toBeHidden();
   const pos = room.game.avatar, dir = autoDirection(room.game);
-  await child.locator(`[data-dir="${dir}"]`).click(); await expect.poll(() => room.game.avatar).not.toBe(pos);
+  const movementKey = ['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'][dir];
+  await child.keyboard.down(movementKey); await expect.poll(() => room.game.avatar).not.toBe(pos); await child.keyboard.up(movementKey);
   for (let cell = 0; cell < 240; cell++) { const b = neighbor(room.game, cell, 0); if (b >= 0 && !room.game.base.has(edge(cell, b))) {
     const canvas = parent.locator('#board-parent'); await canvas.scrollIntoViewIfNeeded(); const box = await canvas.boundingBox();
     const { cols, rows } = room.game.settings; await parent.mouse.click(box.x + ((cell % cols + 1) * 36 + 13) / (cols * 36 + 28) * box.width, box.y + ((Math.floor(cell / cols) + .5) * 36 + 14) / (rows * 36 + 28) * box.height); break;
@@ -60,33 +76,35 @@ try {
   await child.reload(); await expect(parent.locator('#phase')).toHaveText('ひと休み中'); await expect(child.locator('#maze-role')).toHaveText('子ども役');
   await parent.locator('#ready-start').click(); await child.locator('#ready-start').click(); await expect(child.locator('#phase')).toHaveText('探検中');
   room.game.time = room.game.settings.duration - .01;
-  await expect(parent.locator('#result')).toBeVisible(); await expect(child.locator('#result')).toBeVisible();
-  // The first leg only leads on to the second: no way to dismiss it, no final scores yet.
-  await expect(parent.locator('#result-title')).toHaveText('第1ラウンド終了');
-  await expect(parent.locator('#close-result')).toBeHidden(); await expect(parent.locator('#result-rounds')).toBeHidden();
-  await expect(parent.locator('#again')).toHaveText('交代して第2ラウンドへ');
-  await parent.locator('#again').click(); await child.locator('#again').click(); await expect(parent.locator('#phase')).toHaveText('開始前');
-  // Both sides asked for another round, so the roles are exchanged and each board follows.
+  await expect(parent.locator('#phase')).toHaveText('開始前');
+  await expect(parent.locator('#result')).toBeHidden(); await expect(child.locator('#result')).toBeHidden();
+  assert.equal(room.leg, 2); assert.equal(room.results.length, 1);
+  await expect(parent.locator('body')).toHaveAttribute('data-ocean-phase', 'ready');
+  // The first round automatically changes both roles and reopens their new tutorials.
   await expect(parent.locator('#maze-role')).toHaveText('子ども役'); await expect(child.locator('#maze-role')).toHaveText('親役');
   await expect(parent.locator('#board-child')).toBeVisible(); await expect(child.locator('#board-parent')).toBeVisible();
   await expect(parent.locator('#ready-title')).toHaveText('あなたは子どもです。');
   await expect(parent.locator('.briefing-title')).toHaveText('移動してアイテムを探し、報酬を獲得');   // the briefing follows the new role
   // The second leg ends the match: totals for both people and a fresh start.
-  for (const page of [parent, child]) { await page.locator('.briefing-close').click(); await page.locator('#ready-start').click(); } await expect(parent.locator('#phase')).toHaveText('探検中');
+  for (const page of [parent, child]) { await page.locator('.briefing-next').click(); await page.locator('.briefing-next').click(); await page.locator('.briefing-launch').click(); await page.locator('#ready-start').click(); }
+  for (const n of ['3', '2', '1']) { await expect(parent.locator('#countdown-number')).toHaveText(n); await expect(child.locator('#countdown-number')).toHaveText(n); assert.equal(room.game.time, 0); }
+  await expect(parent.locator('#phase')).toHaveText('探検中');
   room.game.time = room.game.settings.duration - .01;
   await expect(parent.locator('#result-title')).toHaveText('ふたりの探検が終わりました');
   await expect(parent.locator('#result-label-a')).toHaveText('あなた'); await expect(parent.locator('#result-rounds')).toContainText('第2ラウンド');
   await expect(parent.locator('#swap-note')).toBeHidden(); await expect(parent.locator('#again')).toHaveText('もう一度あそぶ');
   const totals = await parent.evaluate(() => [+document.getElementById('final-parent').textContent, +document.getElementById('final-child').textContent]);
   assert.equal(totals[0] + totals[1], room.results.reduce((sum, leg) => sum + leg.parent + leg.child, 0), 'totals cover both rounds');
-  await parent.locator('#again').click(); await child.locator('#again').click();
-  await expect(parent.locator('#maze-role')).toHaveText('親役'); await expect(child.locator('#maze-role')).toHaveText('子ども役');
+  await expect(parent.locator('body')).toHaveAttribute('data-ocean-phase', 'summary');
+  await parent.locator('#close-result').click(); await expect(parent.locator('#ending')).toBeVisible();
+  await expect(parent.locator('body')).toHaveAttribute('data-ocean-phase', 'ending');
+  await parent.screenshot({ path: 'artifacts/maze-ending.png' });
+  await expect(parent.locator('#lobby')).toBeVisible({ timeout: 6000 });
+  await expect(child.locator('#result')).toBeVisible();
+  await expect(child.locator('#result-rounds')).toContainText('第2ラウンド');
+  await child.locator('#close-result').click(); await child.locator('#ending-finish').click();
+  await expect(child.locator('#lobby')).toBeVisible(); await expect(child.locator('body')).not.toHaveClass(/immersive/);
   await child.setViewportSize({ width: 390, height: 844 });
   assert.equal(await child.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
-  await child.screenshot({ path: 'artifacts/maze-two-player-mobile.png', fullPage: true });
-  await parent.screenshot({ path: 'artifacts/maze-two-player-parent.png', fullPage: true });
-  // The ready prompt is modal, so its own settings button is the way into the room panel.
-  await child.locator('#ready-settings').click(); await child.locator('#maze-leave').click();
-  await expect(child.locator('#lobby')).toBeVisible(); await expect(parent.locator('#maze-partner')).toHaveText('相手を待っています');
-  assert.deepEqual(errors, []); console.log('PASS: two browsers, private views, ready, human movement/walls, reconnect, joint result/restart, mobile and leave.');
+  assert.deepEqual(errors, []); console.log('PASS: two browsers, private views, ready, human movement/walls, reconnect, two confirmed briefings, synchronized countdowns, automatic role swap, final report, ending and independent exits.');
 } finally { await browser?.close(); await app.close(); }

@@ -1,8 +1,14 @@
-const params = new URLSearchParams(location.search);
-if (params.has('online') || params.has('room')) {
-  document.documentElement.lang = 'ja';
-  document.title = 'ふたりのあいだの海 — Between Tides';
-  await import('./main.js');
-} else {
-  await import('./maze-main.js');
-}
+import { createOceanPresentation } from './ocean-presentation.js';
+export const ocean = createOceanPresentation();
+const onPhase = event => ocean.setPhase(event.detail);
+const onPulse = () => ocean.pulse();
+const onOxygen = event => ocean.setOxygen(event.detail);
+window.addEventListener('ocean-phase', onPhase);
+window.addEventListener('ocean-pulse', onPulse);
+window.addEventListener('ocean-oxygen', onOxygen);
+await import('./maze-main.js');
+
+if (import.meta.hot) import.meta.hot.dispose(() => {
+  ocean.destroy();
+  window.removeEventListener('ocean-phase', onPhase); window.removeEventListener('ocean-pulse', onPulse); window.removeEventListener('ocean-oxygen', onOxygen);
+});

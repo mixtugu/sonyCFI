@@ -56,10 +56,7 @@ export function connectMaze({ settings, onState, onLeave, notice }) {
   fetch('/connection-info').then(r => r.json()).then(data => {
     durable = !!data.durable;
     if (['localhost', '127.0.0.1', '[::1]'].includes(location.hostname) && data.lan?.[0]) shareOrigin = data.lan[0]; link();
-    if (durable) {
-      document.querySelectorAll('a[href="?online=1"]').forEach(a => { a.hidden = true; });
-      if (!ticket) { client.connected = true; connection(); return; }
-    }
+    if (durable && !ticket) { client.connected = true; connection(); return; }
     connect();
   }).catch(() => connect());
   return client;

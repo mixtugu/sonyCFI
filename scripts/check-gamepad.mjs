@@ -15,7 +15,7 @@ const fakePad = () => {
 const app = await createApp({ port: 0, host: '127.0.0.1' });
 let browser;
 try {
-  browser = await chromium.launch(); const page = await browser.newPage(); const errors = []; page.on('pageerror', e => errors.push(e.message));
+  browser = await chromium.launch(); const page = await browser.newPage({ reducedMotion: 'reduce' }); const errors = []; page.on('pageerror', e => errors.push(e.message));
   await page.addInitScript(fakePad); await page.goto(`http://127.0.0.1:${app.server.address().port}/test`);
   const press = async (buttons, axes) => { await page.evaluate(([b, a]) => { window.__pad = { buttons: b, axes: a }; }, [buttons, axes]); await page.waitForTimeout(120); await page.evaluate(() => { window.__pad = { buttons: [] }; }); await page.waitForTimeout(120); };
   await press([]); await expect(page.locator('#pad-status')).toBeVisible();
@@ -43,7 +43,8 @@ try {
   }
   await page.evaluate(() => { window.__pad = { buttons: [] }; });
   assert.ok(moved, 'child moved with the stick');
-  await press([3]); await expect(page.locator('body')).toHaveClass(/immersive/); await press([3]); await expect(page.locator('body')).not.toHaveClass(/immersive/); // △ fullscreen
+  await expect(page.locator('body')).toHaveClass(/immersive/);
+  await press([3]); await expect(page.locator('body')).not.toHaveClass(/immersive/); await press([3]); await expect(page.locator('body')).toHaveClass(/immersive/); // △ fullscreen
   await press([4]); await expect(page.locator('[data-mode=parent]')).toHaveAttribute('aria-pressed', 'true'); // L1 previous mode
   assert.deepEqual(errors, []);
   console.log('Gamepad: connect indicator, OPTIONS start/pause, ○ rotate, × wall + rumble, L1/R1 modes, CREATE reset, □ settings, △ fullscreen, stick movement passed.');
