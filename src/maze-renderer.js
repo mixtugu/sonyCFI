@@ -80,7 +80,83 @@ function paintSeabed(cols, rows, variant) {
   return canvas;
 }
 
+// Wall design is a per-viewer display preference: 'ridge' (extruded rock walls) or 'reef' (rocks and corals).
+export const WALL_STYLES = ['ridge', 'reef'];
+let wallStyle = 'ridge';
+export function setWallStyle(style) { if (WALL_STYLES.includes(style)) wallStyle = style; }
+
+// Lumpy boulder lit from the upper left, with a contact shadow down-right.
+function drawRock(c, x, y, r, seed, [dark, mid, light]) {
+  c.save(); c.translate(x, y);
+  c.fillStyle = 'rgba(0,8,16,.32)'; c.beginPath(); c.ellipse(2.2, 2.8, r * 1.05, r * .8, 0, 0, TAU); c.fill();
+  const shape = new Path2D();
+  for (let i = 0; i <= 9; i++) { const a = i / 9 * TAU, k = r * (.82 + hash(seed * 13 + i % 9) * .3); i ? shape.lineTo(Math.cos(a) * k, Math.sin(a) * k * .9) : shape.moveTo(Math.cos(a) * k, Math.sin(a) * k * .9); }
+  shape.closePath();
+  const g = c.createRadialGradient(-r * .35, -r * .45, r * .1, 0, 0, r * 1.15);
+  g.addColorStop(0, light); g.addColorStop(.55, mid); g.addColorStop(1, dark);
+  c.fillStyle = g; c.fill(shape);
+  c.strokeStyle = 'rgba(0,10,18,.35)'; c.lineWidth = .6; c.stroke(shape);
+  if (hash(seed * 7) > .5) { c.fillStyle = 'rgba(120,190,140,.45)'; c.beginPath(); c.ellipse(-r * .2, -r * .5, r * .45, r * .22, -.3, 0, TAU); c.fill(); }
+  c.restore();
+}
+function drawBrainCoral(c, x, y, r, seed, [base, ridge]) {
+  c.save(); c.translate(x, y);
+  c.fillStyle = 'rgba(0,8,16,.3)'; c.beginPath(); c.ellipse(2, 2.6, r, r * .8, 0, 0, TAU); c.fill();
+  const g = c.createRadialGradient(-r * .3, -r * .4, 0, 0, 0, r); g.addColorStop(0, ridge); g.addColorStop(1, base);
+  disc(c, 0, 0, r, g);
+  c.strokeStyle = 'rgba(60,30,20,.35)'; c.lineWidth = .55; c.beginPath();
+  for (let i = -2; i <= 2; i++) { const yy = i * r * .32; c.moveTo(-r * .8, yy); for (let x = -r * .8; x <= r * .8; x += 1.4) c.lineTo(x, yy + Math.sin(x * 1.6 + seed + i) * .7); }
+  c.save(); c.clip(new Path2D(`M${-r} 0 A${r} ${r} 0 1 0 ${r} 0 A${r} ${r} 0 1 0 ${-r} 0`)); c.stroke(); c.restore();
+  c.restore();
+}
+function drawBranchCoral(c, x, y, size, seed, [stem, tip], sway = 0) {
+  c.save(); c.translate(x, y); c.lineCap = 'round';
+  c.strokeStyle = 'rgba(0,8,16,.28)'; c.lineWidth = 2; c.beginPath(); c.moveTo(1.5, 2.5); c.lineTo(4, 4); c.stroke();
+  const branches = 3 + Math.floor(hash(seed) * 3);
+  for (let i = 0; i < branches; i++) {
+    const a = -Math.PI / 2 + (i - (branches - 1) / 2) * .55 + (hash(seed + i * 3) - .5) * .3 + sway;
+    const len = size * (.75 + hash(seed * 5 + i) * .45), mx = Math.cos(a) * len * .55, my = Math.sin(a) * len * .55;
+    const ex = Math.cos(a + .25 * (i % 2 ? 1 : -1)) * len, ey = Math.sin(a + .25 * (i % 2 ? 1 : -1)) * len;
+    c.strokeStyle = stem; c.lineWidth = 1.8; c.beginPath(); c.moveTo(0, 0); c.quadraticCurveTo(mx, my, ex, ey); c.stroke();
+    c.lineWidth = 1.2; c.beginPath(); c.moveTo(mx, my); c.lineTo(mx + Math.cos(a - .7) * len * .4, my + Math.sin(a - .7) * len * .4); c.stroke();
+    disc(c, ex, ey, 1.25, tip); disc(c, mx + Math.cos(a - .7) * len * .4, my + Math.sin(a - .7) * len * .4, 1, tip);
+  }
+  c.restore();
+}
+function drawSponge(c, x, y, r, [body, rim]) {
+  c.save(); c.translate(x, y);
+  c.fillStyle = 'rgba(0,8,16,.28)'; c.beginPath(); c.ellipse(2, 2.5, r * 1.3, r * .8, 0, 0, TAU); c.fill();
+  for (const [dx, dy, k] of [[-r * .6, .5, .8], [r * .5, .8, .7], [0, -r * .3, 1]]) {
+    c.fillStyle = body; c.beginPath(); c.ellipse(dx, dy, r * .5 * k, r * .62 * k, 0, 0, TAU); c.fill();
+    c.fillStyle = rim; c.beginPath(); c.ellipse(dx, dy - r * .2 * k, r * .34 * k, r * .2 * k, 0, 0, TAU); c.fill();
+  }
+  c.restore();
+}
+function drawAnemone(c, x, y, r, amb, seed, [body, tip]) {
+  c.save(); c.translate(x, y); c.lineCap = 'round';
+  for (let i = 0; i < 10; i++) {
+    const a = i / 10 * TAU, w = Math.sin(amb * 2 + seed + i) * .35;
+    c.strokeStyle = body; c.lineWidth = 1; c.beginPath(); c.moveTo(0, 0); c.quadraticCurveTo(Math.cos(a + w) * r * .6, Math.sin(a + w) * r * .6, Math.cos(a + w * 1.6) * r, Math.sin(a + w * 1.6) * r); c.stroke();
+    disc(c, Math.cos(a + w * 1.6) * r, Math.sin(a + w * 1.6) * r, .7, tip);
+  }
+  disc(c, 0, 0, r * .3, tip);
+  c.restore();
+}
+const STONE = ['#173d47', '#3f7376', '#8cc0b4'];
+// A reef wall is a closely packed row of rocks and corals along the edge, with a boulder at every joint.
+function paintReefEdge(c, [x1, y1, x2, y2], id) {
+  for (let i = 0; i < 4; i++) {
+    const k = (i + .5) / 4, x = x1 + (x2 - x1) * k + (hash(id * 9 + i) - .5) * 1.6, y = y1 + (y2 - y1) * k + (hash(id * 11 + i) - .5) * 1.6;
+    const roll = hash(id * 17 + i * 5), seed = id * 4 + i;
+    if (roll < .52) drawRock(c, x, y, 4.6 + hash(seed) * 1.6, seed, STONE);
+    else if (roll < .7) drawBrainCoral(c, x, y, 4.6 + hash(seed) * 1.2, seed, hash(seed + 1) > .5 ? ['#a87c4a', '#e8c98c'] : ['#7d8f5a', '#c6d898']);
+    else if (roll < .86) { drawRock(c, x, y + 1, 3.6, seed, STONE); drawBranchCoral(c, x, y, 7, seed, hash(seed + 2) > .5 ? ['#c86f8c', '#ffc0d6'] : ['#5aa6a0', '#bff5e2']); }
+    else drawSponge(c, x, y, 4.6, hash(seed + 3) > .5 ? ['#6f5aa8', '#b7a6e8'] : ['#c27a3c', '#f5c088']);
+  }
+}
+
 function paintWalls(s, role, cols, rows, segment) {
+  if (wallStyle === 'reef') return paintReef(s, role, cols, rows, segment);
   const w = cols * CELL + PAD * 2, h = rows * CELL + PAD * 2, canvas = layer(w * 2, h * 2), c = canvas.getContext('2d');
   c.scale(2, 2); c.translate(PAD, PAD);
   const path = new Path2D(), frame = new Path2D(), segments = [];
@@ -102,6 +178,27 @@ function paintWalls(s, role, cols, rows, segment) {
       for (const [px, py] of [[-2.5, -3.5], [2.8, -3], [.4, -4.5]]) disc(c, mx + px, my + py, .9, hue[1]);
     }
   }
+  return { canvas, path };
+}
+
+function paintReef(s, role, cols, rows, segment) {
+  const w = cols * CELL + PAD * 2, h = rows * CELL + PAD * 2, canvas = layer(w * 2, h * 2), c = canvas.getContext('2d');
+  c.scale(2, 2); c.translate(PAD, PAD);
+  const path = new Path2D(), frame = new Path2D(), segments = [], joints = new Map();
+  frame.rect(0, 0, cols * CELL, rows * CELL);
+  for (const e of s.base) {
+    if (role === 'child' && s.secrets.has(e)) continue;
+    const [a, b] = e.split(':').map(Number), coords = segment(a, b);
+    path.moveTo(coords[0], coords[1]); path.lineTo(coords[2], coords[3]); segments.push([coords, a * 131 + b]);
+    for (const [x, y] of [[coords[0], coords[1]], [coords[2], coords[3]]]) joints.set(`${x},${y}`, [x, y]);
+  }
+  extrude(c, frame, { height: 5, width: 6.5, side: ['072430', '124050'], top: '#3c7a7b', edge: '#9fd8c8' });
+  // A faint seabed groove keeps every edge legible beneath the objects.
+  c.save(); c.lineCap = 'round'; c.strokeStyle = 'rgba(0,12,20,.35)'; c.lineWidth = 6; c.stroke(path); c.restore();
+  // Paint top-down by row so nearer objects overlap farther ones.
+  const items = [...segments.map(([coords, id]) => ({ y: (coords[1] + coords[3]) / 2, draw: () => paintReefEdge(c, coords, id) })),
+    ...[...joints.values()].map(([x, y]) => ({ y, draw: () => drawRock(c, x, y, 4.8, x * 7 + y * 13, STONE) }))];
+  items.sort((p, q) => p.y - q.y).forEach(item => item.draw());
   return { canvas, path };
 }
 
@@ -242,7 +339,7 @@ export function drawMaze(canvas, s, role, cursor, direction, options = {}) {
   const variant = (baseHash % 997) + baseCount;
   const seabedKey = `${cols}x${rows}:${variant}`;
   if (v.seabedKey !== seabedKey) { v.seabed = paintSeabed(cols, rows, variant); v.seabedKey = seabedKey; }
-  const wallsKey = `${seabedKey}:${role}:${role === 'child' ? signature(s.base, s.secrets).join(':') : ''}`;
+  const wallsKey = `${seabedKey}:${wallStyle}:${role}:${role === 'child' ? signature(s.base, s.secrets).join(':') : ''}`;
   if (v.wallsKey !== wallsKey) { v.wallsLayer = paintWalls(s, role, cols, rows, segment); v.wallsKey = wallsKey; }
   c.drawImage(v.seabed, 0, 0, width, height);
 
@@ -300,8 +397,22 @@ export function drawMaze(canvas, s, role, cursor, direction, options = {}) {
     if (role === 'child' && s.secrets.has(e)) continue;
     const born = v.births.get(e), k = born === undefined ? 1 : Math.min(1, (t - born) / .5), rise = k >= 1 ? 1 : backOut(k);
     const wall = new Path2D(); wall.moveTo(coords[0], coords[1]); wall.lineTo(coords[2], coords[3]);
-    extrude(c, wall, { height: 5.5 * Math.max(.05, rise), width: 5.8, side: ['4a1d2a', '823445'], top: '#f0917a', edge: '#ffd8bf', alpha: Math.min(1, k * 2.5) });
-    for (let i = 0; i < 4; i++) { const q = (i + .5) / 4; disc(c, coords[0] + (coords[2] - coords[0]) * q, coords[1] + (coords[3] - coords[1]) * q - 5.5 * rise, .9 + .3 * Math.sin(amb * 3 + i + a), 'rgba(255,225,205,.85)'); }
+    if (wallStyle === 'reef') {
+      // The parent's barrier is a warm red reef: fire coral, brain coral and anemones grow out of the sand.
+      const id = a * 131 + b, grow = Math.max(.05, rise);
+      c.save(); c.globalAlpha = Math.min(1, k * 2.5); c.lineCap = 'round'; c.strokeStyle = 'rgba(70,10,20,.4)'; c.lineWidth = 6; c.stroke(wall); c.restore();
+      for (let i = 0; i < 4; i++) {
+        const q = (i + .5) / 4, x = coords[0] + (coords[2] - coords[0]) * q, y = coords[1] + (coords[3] - coords[1]) * q, seed = id * 5 + i;
+        c.save(); c.globalAlpha = Math.min(1, k * 2.5); c.translate(x, y); c.scale(grow, grow);
+        const roll = hash(seed * 3);
+        if (roll < .4) drawBranchCoral(c, 0, 1, 8.5, seed, ['#e2564f', '#ffc3a6'], Math.sin(amb * 1.3 + seed) * .08);
+        else if (roll < .65) drawBrainCoral(c, 0, 0, 5, seed, ['#c9483f', '#ff9d7e']);
+        else if (roll < .85) { disc(c, 0, 1, 3.6, '#7a2632'); drawAnemone(c, 0, 0, 5.2, amb, seed, ['#ff8f84', '#ffe0c8']); }
+        else drawSponge(c, 0, 0, 4.8, ['#d8613f', '#ffb48a']);
+        c.restore();
+      }
+    } else extrude(c, wall, { height: 5.5 * Math.max(.05, rise), width: 5.8, side: ['4a1d2a', '823445'], top: '#f0917a', edge: '#ffd8bf', alpha: Math.min(1, k * 2.5) });
+    if (wallStyle !== 'reef') for (let i = 0; i < 4; i++) { const q = (i + .5) / 4; disc(c, coords[0] + (coords[2] - coords[0]) * q, coords[1] + (coords[3] - coords[1]) * q - 5.5 * rise, .9 + .3 * Math.sin(amb * 3 + i + a), 'rgba(255,225,205,.85)'); }
     if (k < 1) { c.save(); c.globalCompositeOperation = 'lighter'; c.globalAlpha = (1 - k) * .6; c.strokeStyle = '#ff9f86'; c.lineWidth = 14; c.lineCap = 'round'; c.stroke(wall); c.restore(); }
   }
   drawFish(c, cols * cell, rows * cell, amb);

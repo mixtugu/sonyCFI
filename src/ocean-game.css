@@ -151,4 +151,10 @@
 @keyframes drop{0%{opacity:0;transform:translate(0,0) scale(.3)}10%{opacity:1}50%{transform:translate(var(--dx),var(--dy)) scale(1)}100%{opacity:0;transform:translate(calc(var(--dx) * 1.35),calc(var(--dy) * .1 + 70px)) scale(.7)}}
 #ending .fx-sparkles{position:fixed;inset:0;border-radius:0}
 
+.wall-style{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin:0 0 16px;padding:12px 14px;border-radius:14px;background:#ffffff0a;border:1px solid #a8f0e026;font-size:12px;color:var(--muted)}
+.wall-style>span{flex:1 0 100%;color:#cfeee4;font-weight:500}
+.wall-style label{display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:999px;border:1px solid #a8f0e033;cursor:pointer;color:#d6eee6}
+.wall-style label:has(input:checked){background:linear-gradient(180deg,#ecfff5,#a6e7d3);color:#093441;border-color:transparent}
+.wall-style input{margin:0;accent-color:#5fd2c0}
+.wall-style small{flex:1 0 100%;font-size:10px}
 @media(max-width:620px){.countdown-rings i{width:170px;height:170px;left:-85px;top:-85px}.ocean-world .return-art{height:150px}}
