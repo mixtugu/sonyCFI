@@ -1,6 +1,7 @@
 import './ocean.css';
 import { drawWater, drawDiver, drawRipple, motionPreference, causticTile } from './ocean-art.js';
 import { createDepths } from './ocean-depths.js';
+import { drawFish, drawJelly } from './maze-renderer.js';
 
 // Camera targets per in-game phase: depth 0 is the surface, 1 the deep; surface 1 lifts the camera out.
 const SCENES = { ready: { depth: .34 }, countdown: { depth: .7 }, playing: { depth: .8 }, result: { depth: .02 }, summary: { depth: .02 }, ending: { depth: 0, surface: 1 } };
@@ -17,6 +18,10 @@ export function createOceanPresentation() {
   const depthCanvas = document.createElement('canvas');
   depthCanvas.className = 'ocean-depths'; depthCanvas.setAttribute('aria-hidden', 'true');
   canvas.after(depthCanvas);
+  const lifeCanvas = document.createElement('canvas');
+  lifeCanvas.className = 'ocean-life'; lifeCanvas.setAttribute('aria-hidden', 'true');
+  depthCanvas.after(lifeCanvas);
+  const life = lifeCanvas.getContext('2d');
   let depths = null;
   try { depths = createDepths(depthCanvas); } catch { depths = null; }
   if (!depths) depthCanvas.remove();
@@ -109,6 +114,22 @@ export function createOceanPresentation() {
     });
   }
 
+  function drawLife(now) {
+    const scale = Math.min(devicePixelRatio || 1, 1.5), width = innerWidth, height = innerHeight;
+    const pixelWidth = Math.round(width * scale), pixelHeight = Math.round(height * scale);
+    if (lifeCanvas.width !== pixelWidth || lifeCanvas.height !== pixelHeight) { lifeCanvas.width = pixelWidth; lifeCanvas.height = pixelHeight; }
+    life.setTransform(scale, 0, 0, scale, 0, 0); life.globalCompositeOperation = 'source-over'; life.globalAlpha = 1;
+    life.clearRect(0, 0, width, height);
+    const time = motionPreference.matches ? 0 : (phase === 'paused' ? phaseAt : now) / 1000;
+    drawFish(life, width, height, time); drawJelly(life, width, height, time);
+    life.globalCompositeOperation = 'destination-out';
+    for (const board of document.querySelectorAll('.board-card:not([hidden])')) {
+      const rect = board.getBoundingClientRect();
+      if (rect.width && rect.height) life.fillRect(rect.left - 8, rect.top - 8, rect.width + 16, rect.height + 16);
+    }
+    life.globalCompositeOperation = 'source-over';
+  }
+
   let raf;
   function frame(now) {
     raf = requestAnimationFrame(frame);
@@ -124,6 +145,7 @@ export function createOceanPresentation() {
     // The flat sea stops painting once the WebGL ocean fully covers it.
     if (!deep || now - shownAt < 1300) drawFlat(now);
     if (depths && (deep || now - hiddenAt < 1300)) drawDeep(dtReal);
+    drawLife(now);
   }
   raf = requestAnimationFrame(frame);
   return {
@@ -140,6 +162,6 @@ export function createOceanPresentation() {
     },
     pulse() { if (phase !== 'paused') sim.pulseAt = sim.clock; },
     setOxygen(value) { oxygen = Math.max(0, Math.min(1, +value || 0)); },
-    destroy() { cancelAnimationFrame(raf); close(); canvas.remove(); depthCanvas.remove(); window.removeEventListener('pointermove', onPointer); window.removeEventListener('pointerdown', onDown); window.removeEventListener('keydown', onKey); }
+    destroy() { cancelAnimationFrame(raf); close(); canvas.remove(); depthCanvas.remove(); lifeCanvas.remove(); window.removeEventListener('pointermove', onPointer); window.removeEventListener('pointerdown', onDown); window.removeEventListener('keydown', onKey); }
   };
 }

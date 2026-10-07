@@ -8,6 +8,8 @@ test('seeded mazes are connected at every supported board size', () => {
     assert.equal(reachable(s).size, cols * rows);
     assert.deepEqual([...s.base], [...createMaze({ cols, rows }).base]);
     assert.equal(new Set(s.items.map(i => i.cell)).size, 12);
+    assert.ok(s.items.every(i => ['small', 'medium', 'large'].includes(i.fishSize)));
+    assert.ok(s.items.every(i => i.fishSize === 'large' ? ['shark', 'mermaid'].includes(i.fishKind) : i.fishKind === 'fish'));
     assert.ok(s.items.every(i => i.cell !== s.avatar && i.cell !== s.goal));
   }
 });

@@ -202,27 +202,12 @@ function paintReef(s, role, cols, rows, segment) {
   return { canvas, path };
 }
 
-function drawClam(c, x, y, amb, seed, open) {
-  c.save(); c.fillStyle = 'rgba(0,10,18,.35)'; c.beginPath(); c.ellipse(x + 2.5, y + 5.5, 11.5, 4.8, 0, 0, TAU); c.fill();
-  const shell = (cy, rx, ry, flip, dark, light) => {
-    c.save(); c.translate(x, cy); if (flip) c.scale(1, -1);
-    const g = c.createLinearGradient(0, 0, 0, ry); g.addColorStop(0, light); g.addColorStop(1, dark);
-    c.fillStyle = g; c.beginPath(); c.ellipse(0, 0, rx, ry, 0, 0, Math.PI); c.closePath(); c.fill();
-    c.strokeStyle = 'rgba(110,70,62,.35)'; c.lineWidth = .6;
-    for (let i = 1; i < 6; i++) { const a = Math.PI * i / 6; c.beginPath(); c.moveTo(0, 0); c.lineTo(Math.cos(a) * rx * .94, Math.sin(a) * ry * .94); c.stroke(); }
-    c.restore();
-  };
-  if (!open) { shell(y + 1, 9.5, 5, false, '#8e6f6a', '#c9a99c'); shell(y + 1, 9.5, 3.4, true, '#a08079', '#d8bcae'); c.restore(); return; }
-  const breathe = Math.sin(amb * 1.6 + seed) * .08;
-  shell(y - 2.5, 10, 7 * (.86 + breathe), true, '#a98178', '#e5c4b6');
-  shell(y + 2, 11, 6, false, '#c9a397', '#f7e3d6');
-  const g = c.createRadialGradient(x - 2.4, y - 3, .5, x, y - .5, 6.6);
-  g.addColorStop(0, '#ffffff'); g.addColorStop(.45, '#f6eed8'); g.addColorStop(1, '#b3a171');
-  disc(c, x, y - .5, 6.3, g);
-  const a = amb * .8 + seed;
-  c.fillStyle = 'rgba(255,255,255,.75)'; c.beginPath(); c.ellipse(x - 2 + Math.cos(a) * .8, y - 3 + Math.sin(a) * .5, 1.5, .9, -.6, 0, TAU); c.fill();
-  c.fillStyle = 'rgba(90,72,40,.72)'; c.font = 'bold 7px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('?', x + .3, y + .3);
-  c.restore();
+function drawFishIcon(c, x, y, size, color, eyeColor) {
+  const scale = size === 'small' ? 1 : size === 'large' ? 1.8 : 1.4;
+  c.save(); c.translate(x, y); c.scale(scale, scale * 1.3); c.fillStyle = color;
+  c.beginPath(); c.ellipse(0, 0, 5, 3, 0, 0, TAU); c.fill();
+  c.beginPath(); c.moveTo(-4, 0); c.lineTo(-7.5, -2.8); c.lineTo(-7.5, 2.8); c.closePath(); c.fill();
+  disc(c, 2.5, -.65, .55, eyeColor); c.restore();
 }
 
 function drawKelp(c, cols, rows, amb, variant) {
@@ -239,13 +224,13 @@ function drawKelp(c, cols, rows, amb, variant) {
   c.restore();
 }
 
-function drawFish(c, w, h, amb) {
-  for (let k = 0; k < 2; k++) {
+export function drawFish(c, w, h, amb) {
+  for (let k = 0; k < 3; k++) {
     const sp = .07 + k * .045, ph = k * 2.4;
     const cx = w / 2 + Math.sin(amb * sp + ph) * w * .46, cy = h / 2 + Math.sin(amb * sp * 1.7 + ph * 1.3) * h * .4;
     const heading = Math.atan2(Math.cos(amb * sp * 1.7 + ph * 1.3) * h * .4 * 1.7, Math.cos(amb * sp + ph) * w * .46);
     const cos = Math.cos(heading), sin = Math.sin(heading);
-    for (let j = 0; j < 7; j++) {
+    for (let j = 0; j < 9; j++) {
       const row = j % 3, col = Math.floor(j / 3);
       const lx = -row * 9 - col * 6 + Math.sin(amb * 1.3 + j) * 1.5, ly = (col - 1) * 7 + (row - 1) * 3 + Math.cos(amb * 1.1 + j * 2) * 1.5;
       const x = cx + lx * cos - ly * sin, y = cy + lx * sin + ly * cos;
@@ -261,15 +246,17 @@ function drawFish(c, w, h, amb) {
   }
 }
 
-function drawJelly(c, w, h, amb) {
-  const x = w * (.5 + .34 * Math.sin(amb * .031 + 1)), y = h * (.5 + .3 * Math.sin(amb * .043 + 2)), pulse = Math.sin(amb * 1.8);
-  c.save(); c.globalCompositeOperation = 'lighter';
-  const glow = c.createRadialGradient(x, y, 1, x, y, 20); glow.addColorStop(0, 'rgba(220,150,255,.2)'); glow.addColorStop(1, 'rgba(220,150,255,0)'); disc(c, x, y, 20, glow);
-  c.strokeStyle = 'rgba(240,190,255,.35)'; c.lineWidth = .7;
-  for (let i = 0; i < 5; i++) { const ox = (i - 2) * 2.2; c.beginPath(); c.moveTo(x + ox, y + 2); c.bezierCurveTo(x + ox + Math.sin(amb * 2 + i) * 2, y + 7, x + ox - Math.sin(amb * 2.3 + i) * 2, y + 11, x + ox + Math.sin(amb * 1.7 + i) * 1.5, y + 15 - pulse); c.stroke(); }
-  const bell = c.createRadialGradient(x - 1.5, y - 2, .5, x, y, 8); bell.addColorStop(0, 'rgba(255,235,255,.55)'); bell.addColorStop(1, 'rgba(200,130,240,.18)');
-  c.fillStyle = bell; c.beginPath(); c.ellipse(x, y, 7 * (1 + pulse * .08), 5.5 * (1 - pulse * .06), 0, Math.PI, TAU); c.quadraticCurveTo(x, y + 3, x - 7 * (1 + pulse * .08), y); c.fill();
-  c.restore();
+export function drawJelly(c, w, h, amb) {
+  for (let k = 0; k < 3; k++) {
+    const phase = k * 2.1, x = w * (.5 + .46 * Math.sin(amb * .031 + phase)), y = h * (.5 + .44 * Math.sin(amb * .043 + phase * 1.3)), pulse = Math.sin(amb * 1.8 + phase);
+    c.save(); c.globalCompositeOperation = 'lighter';
+    const glow = c.createRadialGradient(x, y, 1, x, y, 20); glow.addColorStop(0, 'rgba(220,150,255,.2)'); glow.addColorStop(1, 'rgba(220,150,255,0)'); disc(c, x, y, 20, glow);
+    c.strokeStyle = 'rgba(240,190,255,.35)'; c.lineWidth = .7;
+    for (let i = 0; i < 5; i++) { const ox = (i - 2) * 2.2; c.beginPath(); c.moveTo(x + ox, y + 2); c.bezierCurveTo(x + ox + Math.sin(amb * 2 + i + phase) * 2, y + 7, x + ox - Math.sin(amb * 2.3 + i + phase) * 2, y + 11, x + ox + Math.sin(amb * 1.7 + i + phase) * 1.5, y + 15 - pulse); c.stroke(); }
+    const bell = c.createRadialGradient(x - 1.5, y - 2, .5, x, y, 8); bell.addColorStop(0, 'rgba(255,235,255,.55)'); bell.addColorStop(1, 'rgba(200,130,240,.18)');
+    c.fillStyle = bell; c.beginPath(); c.ellipse(x, y, 7 * (1 + pulse * .08), 5.5 * (1 - pulse * .06), 0, Math.PI, TAU); c.quadraticCurveTo(x, y + 3, x - 7 * (1 + pulse * .08), y); c.fill();
+    c.restore();
+  }
 }
 
 function drawAnchor(c, x, y) {
@@ -378,8 +365,11 @@ export function drawMaze(canvas, s, role, cursor, direction, options = {}) {
       v.taken.add(item.cell);
       if (animate) { v.events.push({ x, y, at: t, color: '#ffe4a7', radius: 32 }); v.sparks.push({ x, y, at: t }); }
     }
-    // A sealed pearl reveals neither category nor risk before collection.
-    drawClam(c, x, y, amb, item.cell, !item.taken);
+    if (!item.taken) {
+      const size = item.fishSize ?? (item.category === 'red' ? 'large' : item.category === 'yellow' ? 'medium' : 'small');
+      const highRisk = item.highRisk ?? item.category === 'red';
+      drawFishIcon(c, x, y, size, role === 'parent' ? highRisk ? '#e4554f' : '#489fca' : '#246a72', role === 'parent' ? '#fff4e5' : '#e9f4dd');
+    }
     if (item.taken) {
       disc(c, x, y - 3, 8.5, role === 'parent' ? palette[item.category] : '#1f5f5c');
       c.strokeStyle = 'rgba(255,255,255,.35)'; c.lineWidth = 1; c.beginPath(); c.arc(x, y - 3, 8.5, 0, TAU); c.stroke();
@@ -415,11 +405,10 @@ export function drawMaze(canvas, s, role, cursor, direction, options = {}) {
     if (wallStyle !== 'reef') for (let i = 0; i < 4; i++) { const q = (i + .5) / 4; disc(c, coords[0] + (coords[2] - coords[0]) * q, coords[1] + (coords[3] - coords[1]) * q - 5.5 * rise, .9 + .3 * Math.sin(amb * 3 + i + a), 'rgba(255,225,205,.85)'); }
     if (k < 1) { c.save(); c.globalCompositeOperation = 'lighter'; c.globalAlpha = (1 - k) * .6; c.strokeStyle = '#ff9f86'; c.lineWidth = 14; c.lineCap = 'round'; c.stroke(wall); c.restore(); }
   }
-  drawFish(c, cols * cell, rows * cell, amb);
   c.restore();
 
   // Unexplored water is murky; the diver's torch and visited cells cut through it.
-  const fogGoal = onDemand ? .22 : s.phase === 'result' ? 0 : role === 'child' ? .58 : .32;
+  const fogGoal = onDemand ? .22 : s.phase === 'result' ? 0 : .32;
   v.fogLevel = v.fogLevel === null || !animate ? fogGoal : v.fogLevel + (fogGoal - v.fogLevel) * (1 - Math.exp(-dt / .8));
   const dx = v.x + pad, dy = v.y + pad;
   if (v.fogLevel > .005) {
@@ -465,7 +454,6 @@ export function drawMaze(canvas, s, role, cursor, direction, options = {}) {
     if (tw > .02) { c.strokeStyle = `rgba(255,250,225,${tw * .9})`; c.lineWidth = .8; c.beginPath(); c.moveTo(x - 2 - 5 * tw, y - 3); c.lineTo(x - 2 + 5 * tw, y - 3); c.moveTo(x - 2, y - 3 - 5 * tw); c.lineTo(x - 2, y - 3 + 5 * tw); c.stroke(); }
   }
   c.restore();
-  drawJelly(c, cols * cell, rows * cell, amb);
   if (role === 'parent') {
     // The exit is a column of daylight from an opening in the surface.
     const [x, y] = center(s.goal), sway = Math.sin(amb * 1.3) * .06;
