@@ -43,7 +43,10 @@ export function createMaze(settings = {}, seed = 260830) {
     for (let y = Math.floor(zy * config.rows / 3); y < Math.floor((zy + 1) * config.rows / 3); y++)
       for (let x = Math.floor(zx * config.cols / 4); x < Math.floor((zx + 1) * config.cols / 4); x++) { const n = y * config.cols + x; if (n !== s.goal && x + (config.rows - 1 - y) > 2) cells.push(n); }
     const cell = cells[Math.floor(random() * cells.length)];
-    s.items.push({ cell, category, risk: roll(config[category + 'Min'], config[category + 'Max']), reward: roll(config.rewardMin, config.rewardMax), taken: false });
+    const risk = roll(config[category + 'Min'], config[category + 'Max']), reward = roll(config.rewardMin, config.rewardMax);
+    const fishSize = ['small', 'medium', 'large'][Math.floor(random() * 3)];
+    const fishKind = fishSize === 'large' ? random() < .5 ? 'shark' : 'mermaid' : 'fish';
+    s.items.push({ cell, category, risk, reward, fishSize, fishKind, taken: false });
   }
   s.trail.push(s.avatar);
   return s;

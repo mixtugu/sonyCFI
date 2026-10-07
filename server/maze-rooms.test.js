@@ -41,7 +41,19 @@ test('playing keeps private views and role restrictions with no CPU actions', ()
   }
   const parentView = service.view(room, room.members[0]).game, childView = service.view(room, room.members[1]).game;
   assert.deepEqual(parentView.secrets, []); assert.equal(parentView.childScore, null); assert.equal(childView.parentScore, null); assert.equal(childView.goal, null);
-  assert.ok(parentView.items.filter(i => !i.taken).every(i => !('risk' in i) && !('reward' in i) && !('category' in i))); assert.equal('seed' in childView, false);
+  assert.ok(parentView.items.filter(i => !i.taken).every(i => ['small', 'medium', 'large'].includes(i.fishSize) && typeof i.highRisk === 'boolean' && !('risk' in i) && !('reward' in i) && !('category' in i) && !('fishKind' in i)));
+  assert.ok(childView.items.every(i => ['small', 'medium', 'large'].includes(i.fishSize) && !('highRisk' in i)));
+  assert.equal('seed' in childView, false);
+});
+test('fish kind stays hidden until collection and is then shared with both roles', () => {
+  const { service, room } = setup(), item = room.game.items[0];
+  const member = role => room.members.find(m => m.role === role);
+  const viewItem = role => service.view(room, member(role)).game.items.find(i => i.cell === item.cell);
+  assert.equal('fishKind' in viewItem('parent'), false);
+  assert.equal('fishKind' in viewItem('child'), false);
+  item.taken = true;
+  assert.equal(viewItem('parent').fishKind, item.fishKind);
+  assert.equal(viewItem('child').fishKind, item.fishKind);
 });
 test('first leg automatically swaps into a fresh briefing; only leg two exposes final totals', () => {
   const { service, parent, room, both, ready } = setup(); ready(); service.tick(3);

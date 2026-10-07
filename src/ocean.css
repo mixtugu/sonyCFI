@@ -1,6 +1,6 @@
 /* Shared visual shell. The artwork is procedural and requires no downloaded assets. */
 .ocean-world{background:#041e32;min-height:100dvh;isolation:isolate}
-.ocean-backdrop,.ocean-depths{position:fixed;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none}
+.ocean-backdrop,.ocean-depths,.ocean-life{position:fixed;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none}
 .ocean-depths{opacity:0;transition:opacity 1.2s ease}.ocean-depths.is-visible{opacity:1}
 .ocean-intro{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:linear-gradient(180deg,#072b4320,#041e3222);animation:ocean-intro-out .7s 2.5s both;pointer-events:auto;color:#ebfff8;text-align:center;padding:24px}
 .ocean-intro-copy{animation:ocean-copy-in 1.2s both;text-shadow:0 3px 24px #041c32}

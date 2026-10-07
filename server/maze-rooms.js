@@ -119,7 +119,7 @@ export class MazeRooms {
       partner: { connected: room.members.some(m => m !== member && m.socket?.readyState === 1), ready: room.members.some(m => m !== member && m.ready), tutorialComplete: room.members.some(m => m !== member && m.tutorialComplete), again: room.members.some(m => m !== member && m.again) }, reason: room.reason,
       game: { settings: g.settings, phase: g.phase, time: g.time, avatar: g.avatar, goal: parent || review ? g.goal : null,
         base: [...g.base], walls: [...g.walls], secrets: !parent || review ? [...g.secrets] : [],
-        items: g.items.map(i => ({ cell: i.cell, taken: i.taken, ...(i.taken && (parent || review) ? { category: i.category, risk: i.risk } : {}), ...(i.taken && (!parent || review) ? { reward: i.reward } : {}) })),
+        items: g.items.map(i => ({ cell: i.cell, taken: i.taken, fishSize: i.fishSize, ...(i.taken ? { fishKind: i.fishKind } : {}), ...(!i.taken && parent ? { highRisk: i.category === 'red' } : {}), ...(i.taken && (parent || review) ? { category: i.category, risk: i.risk } : {}), ...(i.taken && (!parent || review) ? { reward: i.reward } : {}) })),
         parentScore: parent || review ? g.parentScore : null, childScore: !parent || review ? g.childScore : null,
         collected: g.collected, moves: g.moves, trail: g.trail, logs: review ? g.logs : g.logs.filter(l => l.text.startsWith('壁を設置')).map(l => ({ time: l.time, text: '親が壁を置きました。' })) } };
   }
