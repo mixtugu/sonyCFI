@@ -10,6 +10,12 @@ import { createResultScene } from './result-scene.js';
 const fields = [['cols', '横のマス数'], ['rows', '縦のマス数'], ['duration', '制限時間（秒）'], ['wallLimit', '壁の枚数'], ['wallCost', '親の壁コスト'], ['moveMs', '移動間隔（ms）']];
 const ranges = [['red', '高リスク', 'redMin', 'redMax'], ['yellow', '中リスク', 'yellowMin', 'yellowMax'], ['green', '低リスク', 'greenMin', 'greenMax'], ['gold', '子どもの報酬', 'rewardMin', 'rewardMax']];
 const input = (key, label) => `<input type="number" name="${key}" aria-label="${label}" min="${LIMITS[key][0]}" max="${LIMITS[key][1]}" step="${key === 'moveMs' ? 50 : 1}" value="${DEFAULTS[key]}" required>`;
+const catchIcon = item => {
+  const kind = item.fishSize === 'large' ? item.fishKind || 'shark' : item.fishSize;
+  const icons = { small: ['🐟', '小さい魚'], medium: ['🐠', '中くらいの魚'], shark: ['🦈', 'サメ'], mermaid: ['🧜‍♀️', '人魚'] };
+  const [icon, label] = icons[kind] || icons.small;
+  return `<span class="catch-icon" role="listitem" title="${label}" aria-label="${label}">${icon}</span>`;
+};
 // Decorative particles for the in-game dialogs, laid out deterministically and animated by CSS.
 const seeded = (i, k) => { const x = Math.sin(i * 127.1 + k * 311.7) * 43758.5453; return x - Math.floor(x); };
 const particles = (className, n, style, rise) => `<div class="${className}" aria-hidden="true"${rise ? ` style="--rise:${rise}px"` : ''}>${Array.from({ length: n }, (_, i) => `<i style="${style(i)}"></i>`).join('')}</div>`;
@@ -33,7 +39,7 @@ document.querySelector('#app').innerHTML = `
 <section class="toolbar" aria-label="ゲーム操作"><div class="mode-group" aria-label="プレイモード"><button data-mode="parent" class="selected" aria-pressed="true">親</button><button data-mode="child" aria-pressed="false">子ども</button><button data-mode="cpu" aria-pressed="false">CPU</button></div><span id="room-chip" class="room-chip" hidden><b id="room-chip-code"></b><i id="room-chip-partner"></i></span><div class="status"><i id="phase-dot"></i><b id="phase">開始前</b><div class="oxygen" id="oxygen" role="meter" aria-label="残りの酸素" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span class="oxygen-bubbles" aria-hidden="true"><i></i><i></i><i></i></span><span class="oxygen-valve" aria-hidden="true"><i class="oxygen-knob"></i><i class="oxygen-neck"></i></span><span class="oxygen-body"><span class="oxygen-track"><span class="oxygen-fill" id="oxygen-fill"></span><span class="oxygen-ticks" aria-hidden="true"></span></span><span class="oxygen-band" aria-hidden="true"></span><span class="oxygen-band" aria-hidden="true"></span><strong id="timer">00:30</strong><span class="oxygen-label" aria-hidden="true">O₂</span></span></div></div><div class="run-controls"><button id="reset" class="secondary" aria-label="リセット">↺</button><button id="start" class="primary">スタート</button><button id="settings-open" class="secondary" aria-label="設定と部屋コード" title="設定と部屋コード (□)">⚙</button><button id="fullscreen" class="secondary" aria-label="全画面" aria-pressed="false" title="全画面 (F)">⛶</button></div></section>
 <p id="mode-description" class="hint"></p>
 <div class="boards">
-${['parent', 'child'].map(role => `<section class="board-card ${role}"><div class="board-heading"><h2>${role === 'parent' ? '親' : '子ども'} <span class="role-badge" id="badge-${role}"></span></h2><span class="score"><strong id="score-${role}">${role === 'parent' ? '100' : '0'}</strong><small id="detail-${role}">0 / 12</small></span></div><div class="board-surface"><canvas id="board-${role}" tabindex="0" aria-label="${role === 'parent' ? '親の迷路。マスの端をクリックして壁を設置' : '子どもの迷路。矢印キーで移動'}"></canvas></div></section>`).join('')}
+${['parent', 'child'].map(role => `<section class="board-card ${role}"><div class="board-heading"><h2>${role === 'parent' ? '親' : '子ども'} <span class="role-badge" id="badge-${role}"></span></h2><span class="score"><strong id="score-${role}">${role === 'parent' ? '100' : '0'}</strong><small id="detail-${role}">0 / 12</small></span><aside class="catch-tray" aria-label="獲得した魚"><span class="catch-label">獲得した魚</span><div class="catch-icons" id="catch-icons-${role}" role="list" aria-label="魚の一覧"></div></aside></div><div class="board-surface"><canvas id="board-${role}" tabindex="0" aria-label="${role === 'parent' ? '親の迷路。マスの端をクリックして壁を設置' : '子どもの迷路。矢印キーで移動'}"></canvas></div></section>`).join('')}
 </div>
 <div class="interaction-panel"><div class="touch-controls"><div class="dpad"><button data-dir="3" aria-label="上">↑</button><button data-dir="2" aria-label="左">←</button><button data-dir="1" aria-label="下">↓</button><button data-dir="0" aria-label="右">→</button></div><button id="rotate" class="secondary">↻ <span id="direction">右</span></button><button id="place" class="primary">壁を置く</button></div><p id="control-hint" class="hint"></p></div>
 </main>
@@ -226,7 +232,11 @@ function update() {
   for (const role of ['parent', 'child']) {
     const score = $('score-' + role), value = String(game[role + 'Score']);
     if (score.textContent !== value) { score.textContent = value; if (game.phase === 'playing') restart(score, 'bump'); }
-    $('badge-' + role).textContent = game.mode === role ? 'あなた' : 'CPU'; }
+    $('badge-' + role).textContent = game.mode === role ? 'あなた' : 'CPU';
+    const tray = $('catch-icons-' + role), caught = game.items.filter(item => item.taken);
+    const key = caught.map(item => `${item.cell}:${item.fishSize}:${item.fishKind || ''}`).join('|');
+    if (tray.dataset.caught !== key) { tray.dataset.caught = key; tray.innerHTML = caught.length ? caught.map(catchIcon).join('') : '<span class="catch-empty" role="listitem">まだいない</span>'; }
+  }
   $('detail-parent').textContent = `${game.walls.size} / ${game.settings.wallLimit}`; $('detail-child').textContent = `${game.collected} / ${game.items.length}`;
   document.querySelectorAll('[data-mode]').forEach(b => { b.classList.toggle('selected', b.dataset.mode === game.mode); b.setAttribute('aria-pressed', b.dataset.mode === game.mode); });
   $('rotate').hidden = $('place').hidden = game.mode !== 'parent';
