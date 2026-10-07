@@ -1,5 +1,6 @@
 import { drawMaze } from './maze-renderer.js';
 import { edge } from './maze.js';
+import { padIcon, controllerDiagram } from './controller-guide.js';
 
 // The pre-round briefing: three short steps per role, each a title, one line of description and one
 // line of controls. The first steps carry a 5×4 practice board to try the controls on.
@@ -50,12 +51,12 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
 <div class="briefing-maze"><canvas class="briefing-canvas" aria-hidden="true"></canvas><div class="briefing-board" role="grid" aria-label="練習用の迷路"></div></div>
 <div class="briefing-oxygen oxygen" hidden><span class="oxygen-valve" aria-hidden="true"><i class="oxygen-knob"></i><i class="oxygen-neck"></i></span><span class="oxygen-body"><span class="oxygen-track"><span class="oxygen-fill"></span><span class="oxygen-ticks"></span></span><span class="oxygen-band"></span><span class="oxygen-band"></span><strong></strong><span class="oxygen-label">O₂</span></span></div>
 <div class="practice-feedback" role="status" aria-live="polite"></div></div>
-<div class="briefing-copy"><div class="briefing-count"></div><h3 class="briefing-title"></h3><p class="briefing-description"></p><div class="briefing-controls"></div></div>
+<div class="briefing-copy"><div class="briefing-count"></div><h3 class="briefing-title"></h3><p class="briefing-description"></p><div class="briefing-controls"></div><div class="briefing-controller" hidden>${controllerDiagram()}</div></div>
 </div>
 <div class="briefing-footer"><button type="button" class="secondary briefing-previous">戻る</button><div class="briefing-nav"><button type="button" class="secondary briefing-next">次へ</button><button type="button" class="primary briefing-launch" hidden>確認して待機へ</button></div></div>`;
   const find = selector => container.querySelector(selector);
   const art = find('.briefing-art'), board = find('.briefing-board'), feedback = find('.practice-feedback'), controls = find('.briefing-controls'), layout = find('.briefing-layout');
-  let running = false, role = 'parent', settings = {}, step = 0, keyTimer = 0, shownStep = -1, loop = 0, painted = 0;
+  let running = false, controller = false, role = 'parent', settings = {}, step = 0, keyTimer = 0, shownStep = -1, loop = 0, painted = 0;
   const practice = { cursor: { x: 2, y: 2 }, direction: 1, child: { x: 0, y: 3 }, placed: new Set(), fixed: new Set(FIXED_WALLS), passages: new Set(PASSAGES), feedback: '' };
 
   const parent = () => role === 'parent';
@@ -68,7 +69,7 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
   function start(nextRole, nextSettings) {
     role = nextRole === 'parent' ? 'parent' : 'child'; settings = nextSettings; step = 0; running = true;
     practice.cursor = { x: 2, y: 2 }; practice.direction = 1; practice.child = { x: 0, y: 3 }; practice.placed.clear();
-    practice.feedback = parent() ? '矢印キーでカーソルを動かしてみましょう' : '矢印キーで子どもを1マス動かしてみましょう';
+    practice.feedback = '';
     shownStep = -1;
     update();
     // Keys go to the practice board rather than to whichever button the dialog focused first.
@@ -89,7 +90,7 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
     const target = Math.max(0, Math.min(steps().length - 1, next));
     if (target === step) return;
     step = target;
-    if (moveStep()) { practice.child = { x: 0, y: 3 }; practice.feedback = step === 1 ? '点線の通路の向こうへ進んでみましょう' : '矢印キーで子どもを1マス動かしてみましょう'; }
+    if (moveStep()) { practice.child = { x: 0, y: 3 }; practice.feedback = step === 1 ? '点線の通路の向こうへ進んでみましょう' : ''; }
     update();
   }
   function setKicker(text) { find('.briefing-kicker').textContent = text; }
@@ -100,6 +101,16 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
     find('.briefing-title').textContent = guide.title;
     find('.briefing-description').textContent = guide.description(settings);
     controls.innerHTML = guide.controls(settings);
+    find('.briefing-controller').hidden = !controller || !(cursorStep() || moveStep());
+    if (controller && (cursorStep() || moveStep())) {
+      if (cursorStep()) find('.briefing-description').textContent = '左スティック・方向キーで位置を選び、右スティックで壁の向きを指定。○で回転、×で壁を設置して、子どもが危ないアイテムへ進む道をふさぎます。';
+      else if (step === 0) find('.briefing-description').textContent = '左スティック・方向キーで子どもを隣のマスへ動かします。アイテムに触れると報酬を獲得します。';
+      controls.innerHTML = `<kbd data-practice-key="Arrow">${padIcon('left')}${padIcon('dpad')} ${parent() ? '位置' : '移動'}</kbd>` + (parent() ? `<kbd data-practice-key="Tab" role="button" tabindex="0">${padIcon('right')}${padIcon('circle')} 向き</kbd><kbd data-practice-key="Space" role="button" tabindex="0">${padIcon('cross')} 設置</kbd>` : '点線は秘密の通路');
+    }
+    find('.briefing-close').innerHTML = controller ? `${padIcon('create')} 閉じる` : '閉じる <kbd>Esc</kbd>';
+    find('.briefing-previous').innerHTML = controller ? `${padIcon('l1')} 戻る` : '戻る';
+    find('.briefing-next').innerHTML = controller ? `${padIcon('r1')} 次へ` : '次へ';
+    find('.briefing-launch').innerHTML = controller ? `${padIcon('options')} 確認して待機へ` : '確認して待機へ';
     find('.briefing-count').textContent = `${String(step + 1).padStart(2, '0')} / ${String(steps().length).padStart(2, '0')}`;
     art.dataset.step = step;
     find('.briefing-art-tag').textContent = guide.tag;
@@ -157,7 +168,8 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
     const oxygen = find('.briefing-oxygen');
     oxygen.hidden = step !== 2;
     oxygen.querySelector('strong').textContent = String(Math.floor(settings.duration / 60)).padStart(2, '0') + ':' + String(settings.duration % 60).padStart(2, '0');
-    feedback.textContent = interactive ? practice.feedback : scoreExample ? '壁 −' + settings.wallCost + ' · アイテム −' + settings.redMin : '残り時間 · O₂';
+    const practiceHint = `${controller ? '左スティック・方向キー' : '矢印キー'}で${parent() ? 'カーソル' : '子ども'}を動かしてみましょう`;
+    feedback.textContent = interactive ? practice.feedback || practiceHint : scoreExample ? '壁 −' + settings.wallCost + ' · アイテム −' + settings.redMin : '残り時間 · O₂';
     board.replaceChildren();
     if (!interactive) return;
     for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
@@ -178,7 +190,7 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
   }
   function moveChild(direction) {
     const { x, y } = practice.child, nx = x + direction.dx, ny = y + direction.dy;
-    if (!inBounds(nx, ny)) practice.feedback = '迷路の端です。別の矢印を押してください';
+    if (!inBounds(nx, ny)) practice.feedback = '迷路の端です。別の方向へ進んでください';
     else if (blocked(x, y, nx, ny)) practice.feedback = '壁で停止。別の方向へ進んでください';
     else {
       practice.child = { x: nx, y: ny };
@@ -226,8 +238,12 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
   // The pad mirrors the round: stick or d-pad moves, ○ turns the wall, × places it.
   function pad(input, pressed) {
     if (!running) return;
+    if (pressed('create')) { close(); return; }
+    if (pressed('l1')) { go(step - 1); return; }
+    if (pressed('options') || pressed('r1')) { if (last()) onFinish?.(); else go(step + 1); return; }
     // The game's directions run right, down, left, up; the board's run north, east, south, west.
     if (input.step >= 0 && (cursorStep() || moveStep())) arrow((input.step + 1) % 4);
+    if (cursorStep() && input.aim >= 0) { practice.direction = (input.aim + 1) % 4; practice.feedback = `設置方向: ${DIRECTIONS[practice.direction].name}`; highlight('Tab'); drawBoard(); }
     if (cursorStep() && pressed('circle')) { highlight('Tab'); rotate(); }
     if (cursorStep() && pressed('cross')) { highlight('Space'); placeWall(); }
   }
@@ -251,6 +267,6 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
   find('.briefing-previous').onclick = () => go(step - 1);
   find('.briefing-next').onclick = () => go(step + 1);
   find('.briefing-launch').onclick = () => onFinish?.();
-  return { start, stop, key, pad, setKicker, next: () => go(step + 1),
+  return { start, stop, key, pad, setKicker, setController: value => { if (controller !== value) { controller = value; update(); } }, next: () => go(step + 1),
     get step() { return step; }, get last() { return last(); }, get running() { return running; } };
 }

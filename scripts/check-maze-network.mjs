@@ -7,6 +7,9 @@ let browser;
 try {
   browser = await chromium.launch();
   const contexts = await Promise.all([1, 2].map(() => browser.newContext({ viewport: { width: 1280, height: 900 } })));
+  // Keep keyboard/pointer coverage independent of controllers attached to the test host.
+  // Controller input and disconnect behavior are exercised in check-controller-flow.mjs.
+  await Promise.all(contexts.map(context => context.addInitScript(() => { navigator.getGamepads = () => []; })));
   const pages = await Promise.all(contexts.map(c => c.newPage())); const [parent, child] = pages;
   const errors = []; pages.forEach(p => p.on('pageerror', e => errors.push(e.message)));
   const url = `http://127.0.0.1:${app.port}`;

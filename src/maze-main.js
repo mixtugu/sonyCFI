@@ -1,8 +1,12 @@
 import './maze.css';
 import './ocean-game.css';
+import './controller.css';
+import { padAction, controllerDiagram, playGuide } from './controller-guide.js';
+import { createControllerUI } from './controller-ui.js';
 import { DEFAULTS, LIMITS, createMaze, start, tick, move, placeWall, neighbor } from './maze.js';
 import { drawMaze, pointerCell, setWallStyle, WALL_STYLES } from './maze-renderer.js';
 import { connectMaze } from './maze-network.js';
+import { connectSoloMaze } from './maze-solo.js';
 import { createPadReader, firstPad, rumble } from './gamepad.js';
 import { createTutorial } from './tutorial.js';
 import { createResultScene } from './result-scene.js';
@@ -23,17 +27,21 @@ const bubbles = (n, rise = 560) => particles('fx-bubbles', n, i => `--x:${(2 + s
 const sparkles = n => particles('fx-sparkles', n, i => `--x:${(seeded(i, 5) * 100).toFixed(1)}%;--y:${(40 + seeded(i, 6) * 38).toFixed(1)}%;--s:${(8 + seeded(i, 7) * 14).toFixed(0)}px;--d:${(1.8 + seeded(i, 8) * 2.2).toFixed(2)}s;--delay:${(.8 + seeded(i, 9) * 2.5).toFixed(2)}s`);
 const drops = n => particles('fx-drops', n, i => { const a = -Math.PI * (.12 + .76 * seeded(i, 10)), r = 110 + seeded(i, 11) * 250; return `--dx:${(Math.cos(a) * r * 1.5).toFixed(0)}px;--dy:${(Math.sin(a) * r).toFixed(0)}px;--s:${(4 + seeded(i, 12) * 7).toFixed(1)}px;--delay:${(.05 + seeded(i, 13) * .35).toFixed(2)}s`; });
 const waterLight = '<div class="fx-caustics" aria-hidden="true"></div><div class="fx-rays" aria-hidden="true"></div>';
-// Playing with another person is the game; /test is the single-device mode with the CPU.
-const testMode = location.pathname.replace(/\/+$/, '') === '/test';
+// /test retains the sandbox; /test/1 and /test/2 preview a real match from either starting seat.
+const route = location.pathname.replace(/\/+$/, '');
+const sandboxMode = route === '/test';
+const testRole = route === '/test/1' ? 'parent' : route === '/test/2' ? 'child' : null;
+const testMode = sandboxMode || !!testRole;
+const testLabel = testRole === 'parent' ? '親からテスト' : '子どもからテスト';
 document.querySelector('#app').innerHTML = `
-<header class="top"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">〰</span>ふたりのあいだの海${testMode ? '<span class="test-badge">テスト</span>' : ''}</a><nav><span id="pad-status" class="pad-status" hidden>🎮 コントローラー</span><button id="help-open" class="text-button">遊び方</button></nav></header>
+<header class="top"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">〰</span>ふたりのあいだの海${testMode ? '<span class="test-badge">テスト</span>' : ''}</a><nav><span id="pad-status" class="pad-status" hidden>PlayStation 操作</span><button id="help-open" class="text-button">遊び方</button></nav></header>
 <section id="lobby" class="lobby"${testMode ? ' hidden' : ''}>
 <div class="ocean-story"><p class="ocean-kicker">BETWEEN TIDES / ふたりのあいだの海</p><h1>きみと見つける、<br><em>海の向こう。</em></h1><p>光が揺れる、ふたりだけの海。<br>ひとりは泳ぎ、ひとりは道をつくる。<br>まだ知らない景色を、いっしょに。</p><div class="ocean-coordinate"><span>01 — INTO THE BLUE</span><span>ふたりの海底探検</span></div></div><div class="lobby-card">
-<p class="eyebrow">DIVE TOGETHER · 二人で、ひとつの迷路</p><h1>部屋をつくって、<br>相手を招待しよう。</h1>
-<div id="net-lobby-mount"></div>
-<p class="lobby-note">つくった人が親、参加した人が子どもではじまります。ラウンドごとに必ず交代します。</p>
+<p class="eyebrow">DIVE TOGETHER · 二人で、ひとつの迷路</p><h1>${testRole ? 'ひとりで、<br>本番の流れを試そう。' : '部屋をつくって、<br>相手を招待しよう。'}</h1>
+<div id="net-lobby-mount">${testRole ? `<button type="button" id="test-restart" class="primary wide">${testLabel}をもう一度</button><p><a href="/test/${testRole === 'parent' ? '2' : '1'}">${testRole === 'parent' ? '子ども' : '親'}からテストする ↗</a></p><p><a href="/">二人で遊ぶ ↗</a></p>` : ''}</div>
+<p class="lobby-note">${testRole ? '相手はCPUです。部屋の作成・参加は不要。本番と同じ2ラウンドを体験し、途中で役割を交代します。' : 'つくった人が親、参加した人が子どもではじまります。ラウンドごとに必ず交代します。'}</p>
 <p class="lobby-settings"><span id="lobby-summary"></span><button type="button" id="lobby-settings-open" class="text-button">⚙ 迷路の設定</button></p>
-<p class="lobby-foot">相手がいないときは <a href="/test">ひとりで試す（テストモード）↗</a></p>
+<p class="lobby-foot">ひとりで試す：<a href="/test/1">親から ↗</a> · <a href="/test/2">子どもから ↗</a> · <a href="/test">自由テスト ↗</a></p>
 </div></section>
 <main class="workspace"${testMode ? '' : ' hidden'}>
 <section class="toolbar" aria-label="ゲーム操作"><div class="mode-group" aria-label="プレイモード"><button data-mode="parent" class="selected" aria-pressed="true">親</button><button data-mode="child" aria-pressed="false">子ども</button><button data-mode="cpu" aria-pressed="false">CPU</button></div><span id="room-chip" class="room-chip" hidden><b id="room-chip-code"></b><i id="room-chip-partner"></i></span><div class="status"><i id="phase-dot"></i><b id="phase">開始前</b><div class="oxygen" id="oxygen" role="meter" aria-label="残りの酸素" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span class="oxygen-bubbles" aria-hidden="true"><i></i><i></i><i></i></span><span class="oxygen-valve" aria-hidden="true"><i class="oxygen-knob"></i><i class="oxygen-neck"></i></span><span class="oxygen-body"><span class="oxygen-track"><span class="oxygen-fill" id="oxygen-fill"></span><span class="oxygen-ticks" aria-hidden="true"></span></span><span class="oxygen-band" aria-hidden="true"></span><span class="oxygen-band" aria-hidden="true"></span><strong id="timer">00:30</strong><span class="oxygen-label" aria-hidden="true">O₂</span></span></div></div><div class="run-controls"><button id="reset" class="secondary" aria-label="リセット">↺</button><button id="start" class="primary">スタート</button><button id="settings-open" class="secondary" aria-label="設定と部屋コード" title="設定と部屋コード (□)">⚙</button><button id="fullscreen" class="secondary" aria-label="全画面" aria-pressed="false" title="全画面 (F)">⛶</button></div></section>
@@ -43,17 +51,19 @@ ${['parent', 'child'].map(role => `<section class="board-card ${role}"><div clas
 </div>
 <div class="interaction-panel"><div class="touch-controls"><div class="dpad"><button data-dir="3" aria-label="上">↑</button><button data-dir="2" aria-label="左">←</button><button data-dir="1" aria-label="下">↓</button><button data-dir="0" aria-label="右">→</button></div><button id="rotate" class="secondary">↻ <span id="direction">右</span></button><button id="place" class="primary">壁を置く</button></div><p id="control-hint" class="hint"></p></div>
 </main>
-<dialog id="settings-dialog" class="settings-dialog"><div class="dialog-head"><h2>設定</h2><button id="settings-close" class="text-button" aria-label="閉じる">✕</button></div><div id="net-room-mount"></div><div class="wall-style" role="radiogroup" aria-label="壁のデザイン"><span>壁のデザイン</span><label><input type="radio" name="wall-style" value="ridge">岩の壁</label><label><input type="radio" name="wall-style" value="reef">サンゴと岩</label><small>この画面だけに反映されます</small></div><form id="settings"><div class="fields">${fields.map(([key, label]) => `<label class="field">${label}${input(key, label)}</label>`).join('')}${ranges.map(([color, label, min, max]) => `<div class="field"><label for="${min}"><i class="legend-dot ${color}"></i>${label}</label><span>${input(min, label + ' 最小値').replace('type="number"', `id="${min}" type="number"`)}–${input(max, label + ' 最大値')}</span></div>`).join('')}</div><div class="form-actions"><button type="button" id="defaults" class="text-button">初期値</button><button class="primary" type="submit">適用</button></div></form></dialog>
+<dialog id="settings-dialog" class="settings-dialog"><div class="dialog-head"><h2>設定</h2><button id="settings-close" class="text-button" aria-label="閉じる">✕</button></div><button type="button" id="settings-help" class="secondary">遊び方</button><div id="net-room-mount"></div><div class="wall-style" role="radiogroup" aria-label="壁のデザイン"><span>壁のデザイン</span><label><input type="radio" name="wall-style" value="ridge">岩の壁</label><label><input type="radio" name="wall-style" value="reef">サンゴと岩</label><small>この画面だけに反映されます</small></div><form id="settings"><div class="fields">${fields.map(([key, label]) => `<label class="field">${label}${input(key, label)}</label>`).join('')}${ranges.map(([color, label, min, max]) => `<div class="field"><label for="${min}"><i class="legend-dot ${color}"></i>${label}</label><span>${input(min, label + ' 最小値').replace('type="number"', `id="${min}" type="number"`)}–${input(max, label + ' 最大値')}</span></div>`).join('')}</div><div class="form-actions"><button type="button" id="defaults" class="text-button">初期値</button><button class="primary" type="submit">適用</button></div></form></dialog>
 <div id="notice" role="status"></div>
 <dialog id="result">${waterLight}<div class="return-art" aria-hidden="true"><canvas id="result-scene"></canvas></div><p class="eyebrow">BACK TO THE LIGHT</p><h2 id="result-title">探検完了</h2><div class="result-scores"><div><small id="result-label-a">親</small><strong id="final-parent"></strong></div><div><small id="result-label-b">子ども</small><strong id="final-child"></strong></div></div><p id="final-stats"></p><p id="result-rounds" class="result-rounds" hidden></p><p id="swap-note" class="swap-note">次のラウンドは役割を交代します。</p><div class="dialog-actions"><button id="close-result" class="secondary">閉じる</button><button id="again" class="primary">もう一度</button></div></dialog>
 <dialog id="ready" class="ready-dialog">${waterLight}${bubbles(12)}<p class="eyebrow" id="ready-eyebrow"></p><h2 id="ready-title"></h2><p id="ready-note"></p><div id="ready-tutorial" class="tutorial"></div><div id="ready-invite" hidden><p class="ready-code"><span>部屋コード</span><strong id="ready-code"></strong></p><button type="button" id="ready-copy" class="secondary wide">招待リンクをコピー</button></div><button type="button" id="ready-review" class="secondary wide">チュートリアルを確認</button><button type="button" id="ready-start" class="primary wide">準備完了</button><p class="ready-foot"><button type="button" id="ready-settings" class="text-button">⚙ 設定</button></p></dialog>
 <dialog id="countdown" class="countdown-dialog" aria-label="開始カウントダウン">${bubbles(14, 720)}<p class="eyebrow" id="countdown-round"></p><h2>まもなく探検が始まります</h2><div class="countdown-core"><span class="countdown-rings" aria-hidden="true"><i></i><i></i><i></i></span><strong id="countdown-number" aria-live="assertive" aria-atomic="true">3</strong></div><div class="depth-gauge" aria-hidden="true"><span>水面</span><i><b></b></i><span>海の底</span></div><p>ふたりで、海の向こうへ。</p><button id="countdown-pause" class="secondary">待機に戻る</button></dialog>
 <dialog id="ending" class="ending-dialog"><div class="ending-flash" aria-hidden="true"></div>${drops(24)}${sparkles(18)}<p class="eyebrow">THANK YOU FOR DIVING</p><h2>ふたりの旅は、ここまで。</h2><p>同じ海で見つけた景色を、<br>ふたりで話してみよう。</p><button id="ending-finish" class="primary">海から戻る</button></dialog>
-<dialog id="help">${waterLight}<h2>遊び方</h2><p>親は100点から。子どもがアイテムを取ると、隠れたリスク分だけ親の点が減り、子どもは報酬を得ます。</p><p>親は通路に壁を置けます。壁1枚ごとに親は設定したコスト、子どもは1点を失うので、アイテムを取る前でも子どもの点はマイナスになることがあります。道がふさがると、子どもだけの秘密の通路が開きます。</p><p>矢印キー/WASDで操作。親はTabで向き、Spaceで設置。Escで一時停止。Fで全画面。</p><p class="pad-help"><b>🎮 PS5コントローラー</b><br>方向キー/左スティック 移動・位置選択 · × 壁を置く · 右スティック/○ 壁の向き · OPTIONS スタート/一時停止 · CREATE リセット · L1/R1 モード切替 · □ 設定 · △ 全画面</p><button id="help-close" class="primary">OK</button></dialog>`;
+<dialog id="help">${waterLight}<h2>遊び方</h2><p>親は100点から。子どもがアイテムを取ると、隠れたリスク分だけ親の点が減り、子どもは報酬を得ます。</p><p>親は通路に壁を置けます。壁1枚ごとに親は設定したコスト、子どもは1点を失うので、アイテムを取る前でも子どもの点はマイナスになることがあります。道がふさがると、子どもだけの秘密の通路が開きます。</p><p id="keyboard-help">矢印キー/WASDで操作。親はTabで向き、Spaceで設置。Escで一時停止。Fで全画面。</p><div class="pad-help" hidden><b>PlayStation コントローラー</b>${controllerDiagram()}<p>親：位置を選んで壁を設置</p><div class="controller-actions">${playGuide('parent')}</div><p>子ども：移動してアイテムを探す</p><div class="controller-actions">${playGuide('child')}</div><p>共通の操作</p><div class="controller-actions">${padAction('options', 'スタート / 一時停止')}${padAction('square', '設定')}${padAction('triangle', '全画面')}</div><p>メニュー：方向キー / 左スティックで項目を選択、×で決定、○で戻る。設定の数値は左右で変更。部屋コードは×で入力画面を開きます。</p><p>チュートリアル：L1で前へ、R1 / OPTIONSで次へ・確認、CREATEで閉じる。タッチパッドボタンで遊び方を表示。</p>${sandboxMode ? '<p>テストモード：L1 / R1で役割切替、CREATEでリセット。</p>' : ''}</div><button id="help-close" class="primary">OK</button></dialog>`;
 
 const $ = id => document.getElementById(id);
 let game = createMaze(), cursor = game.avatar, direction = 0, seed = 260830, keys = new Set(), last = 0, uiClock = 0, resultShown = false, lastPhase = null, endingTimer = null, sentOxygen = -1, diveTimer = 0;
 const resultScene = createResultScene($('result-scene'));
+const controllerUI = createControllerUI();
+let padSeen = false;
 // Presentation dialogs rise in once per real opening; fullscreen re-insertion must not replay it.
 function reveal(dialog) { dialog.classList.add('entering'); dialog.showModal(); }
 document.querySelectorAll('dialog').forEach(d => d.addEventListener('animationend', e => { if (e.target === d && e.animationName.startsWith('dialog-')) d.classList.remove('entering'); }));
@@ -64,8 +74,8 @@ const keyDirection = { ArrowRight: 0, d: 0, ArrowDown: 1, s: 1, ArrowLeft: 2, a:
 const descriptions = { parent: '壁を置いて子どもCPUを導こう', child: 'アイテムを集めよう', cpu: 'CPU同士を観察' };
 function oceanPhase() { return !$('lobby').hidden ? 'lobby' : game.phase === 'result' && network.active ? 'summary' : game.phase; }
 function showLobby(on) { if ($('ending').open && !on) return; $('lobby').hidden = !on; document.querySelector('.workspace').hidden = on; if (on) lobbySummary(); window.dispatchEvent(new CustomEvent('ocean-phase', { detail: oceanPhase() })); }
-const network = testMode ? { active: false, connected: false, state: null, send() {} } : connectMaze({ settings: () => Object.fromEntries(new FormData($('settings'))), notice,
-  onLeave: () => { clearTimeout(endingTimer); $('ending').close(); $('countdown').close(); $('settings-dialog').close(); setImmersive(false); document.querySelector('.boards').classList.remove('network-boards'); document.querySelectorAll('.board-card').forEach(b => b.hidden = false); reset(); showLobby(true); },
+const network = sandboxMode ? { active: false, connected: false, state: null, send() {} } : (testRole ? connectSoloMaze : connectMaze)({ role: testRole, settings: () => Object.fromEntries(new FormData($('settings'))), notice,
+  onLeave: () => { clearTimeout(endingTimer); tutorial.stop(); $('ready').close(); $('help').close(); $('ending').close(); $('countdown').close(); $('settings-dialog').close(); setImmersive(false); document.querySelector('.boards').classList.remove('network-boards'); document.querySelectorAll('.board-card').forEach(b => b.hidden = false); reset(); showLobby(true); },
   onState: packet => {
     showLobby(false);
     const changed = network.stateRound !== packet.round || network.stateCode !== packet.code;
@@ -84,11 +94,17 @@ function readyPrompt() {
   const waiting = ['ready', 'paused'].includes(game.phase) && !$('result').open;
   if (!waiting) { if ($('ready').open) { $('ready').close(); tutorial.stop(); } return; }
   const { partner, ready, code, match, tutorialComplete } = network.state, paused = game.phase === 'paused';
-  const partnerLine = partner.connected ? partner.ready ? '相手は準備完了' : partner.tutorialComplete ? '相手は準備中' : '相手はチュートリアルを確認中' : '相手を待っています';
+  const partnerLine = testRole ? '相手はCPU · 準備完了' : partner.connected ? partner.ready ? '相手は準備完了' : partner.tutorialComplete ? '相手は準備中' : '相手はチュートリアルを確認中' : '相手を待っています';
   $('ready-eyebrow').textContent = `${paused ? 'ひと休み中' : `第${match.leg}ラウンド / 全2ラウンド`} · ${partnerLine}`;
   $('ready-title').textContent = game.mode === 'parent' ? 'あなたは親です。' : 'あなたは子どもです。';
-  $('ready-note').textContent = network.state.reason || 'チュートリアルを確認して準備完了を押してください。二人の準備ができたら3秒後に始まります。';
-  if (!$('ready').open) { reveal($('ready')); if (paused || tutorialComplete) tutorial.stop(); else tutorial.start(game.mode, game.settings); setImmersive(true); }
+  $('ready-note').textContent = testRole ? (paused ? '準備完了で3秒後に再開します。' : '相手はCPUです。チュートリアルを確認し、準備完了で3秒後に始まります。') : network.state.reason || 'チュートリアルを確認して準備完了を押してください。二人の準備ができたら3秒後に始まります。';
+  if (!$('ready').open) {
+    const overlays = [$('settings-dialog'), $('help')].filter(dialog => dialog.open), focused = document.activeElement;
+    reveal($('ready')); if (paused || tutorialComplete) tutorial.stop(); else tutorial.start(game.mode, game.settings); setImmersive(true);
+    // A server pause can arrive after settings/help opened; keep that active modal above ready.
+    for (const dialog of overlays) { dialog.close(); dialog.showModal(); }
+    if (overlays.length) focused?.focus({ preventScroll: true });
+  }
   // The briefing is the whole prompt until it is closed or finished; its last step confirms.
   const briefing = !paused && !ready && tutorial.running;
   $('ready').classList.toggle('briefing', briefing);
@@ -150,6 +166,7 @@ $('rotate').onclick = rotate; $('place').onclick = wall;
 $('help-open').onclick = () => { suspend(); reveal($('help')); };
 $('result').addEventListener('close', () => resultScene.stop());
 $('help-close').onclick = () => $('help').close();
+$('settings-help').onclick = () => reveal($('help'));
 // The dialog sits in the top layer, so it stays reachable in fullscreen where the panels are hidden.
 $('settings-open').onclick = () => { suspend(); $('settings-dialog').showModal(); };
 $('lobby-settings-open').onclick = () => $('settings-dialog').showModal();
@@ -200,8 +217,8 @@ function update() {
   $('defaults').hidden = network.active;
   $('room-chip').hidden = !network.active;
   if (network.active) {
-    $('room-chip-code').textContent = network.state.code;
-    $('room-chip-partner').textContent = network.state.partner.connected ? network.state.partner.ready ? '相手は準備完了' : '相手が接続中' : '相手を待っています';
+    $('room-chip-code').textContent = testRole ? testLabel : network.state.code;
+    $('room-chip-partner').textContent = testRole ? '相手はCPU' : network.state.partner.connected ? network.state.partner.ready ? '相手は準備完了' : '相手が接続中' : '相手を待っています';
   }
   $('phase').textContent = { ready: '開始前', countdown: 'まもなく開始', playing: '探検中', paused: 'ひと休み中', result: '探検完了' }[game.phase];
   $('phase-dot').classList.toggle('live', game.phase === 'playing');
@@ -242,7 +259,7 @@ function update() {
   $('rotate').hidden = $('place').hidden = game.mode !== 'parent';
   document.querySelector('.dpad').hidden = game.mode === 'cpu';
   $('direction').textContent = ['右', '下', '左', '上'][direction];
-  $('control-hint').textContent = game.mode === 'parent' ? 'マスの端をクリック、またはSpaceで壁を設置' : game.mode === 'child' ? '矢印/WASDで移動 · 点線は秘密の通路' : '';
+  $('control-hint').innerHTML = padSeen ? playGuide(game.mode) : game.mode === 'parent' ? 'マスの端をクリック、またはSpaceで壁を設置' : game.mode === 'child' ? '矢印/WASDで移動 · 点線は秘密の通路' : '';
   if (game.phase === 'result' && !resultShown) {
     resultShown = true; keys.clear();
     // A match is one round as the parent and one as the child; the second result closes it out.
@@ -266,31 +283,77 @@ let networkClock = 0;
 function step(now) {
   const dt = last ? Math.max(0, Math.min((now - last) / 1000, 1)) : 0; last = now; const padDir = pollPad(now), key = [...keys].at(-1), held = key !== undefined ? keyDirection[key] : padDir >= 0 ? padDir : undefined;
   if (!network.active) { for (let left = dt; left > 0; left -= .1) tick(game, Math.min(left, .1), held === undefined ? -1 : held); }
-  else { networkClock += dt; if (networkClock >= .06) { networkClock = 0; if (held !== undefined && game.mode === 'child' && game.phase === 'playing') network.send({ type: 'move', direction: held }); } }
+  else { network.advance?.(dt); networkClock += dt; if (networkClock >= .06) { networkClock = 0; if (held !== undefined && game.mode === 'child' && game.phase === 'playing') network.send({ type: 'move', direction: held }); } }
   uiClock += dt; if (uiClock >= .08 || game.phase === 'result' && !resultShown) { update(); uiClock = 0; }
 }
-const readPad = createPadReader(); let padSeen = false, feltWalls = 0, feltItems = 0, feltPhase = '';
+const readPad = createPadReader(); let feltWalls = 0, feltItems = 0, feltPhase = '';
+function controllerHints() {
+  let scope = document.querySelector('.workspace'), hint = '';
+  const menu = controllerUI.menuHint;
+  if (controllerUI.editing) { scope = $('controller-keyboard'); hint = padAction('cross', '入力') + padAction('square', '1文字消す') + padAction('options', '入力完了') + padAction('circle', '戻る'); }
+  else if ($('help').open) { scope = $('help'); hint = padAction('circle', '閉じる') + padAction('dpad', 'スクロール'); }
+  else if ($('settings-dialog').open) { scope = $('settings-dialog'); hint = menu + padAction('dpad', '数値は左右で変更'); }
+  else if ($('ending').open) { scope = $('ending'); hint = padAction('cross', '海から戻る'); }
+  else if ($('countdown').open) { scope = $('countdown'); hint = padAction('options', '待機に戻る') + padAction('circle', '待機に戻る'); }
+  else if ($('result').open) { scope = $('result'); hint = padAction('dpad', '項目を選択') + padAction('cross', '決定') + padAction('circle', network.active ? '終了する' : '閉じる'); }
+  else if ($('ready').open) {
+    scope = $('ready');
+    hint = !$('ready-tutorial').hidden ? padAction('l1', '前へ') + padAction('r1', '次へ / 確認') + padAction('options', '次へ / 確認') + padAction('create', '閉じる') : padAction('dpad', '項目を選択') + padAction('cross', '決定') + padAction('options', '準備完了 / 再開');
+    hint += padAction('square', '設定');
+  } else if (!$('lobby').hidden) { scope = document.querySelector('.lobby-card'); hint = padAction('dpad', '項目を選択') + padAction('cross', '決定 / コード入力') + padAction('square', '設定'); }
+  else hint = playGuide(game.mode) + padAction('options', '開始 / 一時停止') + padAction('square', '設定') + padAction('triangle', '全画面') + padAction('touchpad', '遊び方') + (sandboxMode ? padAction('l1', '前の役割') + padAction('r1', '次の役割') + padAction('create', 'リセット') : '');
+  controllerUI.hint(scope, hint, padSeen);
+}
 function pollPad(now) {
   const pad = firstPad(), input = readPad(pad, now);
-  if (!!pad !== padSeen) { padSeen = !!pad; $('pad-status').hidden = !pad; if (pad) notice('コントローラーを接続しました 🎮'); }
+  if (!!pad !== padSeen) {
+    padSeen = !!pad; $('pad-status').hidden = !pad;
+    document.body.classList.toggle('controller-connected', padSeen);
+    $('keyboard-help').hidden = padSeen; document.querySelector('.pad-help').hidden = !padSeen;
+    tutorial.setController(padSeen);
+    $('fullscreen').title = padSeen ? '全画面 (△)' : '全画面 (F)';
+    $('board-parent').setAttribute('aria-label', padSeen ? '親の迷路。左スティックで位置、右スティックで向き、×で壁を設置' : '親の迷路。マスの端をクリックして壁を設置');
+    $('board-child').setAttribute('aria-label', padSeen ? '子どもの迷路。左スティック・方向キーで移動' : '子どもの迷路。矢印キーで移動');
+    if (pad) notice('コントローラーを接続しました。PlayStation のボタンで操作できます。');
+    else { suspend(); notice('コントローラーが切断されました。再接続するかキーボードで操作してください。'); }
+    update();
+  }
+  controllerHints();
   if (!pad) return -1;
   const on = name => input.pressed.has(name);
-  if ($('ending').open) { if (on('cross') || on('circle')) finishEnding(); return -1; }
-  if ($('countdown').open) { if (on('options') || on('circle')) suspend(); return -1; }
-  if ($('help').open) { if (on('cross') || on('circle')) $('help').close(); return -1; }
-  if ($('result').open) { if (on('cross')) $('again').click(); if (on('circle')) $('close-result').click(); return -1; }
-  if ($('settings-dialog').open) { if (on('circle') || on('square')) $('settings-close').click(); return -1; }
-  if ($('ready').open) {
-    const briefing = !$('ready-tutorial').hidden;
-    if (briefing) tutorial.pad(input, on);
-    if (on('options')) { if (briefing) { if (tutorial.last) $('ready-tutorial').querySelector('.briefing-launch').click(); else tutorial.next(); } else $('ready-start').click(); }
-    if (on('square')) $('ready-settings').click();
+  if (controllerUI.editing) { controllerUI.keyboard(input); return -1; }
+  if (on('triangle')) { toggleImmersive(); return -1; }
+  if ($('help').open) {
+    if (on('cross') || on('circle') || on('touchpad')) $('help-close').click();
+    else if (input.step >= 0) $('help').scrollBy(0, input.step === 1 || input.step === 0 ? 100 : -100);
     return -1;
   }
-  if (!$('lobby').hidden) { if (on('square')) $('lobby-settings-open').click(); return -1; }
+  if ($('settings-dialog').open) {
+    if (on('circle') || on('square')) $('settings-close').click();
+    else controllerUI.navigate($('settings-dialog'), input);
+    return -1;
+  }
+  if ($('ending').open) { if (on('cross') || on('circle')) finishEnding(); return -1; }
+  if ($('countdown').open) { if (on('options') || on('circle') || on('cross')) suspend(); return -1; }
+  if ($('result').open) {
+    if (on('circle')) $('close-result').click(); else controllerUI.navigate($('result'), input);
+    return -1;
+  }
+  if (on('touchpad')) { $('help-open').click(); return -1; }
+  if ($('ready').open) {
+    if (on('square')) { $('ready-settings').click(); return -1; }
+    if (!$('ready-tutorial').hidden) tutorial.pad(input, on);
+    else if (on('options')) $('ready-start').click();
+    else controllerUI.navigate($('ready'), input);
+    return -1;
+  }
+  if (!$('lobby').hidden) {
+    if (on('square')) $('lobby-settings-open').click();
+    else controllerUI.navigate($('app'), input);
+    return -1;
+  }
   if (on('square')) { $('settings-open').click(); return -1; }
-  if (on('options')) toggle();
-  if (on('triangle')) toggleImmersive();
+  if (on('options')) { toggle(); return -1; }
   if (on('create') && !network.active) reset();
   if ((on('l1') || on('r1')) && !network.active) { const modes = ['parent', 'child', 'cpu']; setMode(modes[(modes.indexOf(game.mode) + (on('r1') ? 1 : 2)) % 3]); }
   if (game.mode === 'parent') { if (input.step >= 0) control(input.step); if (input.aim >= 0) { direction = input.aim; update(); } if (on('circle')) rotate(); if (on('cross')) wall(); }

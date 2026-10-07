@@ -1,5 +1,5 @@
 // DualSense (PS5) and other controllers through the Gamepad API "standard" mapping.
-export const BUTTONS = { cross: 0, circle: 1, square: 2, triangle: 3, l1: 4, r1: 5, create: 8, options: 9, up: 12, down: 13, left: 14, right: 15 };
+export const BUTTONS = { cross: 0, circle: 1, square: 2, triangle: 3, l1: 4, r1: 5, create: 8, options: 9, up: 12, down: 13, left: 14, right: 15, touchpad: 17 };
 const REPEAT_DELAY = 280, REPEAT_EVERY = 110, DEAD_ZONE = .5;
 
 const down = (pad, name) => !!pad.buttons[BUTTONS[name]]?.pressed;
