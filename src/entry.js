@@ -6,7 +6,8 @@ const onOxygen = event => ocean.setOxygen(event.detail);
 window.addEventListener('ocean-phase', onPhase);
 window.addEventListener('ocean-pulse', onPulse);
 window.addEventListener('ocean-oxygen', onOxygen);
-await import('./maze-main.js');
+// Load the game after the presentation listeners are registered.
+void import('./maze-main.js');
 
 if (import.meta.hot) import.meta.hot.dispose(() => {
   ocean.destroy();
