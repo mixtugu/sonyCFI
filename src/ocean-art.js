@@ -1,4 +1,5 @@
 // Shared, procedural ocean artwork. All coordinates are presentation-only.
+import { OCEAN } from './ocean-palette.js';
 const TAU = Math.PI * 2;
 export const motionPreference = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
 export function disc(c, x, y, r, fill) {
@@ -8,7 +9,7 @@ export function drawWater(c, w, h, time, { surface = false, detail = 1 } = {}) {
   const t = motionPreference.matches ? 0 : time;
   c.save();
   const water = c.createLinearGradient(0, 0, w * .35, h);
-  water.addColorStop(0, '#16788a'); water.addColorStop(.35, '#0b4c63'); water.addColorStop(1, '#041c32');
+  water.addColorStop(0, OCEAN.surface); water.addColorStop(.35, OCEAN.base); water.addColorStop(1, OCEAN.deep);
   c.fillStyle = water; c.fillRect(0, 0, w, h);
   // Wide, soft shafts and narrow caustic bands refract at different rates.
   c.globalCompositeOperation = 'screen';
@@ -16,7 +17,7 @@ export function drawWater(c, w, h, time, { surface = false, detail = 1 } = {}) {
     const x = w * (i * .21 - .16) + Math.sin(t * .19 + i) * w * .035;
     c.save(); c.transform(1, 0, w * .27 / h, 1, x, 0);
     const light = c.createLinearGradient(0, 0, w * .16, 0);
-    light.addColorStop(0, '#b8fff300'); light.addColorStop(.4, '#b8fff311'); light.addColorStop(.6, '#b8fff315'); light.addColorStop(1, '#b8fff300');
+    light.addColorStop(0, `${OCEAN.light}00`); light.addColorStop(.4, `${OCEAN.light}11`); light.addColorStop(.6, `${OCEAN.light}15`); light.addColorStop(1, `${OCEAN.light}00`);
     c.fillStyle = light; c.fillRect(0, 0, w * .16, h); c.restore();
   }
   for (let i = 0; i < 11; i++) {
@@ -36,7 +37,7 @@ export function drawWater(c, w, h, time, { surface = false, detail = 1 } = {}) {
   // Silhouettes sit behind the navigable world, never over its markers.
   for (let i = 0; i < 16 * detail; i++) {
     const x = (i + .4) / (16 * detail) * w, size = 15 + (i * 31 % 47);
-    c.strokeStyle = i % 2 ? '#125459' : '#0a3949'; c.lineWidth = 3; c.lineCap = 'round';
+    c.strokeStyle = i % 2 ? OCEAN.raised : OCEAN.panel; c.lineWidth = 3; c.lineCap = 'round';
     for (let j = -1; j <= 1; j++) {
       c.beginPath(); c.moveTo(x + j * 5, h + 6); c.bezierCurveTo(x - 8, h - size * .3, x + j * 7 + Math.sin(t * .6 + i) * 9, h - size * .7, x + j * 8 + Math.sin(t * .6 + i) * 7, h - size); c.stroke();
     }
@@ -49,7 +50,7 @@ export function drawWater(c, w, h, time, { surface = false, detail = 1 } = {}) {
         const y = horizon - layer * 13 + Math.sin(x / (95 + layer * 35) + t * (.42 + layer * .08)) * (8 + layer * 2);
         c.lineTo(x, y);
       }
-      c.closePath(); c.fillStyle = ['#63c6ca28', '#86e4db28', '#a2f4e33a', '#c1fbe657', '#cceceba0'][layer]; c.fill();
+      c.closePath(); c.fillStyle = ['#687ed728', '#8d9fe828', '#aab9f43a', '#c1ccfb57', '#d4dcefa0'][layer]; c.fill();
     }
     const sun = c.createRadialGradient(w * .67, 0, 0, w * .67, 0, w * .45);
     sun.addColorStop(0, '#e8fff44d'); sun.addColorStop(1, '#b4fff000'); c.fillStyle = sun; c.fillRect(0, 0, w, h);

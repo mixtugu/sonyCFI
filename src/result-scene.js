@@ -1,4 +1,5 @@
 import { drawDiverHD, disc, motionPreference, causticTile } from './ocean-art.js';
+import { OCEAN } from './ocean-palette.js';
 
 const TAU = Math.PI * 2;
 // The report header: the diver rises toward a sunlit, rippling surface.
@@ -12,7 +13,7 @@ export function createResultScene(canvas) {
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
     const still = motionPreference.matches, t = still ? 4 : (now - start) / 1000;
     const water = c.createLinearGradient(0, 0, 0, h);
-    water.addColorStop(0, '#86ded8'); water.addColorStop(.2, '#3eaab4'); water.addColorStop(.62, '#15607a'); water.addColorStop(1, '#0c3b51');
+    water.addColorStop(0, OCEAN.light); water.addColorStop(.2, OCEAN.surface); water.addColorStop(.62, OCEAN.base); water.addColorStop(1, OCEAN.deep);
     c.fillStyle = water; c.fillRect(0, 0, w, h);
     const sun = c.createRadialGradient(w * .68, -10, 0, w * .68, -10, h * 1.1);
     sun.addColorStop(0, 'rgba(255,248,220,.6)'); sun.addColorStop(1, 'rgba(255,248,220,0)'); c.fillStyle = sun; c.fillRect(0, 0, w, h);

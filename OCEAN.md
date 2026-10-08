@@ -4,6 +4,7 @@ The lobby, preparation, exploration, pause, and return screens share a procedura
 
 ## Modules
 
+- `src/ocean-palette.js`: the shared `#000066` (RGB 0, 0, 102) foundation and its light/deep variants. It supplies CSS custom properties, Canvas gradients and WebGL colors. Warm gameplay markers, risk colors and PlayStation button colors retain their distinct meanings.
 - `src/ocean-art.js`: reusable water, refraction, particles, plants, the lobby diver, the in-game diver (`drawDiverHD`), the shared tileable caustic texture, and ripple drawing. Rendering does not modify game state.
 - `src/ocean-presentation.js`: the lobby's 2D viewport canvas, the automatic 3.2-second dive introduction, and pointer ripples. From the briefing on it cross-fades to the WebGL ocean and drives its camera per phase: shallow briefing, descent during the countdown, deep exploration (darker and red-tinged as oxygen runs out), ascent on the report, and breaking the surface on the ending. Without WebGL the 2D sea covers every phase as before.
 - `src/ocean-depths.js`: the full-screen WebGL shader: god rays, caustics, a parallax reef floor with kelp, three-layer marine snow, bubble columns, the surface seen from below, the above-water ending shot, countdown shock rings, and tap ripples. It renders at about half resolution and at most 30 times per second.

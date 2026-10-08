@@ -1,4 +1,5 @@
 import './ocean.css';
+import { applyOceanPalette } from './ocean-palette.js';
 import { drawWater, drawDiver, drawRipple, motionPreference, causticTile } from './ocean-art.js';
 import { createDepths } from './ocean-depths.js';
 import { drawFish, drawJelly } from './maze-renderer.js';
@@ -9,6 +10,7 @@ const SCENES = { ready: { depth: .34 }, countdown: { depth: .7 }, playing: { dep
 // A single bounded ambient canvas follows the whole journey; gameplay never waits for it.
 // The lobby keeps the 2D sea; from the briefing on, a WebGL ocean takes over where available.
 export function createOceanPresentation() {
+  applyOceanPalette();
   document.body.classList.add('ocean-world');
   try { document.documentElement.style.setProperty('--caustics', `url(${causticTile().toDataURL()})`); } catch { /* CSS falls back to plain glass. */ }
   const canvas = document.createElement('canvas');

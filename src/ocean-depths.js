@@ -1,5 +1,6 @@
 // Full-screen WebGL ocean for the in-game journey: light shafts, caustics, parallax reef and
 // marine snow, bubble columns, the surface seen from below, and the camera breaking the surface.
+import { OCEAN, oceanGLSL } from './ocean-palette.js';
 const VERTEX = 'attribute vec2 a;void main(){gl_Position=vec4(a,0.,1.);}';
 const FRAGMENT = `
 #ifdef GL_FRAGMENT_PRECISION_HIGH
@@ -39,7 +40,7 @@ vec3 skyAndSea(vec2 p, float t, float aspect, float horizon) {
   float cl = fbm(vec2(p.x * 1.4 + t * .012, p.y * 4.5));
   sky = mix(sky, vec3(1., .97, .93), smoothstep(.52, .8, cl) * .45 * smoothstep(horizon + .03, horizon + .2, p.y));
   float k = clamp((p.y - (horizon - .22)) / .22, 0., 1.);
-  vec3 sea = mix(vec3(.04, .30, .40), vec3(.55, .74, .78), pow(k, 1.8));
+  vec3 sea = mix(${oceanGLSL(OCEAN.base)}, ${oceanGLSL(OCEAN.light)}, pow(k, 1.8));
   float z = 1. / max(horizon - p.y, .012);
   sea += (noise(vec2(p.x * z * .9 + t * .25, z * 1.6 - t * .7)) - .5) * .09;
   float glit = pow(noise(vec2(p.x * 34., p.y * 75. + t * 2.4)), 9.) * 2.2;
@@ -63,21 +64,21 @@ void main() {
   float wlFlat = mix(.95, -.06, s);
   float wl = wlFlat + (.022 * sin(p.x * 5. + t * 1.4) + .011 * sin(p.x * 12.7 - t * 2.3)) * s;
 
-  vec3 top = mix(vec3(.18, .63, .68), vec3(.02, .14, .23), d);
-  vec3 bot = mix(vec3(.03, .27, .37), vec3(.004, .03, .07), d);
+  vec3 top = mix(${oceanGLSL(OCEAN.surface)}, ${oceanGLSL(OCEAN.base)}, d);
+  vec3 bot = mix(${oceanGLSL(OCEAN.base)}, ${oceanGLSL(OCEAN.abyss)}, d);
   vec3 col = mix(bot, top, pow(clamp(uv.y + uPointer.y * .04, 0., 1.), 1.3));
   vec2 sun = vec2(.22 * aspect + uPointer.x * .1, .72);
-  col += vec3(.22, .52, .52) * exp(-length((p - sun) * vec2(.75, 1.3)) * 2.1) * (1. - d * .75) * .6;
+  col += vec3(.25, .3, .65) * exp(-length((p - sun) * vec2(.75, 1.3)) * 2.1) * (1. - d * .75) * .6;
 
   float a = atan(p.x - sun.x, sun.y + .3 - p.y);
   float rays = smoothstep(.45, 1., noise(vec2(a * 8. + 1.3, t * .11)));
   rays += .75 * smoothstep(.5, 1., noise(vec2(a * 15. - 4., t * .17 + 3.)));
   rays += .5 * smoothstep(.55, 1., noise(vec2(a * 29. + 7., t * .23)));
   rays *= smoothstep(-.75, .45, p.y) * (1. - d * .5) * (1. + s * 1.5);
-  col += vec3(.5, .92, .86) * rays * .2;
+  col += ${oceanGLSL(OCEAN.light)} * rays * .2;
 
   float cz = caustic(vec2(p.x * .55 + uPointer.x * .05, p.y * .9), t * .42);
-  col += vec3(.3, .7, .66) * cz * .05 * (1. - d * .6);
+  col += vec3(.4, .5, .9) * cz * .05 * (1. - d * .6);
 
   // Reef floor: three parallax silhouettes, caustic-lit, with kelp on the nearest.
   for (int L = 0; L < 3; L++) {
@@ -86,8 +87,8 @@ void main() {
     float base = mix(-.95 - fl * .03, -.2 - fl * .09, d);
     float prof = base + .11 * fbm(vec2(x * 1.3, fl * 1.7)) + .03 * noise(vec2(x * 7., fl * 3.1));
     float m = smoothstep(prof + .005, prof - .005, p.y);
-    vec3 rock = mix(col, vec3(.006, .04, .065), .45 + fl * .2);
-    rock += vec3(.3, .72, .66) * cz * (.22 - fl * .05) * (1. - d * .45) * smoothstep(prof - .2, prof, p.y);
+    vec3 rock = mix(col, ${oceanGLSL(OCEAN.abyss)}, .45 + fl * .2);
+    rock += vec3(.4, .5, .9) * cz * (.22 - fl * .05) * (1. - d * .45) * smoothstep(prof - .2, prof, p.y);
     col = mix(col, rock, m);
     if (L == 2) {
       float q = x * 4.5, id = floor(q), hh = hash(vec2(id, 4.2));

@@ -1,5 +1,6 @@
 import { neighbor, edge } from './maze.js';
 import { drawDiverHD, drawRipple, disc, motionPreference, causticTile } from './ocean-art.js';
+import { OCEAN } from './ocean-palette.js';
 
 // Presentation-only: reads the role's state, never mutates it. Each canvas keeps its own visual
 // state (clocks, caches, particles) in a WeakMap, including the tutorial boards.
@@ -35,7 +36,7 @@ function paintSeabed(cols, rows, variant) {
   const w = cols * CELL + PAD * 2, h = rows * CELL + PAD * 2, canvas = layer(w * 2, h * 2), c = canvas.getContext('2d');
   c.scale(2, 2);
   const sand = c.createLinearGradient(0, 0, w * .35, h);
-  sand.addColorStop(0, '#1e6674'); sand.addColorStop(.5, '#134c5d'); sand.addColorStop(1, '#0a3144');
+  sand.addColorStop(0, OCEAN.surface); sand.addColorStop(.5, OCEAN.base); sand.addColorStop(1, OCEAN.deep);
   c.fillStyle = sand; c.fillRect(0, 0, w, h);
   for (let i = 0; i < 70; i++) {
     const x = hash(i * 7 + variant) * w, y = hash(i * 13 + 5 + variant) * h, r = 16 + hash(i * 3 + 1) * 46, light = hash(i + 99) > .5;
@@ -414,7 +415,7 @@ export function drawMaze(canvas, s, role, cursor, direction, options = {}) {
   if (v.fogLevel > .005) {
     const f = v.fog.getContext('2d');
     f.globalCompositeOperation = 'source-over'; f.clearRect(0, 0, width, height);
-    f.fillStyle = `rgba(1,9,20,${v.fogLevel})`; f.fillRect(0, 0, width, height);
+    f.fillStyle = `rgba(0,0,25,${v.fogLevel})`; f.fillRect(0, 0, width, height);
     f.globalCompositeOperation = 'destination-out';
     f.globalAlpha = .72; f.drawImage(v.explored, 0, 0); f.globalAlpha = 1;
     const flicker = 1 + Math.sin(amb * 9) * .015 + Math.sin(amb * 23) * .01, r = cell * 2.3 * flicker;
