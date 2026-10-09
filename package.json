@@ -7,7 +7,7 @@
         "dev": "node server/index.js --dev",
         "build": "vite build",
         "preview": "node server/index.js",
-        "test": "node --test",
+        "test": "node --test src/*.test.js server/*.test.js",
         "start": "node server/index.js",
         "worker:dev": "npm run build && wrangler dev --port 8787",
         "deploy": "npm run build && wrangler deploy",

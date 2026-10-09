@@ -6,12 +6,33 @@ const socket = () => ({ readyState: 1, packets: [], send(raw) { this.packets.pus
 function setup() {
   const service = new MazeRooms(), parent = socket(), child = socket();
   service.handle(parent, { type: 'create', role: 'child' }); const room = [...service.rooms.values()][0];
+  assert.equal(room.code, 'A');
   service.handle(child, { type: 'join', code: room.code });
   assert.deepEqual(room.members.map(m => m.role), ['parent', 'child']);
   const both = type => { service.handle(parent, { type }); service.handle(child, { type }); };
   const ready = () => { both('tutorial'); both('ready'); };
   return { service, parent, child, room, both, ready };
 }
+test('room key is A and an occupied fixed key cannot be replaced', () => {
+  const { service, room } = setup(), duplicate = socket();
+  service.handle(duplicate, { type: 'create' });
+  assert.equal(service.rooms.get('A'), room);
+  assert.equal(duplicate.packets.at(-1).code, 'full');
+});
+test('fixed key becomes reusable after both players explicitly leave', () => {
+  for (const completed of [false, true]) {
+    const { service, parent, child, room } = setup();
+    if (completed) { room.leg = 2; room.game.phase = 'result'; }
+    service.handle(parent, { type: 'leave' });
+    assert.equal(service.rooms.get('A'), room, 'preserve the remaining player session and report');
+    service.handle(child, { type: 'leave' });
+    assert.equal(service.rooms.has('A'), false);
+    const next = socket();
+    service.handle(next, { type: 'create' });
+    assert.notEqual(service.rooms.get('A'), room);
+    assert.equal(next.packets[0].type, 'session');
+  }
+});
 test('both tutorial confirmations and ready votes precede a locked 3, 2, 1 countdown', () => {
   const { service, parent, child, room, both } = setup();
   both('ready'); assert.equal(room.game.phase, 'ready'); assert.ok(room.members.every(m => !m.ready));

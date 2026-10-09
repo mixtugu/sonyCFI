@@ -18,12 +18,16 @@ try {
   await parent.goto(url); await expect(parent.locator('#maze-create button')).toBeEnabled();
   await parent.locator('#lobby-settings-open').click(); await parent.locator('[name=duration]').fill('10'); await parent.locator('#settings button[type=submit]').click();
   await parent.locator('#maze-create button').click();
-  await expect(parent.locator('#maze-code')).toHaveText(/^[A-F0-9]{6}$/, { timeout: 15000 });
+  await expect(parent.locator('#maze-code')).toHaveText('A', { timeout: 15000 });
   const code = await parent.locator('#maze-code').innerText();
+  const duplicateStatus = await parent.evaluate(async () => (await fetch('/maze-api', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ settings: {} }),
+  })).status);
+  assert.equal(duplicateStatus, 409, 'occupied fixed key cannot be replaced');
   await child.goto(`${url}/?maze=${code}`); await expect(child.locator('#maze-join button')).toBeEnabled(); await child.locator('#maze-join button').click();
-  await expect(child.locator('#maze-role')).toHaveText('子ども役');
+  await expect(child.locator('#maze-role')).toHaveText('エクスプローラー');
   await expect(parent.locator('#board-child')).toBeHidden(); await expect(child.locator('#board-parent')).toBeHidden();
-  await expect(parent.locator('#ready-title')).toHaveText('あなたは親です。'); await expect(child.locator('#ready-title')).toHaveText('あなたは子どもです。');
+  await expect(parent.locator('#ready-title')).toHaveText('あなたはナビゲーターです。'); await expect(child.locator('#ready-title')).toHaveText('あなたはエクスプローラーです。');
   const prepare = async page => { await page.locator('.briefing-next').click(); await page.locator('.briefing-next').click(); await page.locator('.briefing-launch').click(); await page.locator('#ready-start').click(); };
   const countdown = async () => { for (const n of ['3', '2', '1']) { await expect(parent.locator('#countdown-number')).toHaveText(n); await expect(child.locator('#countdown-number')).toHaveText(n); assert.equal(await parent.evaluate(() => window.packet.game.time), 0); } };
   for (const page of [parent, child]) await prepare(page);
@@ -42,11 +46,11 @@ try {
   await expect(parent.locator('#detail-parent')).toHaveText('1 / 12');
   assert.deepEqual(await parent.evaluate(() => window.packet.game.secrets), []);
   assert.equal(await child.evaluate(() => window.packet.game.parentScore), null);
-  await child.reload(); await expect(child.locator('#maze-role')).toHaveText('子ども役'); await expect(parent.locator('#phase')).toHaveText('ひと休み中');
+  await child.reload(); await expect(child.locator('#maze-role')).toHaveText('エクスプローラー'); await expect(parent.locator('#phase')).toHaveText('ひと休み中');
   await expect(parent.locator('#detail-parent')).toHaveText('1 / 12');
   await parent.locator('#ready-start').click(); await child.locator('#ready-start').click();
   await expect(parent.locator('.briefing-title')).toHaveText('移動してアイテムを探し、報酬を獲得', { timeout: 18000 });
-  await expect(child.locator('.briefing-title')).toHaveText('壁を立てて子どもを守る');
+  await expect(child.locator('.briefing-title')).toHaveText('壁を立ててエクスプローラーを守る');
   await expect(parent.locator('#result')).toBeHidden();
   assert.equal(await parent.evaluate(() => window.packet.match.leg), 2);
   assert.equal(await parent.evaluate(() => window.packet.tutorialComplete), false);
@@ -66,6 +70,12 @@ try {
   assert.deepEqual(await parent.evaluate(() => window.packet.match), totals);
   await parent.locator('#close-result').click(); await expect(parent.locator('#ending')).toBeVisible();
   await expect(parent.locator('#lobby')).toBeVisible({ timeout: 6000 });
+  await parent.locator('#maze-create button').click();
+  await expect(parent.locator('#ready')).toBeVisible();
+  await expect(parent.locator('#maze-code')).toHaveText('A');
+  await parent.locator('#ready-settings').click();
+  await parent.locator('#maze-leave').click();
+  await expect(parent.locator('#lobby')).toBeVisible();
   assert.deepEqual(errors, []);
   console.log(`PASS: Workers two-browser room, private state, moves/walls, refresh recovery, two briefings/countdowns, automatic swap, final report/ending, mobile, independent exits (${url})`);
 } finally { await browser.close(); }

@@ -68,17 +68,17 @@ export function placeWall(s, cell, dir) {
     s.secrets.add(options[Math.floor(s.random() * options.length)]);
     area = reachable(s);
   }
-  log(s, `壁を設置 · 親 −${s.settings.wallCost}, 子ども −1`);
+  log(s, `壁を設置 · ナビゲーター −${s.settings.wallCost}, エクスプローラー −1`);
   return true;
 }
 export function move(s, dir) {
   if (s.phase !== 'playing' || s.cooldown > 0) return false;
   const b = neighbor(s, s.avatar, dir);
   if (!canMove(s, s.avatar, b)) return false;
-  if (s.secrets.has(edge(s.avatar, b))) log(s, '子どもだけが知る秘密の通路を通りました。');
+  if (s.secrets.has(edge(s.avatar, b))) log(s, 'エクスプローラーだけが知る秘密の通路を通りました。');
   s.avatar = b; s.moves++; s.trail.push(b); s.cooldown = s.settings.moveMs / 1000;
   const item = s.items.find(i => i.cell === b && !i.taken);
-  if (item) { item.taken = true; s.collected++; s.parentScore -= item.risk; s.childScore += item.reward; log(s, `未知のアイテムを発見 · 親 −${item.risk}, 子ども +${item.reward}`); }
+  if (item) { item.taken = true; s.collected++; s.parentScore -= item.risk; s.childScore += item.reward; log(s, `未知のアイテムを発見 · ナビゲーター −${item.risk}, エクスプローラー +${item.reward}`); }
   return true;
 }
 export function autoDirection(s) {

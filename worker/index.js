@@ -47,8 +47,13 @@ export class MazeRoom extends DurableObject {
   }
   async commit(room, outbox = []) {
     // Output is only released after the durable checkpoint succeeds.
-    this.ctx.storage.sql.exec('INSERT INTO room_state (id, data) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data', JSON.stringify(snapshot(room)));
-    await this.ctx.storage.setAlarm(['playing', 'countdown'].includes(room.game.phase) ? Date.now() + (room.game.phase === 'countdown' ? 100 : 1000) : room.touched + TTL);
+    if (!room.members.some(member => member.token)) {
+      this.ctx.storage.sql.exec('DELETE FROM room_state WHERE id = 1');
+      await this.ctx.storage.deleteAlarm();
+    } else {
+      this.ctx.storage.sql.exec('INSERT INTO room_state (id, data) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data', JSON.stringify(snapshot(room)));
+      await this.ctx.storage.setAlarm(['playing', 'countdown'].includes(room.game.phase) ? Date.now() + (room.game.phase === 'countdown' ? 100 : 1000) : room.touched + TTL);
+    }
     for (const [socket, packet] of outbox) { try { socket.send(JSON.stringify(packet)); } catch { /* Close event handles disconnection. */ } }
   }
   async initialize(code, settings, role) {
@@ -130,19 +135,15 @@ export default {
       const text = new TextDecoder().decode(bytes);
       let data; try { data = JSON.parse(text); } catch { return json({ error: 'Invalid JSON' }, 400); }
       if (!data || !data.settings || typeof data.settings !== 'object') return json({ error: '設定を確認してください。' }, 400);
-      for (let i = 0; i < 5; i++) {
-        const codeBytes = crypto.getRandomValues(new Uint8Array(3));
-        const code = [...codeBytes].map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
-        // The host always takes the parent seat; roles swap after every round.
-        const ticket = await env.MAZE_ROOMS.getByName(code).initialize(code, data.settings, 'parent');
-        if (ticket) return json(ticket, 201);
-      }
-      return json({ error: 'もう一度お試しください。' }, 503);
+      const code = 'A';
+      // The host always takes the parent seat; roles swap after every round.
+      const ticket = await env.MAZE_ROOMS.getByName(code).initialize(code, data.settings, 'parent');
+      return ticket ? json(ticket, 201) : json({ error: '部屋「A」はすでに使用中です。' }, 409);
     }
     if (url.pathname === '/maze-socket') {
       if (request.headers.get('Origin') !== url.origin) return json({ error: 'Forbidden' }, 403);
       const code = url.searchParams.get('code')?.toUpperCase();
-      if (!/^[A-F0-9]{6}$/.test(code || '')) return json({ error: 'Invalid room code' }, 400);
+      if (code !== 'A') return json({ error: 'Invalid room code' }, 400);
       return env.MAZE_ROOMS.getByName(code).fetch(request);
     }
     return env.ASSETS.fetch(request);

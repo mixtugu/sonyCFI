@@ -6,9 +6,9 @@ The Gamepad API is polled in `src/maze-main.js`. Connecting a controller changes
 | --- | --- |
 | Menus, lobby, results | D-pad / left stick selects, × activates the focused control |
 | Settings | Up/down selects fields; left/right adjusts numbers within their HTML limits; × selects a wall style or applies settings; ○ / □ closes |
-| Room code | × on the code field opens a six-character hex keypad; directions select keys, × enters, □ deletes, OPTIONS commits, ○ cancels |
-| Parent practice and play | D-pad / left stick selects a cell; right stick aims the wall; ○ rotates; × places |
-| Child practice and play | D-pad / left stick moves |
+| Room entry | The join key is fixed to `A`; select Join and press × |
+| Navigator practice and play | D-pad / left stick selects a cell; right stick aims the wall; ○ rotates; × places |
+| Explorer practice and play | D-pad / left stick moves |
 | Tutorial | L1 goes back; R1 / OPTIONS advances or confirms the final step; CREATE closes without confirming; □ opens settings |
 | Ready / paused | Navigate to review, invite copy, settings or ready; OPTIONS also marks ready / resumes |
 | Playing | OPTIONS pauses; □ opens settings; touchpad click opens help; △ toggles immersive mode |

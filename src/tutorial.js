@@ -6,23 +6,23 @@ import { padIcon, controllerDiagram } from './controller-guide.js';
 // line of controls. The first steps carry a 5×4 practice board to try the controls on.
 const GUIDES = {
   parent: [
-    { title: '壁を立てて子どもを守る', symbol: '親', tag: 'PARENT',
-      description: () => '矢印キーで壁の位置を選択。Tabで向きを選び、Spaceで壁を設置して、子どもが危ないアイテムへ進む道をふさぎます。',
+    { title: '壁を立ててエクスプローラーを守る', symbol: 'ナ', tag: 'NAVIGATOR',
+      description: () => '矢印キーで壁の位置を選択。Tabで向きを選び、Spaceで壁を設置して、エクスプローラーが危ないアイテムへ進む道をふさぎます。',
       controls: () => '<kbd data-practice-key="Arrow">矢印キー</kbd>で位置を選択 · <kbd data-practice-key="Tab" role="button" tabindex="0">Tab</kbd> で向き · <kbd data-practice-key="Space" role="button" tabindex="0">Space</kbd> で設置' },
-    { title: '壁も接触も親の点を下げる', symbol: '!', tag: 'PARENT SCORE',
-      description: s => `壁を立てるたびに親の点が${s.wallCost}点減ります。子どもがアイテムに触れた場合も、そのアイテムの危険度に応じて親の点が下がります。`,
-      controls: s => `壁の設置: 親 −${s.wallCost} · アイテムとの接触: 危険度分減点` },
-    { title: '制限時間内に親の点を守る', symbol: 'O₂', tag: 'TIME LIMIT',
-      description: s => `酸素ボンベの残量が制限時間（${s.duration}秒）です。時間内に危ないアイテムとの接触を抑え、親の点を保ちましょう。`,
+    { title: '壁も接触もナビゲーターの点を下げる', symbol: '!', tag: 'NAVIGATOR SCORE',
+      description: s => `壁を立てるたびにナビゲーターの点が${s.wallCost}点減ります。エクスプローラーがアイテムに触れた場合も、そのアイテムの危険度に応じてナビゲーターの点が下がります。`,
+      controls: s => `壁の設置: ナビゲーター −${s.wallCost} · アイテムとの接触: 危険度分減点` },
+    { title: '制限時間内にナビゲーターの点を守る', symbol: 'O₂', tag: 'TIME LIMIT',
+      description: s => `酸素ボンベの残量が制限時間（${s.duration}秒）です。時間内に危ないアイテムとの接触を抑え、ナビゲーターの点を保ちましょう。`,
       controls: () => '残り時間は上の酸素ボンベで確認' },
   ],
   child: [
-    { title: '移動してアイテムを探し、報酬を獲得', symbol: '子', tag: 'CHILD',
-      description: () => '矢印キーを押すと子どもが隣のマスへ1歩移動します。アイテムに触れると報酬を獲得します。',
-      controls: () => '<kbd data-practice-key="Arrow">矢印キー</kbd>で子どもを操縦 · マスをタップしても移動' },
+    { title: '移動してアイテムを探し、報酬を獲得', symbol: 'エ', tag: 'EXPLORER',
+      description: () => '矢印キーを押すとエクスプローラーが隣のマスへ1歩移動します。アイテムに触れると報酬を獲得します。',
+      controls: () => '<kbd data-practice-key="Arrow">矢印キー</kbd>でエクスプローラーを操縦 · マスをタップしても移動' },
     { title: '壁を避け、秘密の通路を通り抜ける', symbol: '↗', tag: 'SECRET PASSAGE',
-      description: () => 'ふつうの壁の先へは進めません。点線の「秘密の通路」は子どもだけが通り抜けできます。',
-      controls: () => '<kbd data-practice-key="Arrow">矢印キー</kbd>で子どもを操縦 · マスをタップしても移動' },
+      description: () => 'ふつうの壁の先へは進めません。点線の「秘密の通路」はエクスプローラーだけが通り抜けできます。',
+      controls: () => '<kbd data-practice-key="Arrow">矢印キー</kbd>でエクスプローラーを操縦 · マスをタップしても移動' },
     { title: '酸素が尽きる前に探す', symbol: 'O₂', tag: 'TIME LIMIT',
       description: s => `酸素ボンベが空になると探検終了です（${s.duration}秒）。残量を見ながら、制限時間内にできるだけ多くの報酬を集めましょう。`,
       controls: () => '残り時間は上の酸素ボンベで確認' },
@@ -103,8 +103,8 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
     controls.innerHTML = guide.controls(settings);
     find('.briefing-controller').hidden = !controller || !(cursorStep() || moveStep());
     if (controller && (cursorStep() || moveStep())) {
-      if (cursorStep()) find('.briefing-description').textContent = '左スティック・方向キーで位置を選び、右スティックで壁の向きを指定。○で回転、×で壁を設置して、子どもが危ないアイテムへ進む道をふさぎます。';
-      else if (step === 0) find('.briefing-description').textContent = '左スティック・方向キーで子どもを隣のマスへ動かします。アイテムに触れると報酬を獲得します。';
+      if (cursorStep()) find('.briefing-description').textContent = '左スティック・方向キーで位置を選び、右スティックで壁の向きを指定。○で回転、×で壁を設置して、エクスプローラーが危ないアイテムへ進む道をふさぎます。';
+      else if (step === 0) find('.briefing-description').textContent = '左スティック・方向キーでエクスプローラーを隣のマスへ動かします。アイテムに触れると報酬を獲得します。';
       controls.innerHTML = `<kbd data-practice-key="Arrow">${padIcon('left')}${padIcon('dpad')} ${parent() ? '位置' : '移動'}</kbd>` + (parent() ? `<kbd data-practice-key="Tab" role="button" tabindex="0">${padIcon('right')}${padIcon('circle')} 向き</kbd><kbd data-practice-key="Space" role="button" tabindex="0">${padIcon('cross')} 設置</kbd>` : '点線は秘密の通路');
     }
     find('.briefing-close').innerHTML = controller ? `${padIcon('create')} 閉じる` : '閉じる <kbd>Esc</kbd>';
@@ -168,7 +168,7 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
     const oxygen = find('.briefing-oxygen');
     oxygen.hidden = step !== 2;
     oxygen.querySelector('strong').textContent = String(Math.floor(settings.duration / 60)).padStart(2, '0') + ':' + String(settings.duration % 60).padStart(2, '0');
-    const practiceHint = `${controller ? '左スティック・方向キー' : '矢印キー'}で${parent() ? 'カーソル' : '子ども'}を動かしてみましょう`;
+    const practiceHint = `${controller ? '左スティック・方向キー' : '矢印キー'}で${parent() ? 'カーソル' : 'エクスプローラー'}を動かしてみましょう`;
     feedback.textContent = interactive ? practice.feedback || practiceHint : scoreExample ? '壁 −' + settings.wallCost + ' · アイテム −' + settings.redMin : '残り時間 · O₂';
     board.replaceChildren();
     if (!interactive) return;
@@ -194,7 +194,7 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
     else if (blocked(x, y, nx, ny)) practice.feedback = '壁で停止。別の方向へ進んでください';
     else {
       practice.child = { x: nx, y: ny };
-      practice.feedback = passageOpen() && practice.passages.has(edgeKey(x, y, nx, ny)) ? '秘密の通路を通り抜けました' : `子どもが ${coordinate(nx, ny)} へ移動`;
+      practice.feedback = passageOpen() && practice.passages.has(edgeKey(x, y, nx, ny)) ? '秘密の通路を通り抜けました' : `エクスプローラーが ${coordinate(nx, ny)} へ移動`;
     }
     drawBoard();
   }

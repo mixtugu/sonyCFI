@@ -21,7 +21,7 @@ try {
   const pad = async buttons => { await page.evaluate(b => { window.__pad = b; }, buttons); await page.waitForTimeout(100); await page.evaluate(() => { window.__pad = []; }); await page.waitForTimeout(100); };
 
   await page.goto(`${origin}/test/1`);
-  await expect(page.locator('#ready')).toBeVisible(); await expect(page.locator('.briefing-title')).toHaveText('壁を立てて子どもを守る');
+  await expect(page.locator('#ready')).toBeVisible(); await expect(page.locator('.briefing-title')).toHaveText('壁を立ててエクスプローラーを守る');
   await expect(page.locator('#lobby')).toBeHidden(); await expect(page.locator('#board-parent')).toBeVisible(); await expect(page.locator('#board-child')).toBeHidden();
   await expect(page.locator('#ready-invite')).toBeHidden(); await expect(page.locator('.mode-group')).toBeHidden(); await expect(page.locator('#room-chip-partner')).toHaveText('相手はCPU');
   await page.locator('#ready-settings').click(); await page.locator('[name=duration]').fill('5'); await page.locator('#settings button[type=submit]').click();
@@ -35,12 +35,12 @@ try {
   await expect(page.locator('#board-child')).toBeVisible(); await expect(page.locator('#board-parent')).toBeHidden();
   await confirm(); await expect(page.locator('#result')).toBeVisible({ timeout: 12_000 });
   await expect(page.locator('#result-rounds')).toContainText('第2ラウンド');
-  await page.locator('#again').click(); await expect(page.locator('.briefing-title')).toHaveText('壁を立てて子どもを守る');
+  await page.locator('#again').click(); await expect(page.locator('.briefing-title')).toHaveText('壁を立ててエクスプローラーを守る');
   await confirm(); await expect(page.locator('.briefing-title')).toHaveText('移動してアイテムを探し、報酬を獲得', { timeout: 12_000 });
   await confirm(); await expect(page.locator('#result')).toBeVisible({ timeout: 12_000 });
   await page.locator('#close-result').click(); await expect(page.locator('#ending')).toBeVisible(); await page.locator('#ending-finish').click();
   await expect(page.locator('#test-restart')).toBeVisible(); await expect(page.locator('#lobby')).not.toContainText('部屋をつくって');
-  await page.locator('#test-restart').click(); await expect(page.locator('.briefing-title')).toHaveText('壁を立てて子どもを守る');
+  await page.locator('#test-restart').click(); await expect(page.locator('.briefing-title')).toHaveText('壁を立ててエクスプローラーを守る');
   assert.equal(new URL(page.url()).pathname, '/test/1');
   console.log('PASS: /test/1 direct entry, private parent view, settings, pause/countdown, role swap, report, replay, ending and restart.');
 

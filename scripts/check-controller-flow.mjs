@@ -56,17 +56,8 @@ try {
   await press(parent); await expect(parent.locator('.briefing-controller')).toBeVisible();
   await parent.screenshot({ path: 'artifacts/controller-tutorial-parent.png' });
   const code = await parent.locator('#maze-code').textContent(), room = app.mazeRooms.rooms.get(code);
-  await activate(child, '#maze-join input'); await expect(child.locator('#controller-keyboard')).toBeVisible();
-  await press(child, [0]); await press(child, [2]); await expect(child.locator('#controller-keyboard output')).toHaveText('––––––');
-  for (const character of code) {
-    // Horizontal navigation walks the keypad in order, including its action row.
-    for (let i = 0; i < 25; i++) {
-      if (await child.locator(`[data-character="${character}"]`).evaluate(el => el === document.activeElement)) break;
-      await press(child, [15]);
-    }
-    await expect(child.locator(`[data-character="${character}"]`)).toBeFocused(); await press(child, [0]);
-  }
-  await press(child, [9]); await expect(child.locator('#maze-join input')).toHaveValue(code);
+  await expect(child.locator('#maze-join input')).toHaveValue('A');
+  await expect(child.locator('#maze-join input')).toHaveAttribute('readonly', '');
   await activate(child, '#maze-join button'); await expect(child.locator('#ready')).toBeVisible();
   await expect(child.locator('.briefing-description')).toContainText('左スティック');
   await press(child, [15]); await expect(child.locator('.practice-feedback')).toContainText('移動');
@@ -109,5 +100,5 @@ try {
   await activate(parent, '#maze-create button'); await expect(parent.locator('#ready')).toBeVisible(); await press(parent, [2]); await activate(parent, '#maze-leave');
   await expect(parent.locator('#lobby')).toBeVisible(); await expect(parent.locator('#ready')).toBeHidden();
   assert.deepEqual(errors, []);
-  console.log('PASS: controller-only lobby, settings, help, room-code keypad, both tutorials, reconnect guidance, mobile layout, countdown cancel, movement/wall, pause, unplug pause, role swap, result, ending and room exit.');
+  console.log('PASS: controller-only lobby, settings, help, fixed-key room entry, both tutorials, reconnect guidance, mobile layout, countdown cancel, movement/wall, pause, unplug pause, role swap, result, ending and room exit.');
 } finally { await browser?.close(); await app.close(); }
