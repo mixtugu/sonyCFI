@@ -8,7 +8,7 @@ const controls = scope => [...scope.querySelectorAll('button, a[href], input:not
 export function createControllerUI() {
   const hint = document.createElement('div'); hint.className = 'controller-guide'; hint.hidden = true;
   const keyboard = document.createElement('dialog'); keyboard.id = 'controller-keyboard';
-  keyboard.innerHTML = `<h2>部屋コードを入力</h2><output aria-live="polite"></output><div class="controller-keypad">${'0123456789ABCDEF'.split('').map(c => `<button type="button" class="secondary" data-character="${c}">${c}</button>`).join('')}</div><div class="dialog-actions"><button type="button" data-edit="delete" class="secondary">1文字消す</button><button type="button" data-edit="clear" class="secondary">クリア</button><button type="button" data-edit="cancel" class="secondary">戻る</button><button type="button" data-edit="done" class="primary">入力完了</button></div><p>方向キーで選択 · × 入力 · □ 1文字消す · OPTIONS 完了 · ○ 戻る</p>`;
+  keyboard.innerHTML = `<h2>部屋コードを入力</h2><output aria-live="polite"></output><div class="controller-keypad">${'0123456789ABCDEF'.split('').map(c => `<button type="button" class="secondary" data-character="${c}">${c}</button>`).join('')}</div><div class="dialog-actions"><button type="button" data-edit="delete" class="secondary">1文字消す</button><button type="button" data-edit="clear" class="secondary">クリア</button><button type="button" data-edit="cancel" class="secondary">戻る</button><button type="button" data-edit="done" class="primary">入力完了</button></div><p>スティックで選択 · × 入力 · ○ 戻る</p>`;
   document.querySelector('#app').append(keyboard);
   let target = null, draft = '', marked = null, hintHTML = '';
   function mark(element) {
@@ -58,7 +58,7 @@ export function createControllerUI() {
   return {
     navigate,
     hint(scope, html, connected) {
-      hint.hidden = !connected;
+      hint.hidden = !connected || !html;
       if (!connected) { marked?.classList.remove('controller-focus'); return; }
       if (hint.parentElement !== scope) scope.append(hint);
       // SVG serialization changes self-closing tags; compare source strings to avoid repainting every frame.
@@ -66,11 +66,10 @@ export function createControllerUI() {
     },
     get editing() { return keyboard.open; },
     keyboard(input) {
+      // 1文字消す and 入力完了 are buttons on the keypad, so × and ○ cover everything.
       if (input.pressed.has('circle')) { finish(false); return; }
-      if (input.pressed.has('options')) { finish(true); return; }
-      if (input.pressed.has('square')) { draft = draft.slice(0, -1); showDraft(); }
       navigate(keyboard, input);
     },
-    get menuHint() { return padAction('dpad', '項目を選択') + padAction('left', '項目を選択') + padAction('cross', '決定') + padAction('circle', '戻る'); },
+    get menuHint() { return padAction('left', '項目を選択') + padAction('cross', '決定') + padAction('circle', '戻る'); },
   };
 }

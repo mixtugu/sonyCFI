@@ -1,6 +1,6 @@
 import { drawMaze } from './maze-renderer.js';
 import { edge } from './maze.js';
-import { padIcon, controllerDiagram } from './controller-guide.js';
+import { padIcon } from './controller-guide.js';
 
 // The pre-round briefing: three short steps per role, each a title, one line of description and one
 // line of controls. The first steps carry a 5×4 practice board to try the controls on.
@@ -51,7 +51,7 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
 <div class="briefing-maze"><canvas class="briefing-canvas" aria-hidden="true"></canvas><div class="briefing-board" role="grid" aria-label="練習用の迷路"></div></div>
 <div class="briefing-oxygen oxygen" hidden><span class="oxygen-valve" aria-hidden="true"><i class="oxygen-knob"></i><i class="oxygen-neck"></i></span><span class="oxygen-body"><span class="oxygen-track"><span class="oxygen-fill"></span><span class="oxygen-ticks"></span></span><span class="oxygen-band"></span><span class="oxygen-band"></span><strong></strong><span class="oxygen-label">O₂</span></span></div>
 <div class="practice-feedback" role="status" aria-live="polite"></div></div>
-<div class="briefing-copy"><div class="briefing-count"></div><h3 class="briefing-title"></h3><p class="briefing-description"></p><div class="briefing-controls"></div><div class="briefing-controller" hidden>${controllerDiagram()}</div></div>
+<div class="briefing-copy"><div class="briefing-count"></div><h3 class="briefing-title"></h3><p class="briefing-description"></p><div class="briefing-controls"></div></div>
 </div>
 <div class="briefing-footer"><button type="button" class="secondary briefing-previous">戻る</button><div class="briefing-nav"><button type="button" class="secondary briefing-next">次へ</button><button type="button" class="primary briefing-launch" hidden>確認して待機へ</button></div></div>`;
   const find = selector => container.querySelector(selector);
@@ -101,16 +101,18 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
     find('.briefing-title').textContent = guide.title;
     find('.briefing-description').textContent = guide.description(settings);
     controls.innerHTML = guide.controls(settings);
-    find('.briefing-controller').hidden = !controller || !(cursorStep() || moveStep());
+    // With a controller the briefing needs only the sticks, × and ○: taps play the practice board,
+    // holding × moves on and holding ○ goes back.
     if (controller && (cursorStep() || moveStep())) {
-      if (cursorStep()) find('.briefing-description').textContent = '左スティック・方向キーで位置を選び、右スティックで壁の向きを指定。○で回転、×で壁を設置して、エクスプローラーが危ないアイテムへ進む道をふさぎます。';
-      else if (step === 0) find('.briefing-description').textContent = '左スティック・方向キーでエクスプローラーを隣のマスへ動かします。アイテムに触れると報酬を獲得します。';
-      controls.innerHTML = `<kbd data-practice-key="Arrow">${padIcon('left')}${padIcon('dpad')} ${parent() ? '位置' : '移動'}</kbd>` + (parent() ? `<kbd data-practice-key="Tab" role="button" tabindex="0">${padIcon('right')}${padIcon('circle')} 向き</kbd><kbd data-practice-key="Space" role="button" tabindex="0">${padIcon('cross')} 設置</kbd>` : '点線は秘密の通路');
+      if (cursorStep()) find('.briefing-description').textContent = 'スティックで位置と向きを選び、×で壁を設置して、エクスプローラーが危ないアイテムへ進む道をふさぎます。';
+      else if (step === 0) find('.briefing-description').textContent = '左スティックでエクスプローラーを隣のマスへ動かします。アイテムに触れると報酬を獲得します。';
+      controls.innerHTML = `<kbd data-practice-key="Arrow">${padIcon('left')} ${parent() ? '位置' : '移動'}</kbd>` + (parent() ? `<kbd data-practice-key="Tab">${padIcon('right')}${padIcon('circle')} 向き</kbd><kbd data-practice-key="Space">${padIcon('cross')} 設置</kbd>` : '点線は秘密の通路');
     }
-    find('.briefing-close').innerHTML = controller ? `${padIcon('create')} 閉じる` : '閉じる <kbd>Esc</kbd>';
-    find('.briefing-previous').innerHTML = controller ? `${padIcon('l1')} 戻る` : '戻る';
-    find('.briefing-next').innerHTML = controller ? `${padIcon('r1')} 次へ` : '次へ';
-    find('.briefing-launch').innerHTML = controller ? `${padIcon('options')} 確認して待機へ` : '確認して待機へ';
+    find('.briefing-close').hidden = controller;
+    find('.briefing-previous').innerHTML = controller ? `${padIcon('circle')} 長押しで戻る` : '戻る';
+    find('.briefing-next').innerHTML = controller ? `${padIcon('cross')} 長押しで次へ` : '次へ';
+    find('.briefing-launch').innerHTML = controller ? `${padIcon('cross')} 長押しで確認` : '確認して待機へ';
+    container.classList.toggle('pad-briefing', controller);
     find('.briefing-count').textContent = `${String(step + 1).padStart(2, '0')} / ${String(steps().length).padStart(2, '0')}`;
     art.dataset.step = step;
     find('.briefing-art-tag').textContent = guide.tag;
@@ -235,17 +237,24 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
     else if (event.key === 'ArrowRight') { event.preventDefault(); go(step + 1); }
     else if (event.key === 'Enter' && event.target.tagName !== 'BUTTON' && !event.repeat) { event.preventDefault(); if (last()) onFinish?.(); else go(step + 1); }
   }
-  // The pad mirrors the round: stick or d-pad moves, ○ turns the wall, × places it.
-  function pad(input, pressed) {
+  // The pad mirrors the round on the practice board: stick moves, tap ○ turns the wall, tap × places
+  // it. Holding × moves on (or confirms on the last step); holding ○ goes back.
+  function pad(input) {
     if (!running) return;
-    if (pressed('create')) { close(); return; }
-    if (pressed('l1')) { go(step - 1); return; }
-    if (pressed('options') || pressed('r1')) { if (last()) onFinish?.(); else go(step + 1); return; }
+    showHold(input.hold);
+    if (input.long.has('cross')) { if (last()) onFinish?.(); else go(step + 1); return; }
+    if (input.long.has('circle')) { go(step - 1); return; }
     // The game's directions run right, down, left, up; the board's run north, east, south, west.
     if (input.step >= 0 && (cursorStep() || moveStep())) arrow((input.step + 1) % 4);
     if (cursorStep() && input.aim >= 0) { practice.direction = (input.aim + 1) % 4; practice.feedback = `設置方向: ${DIRECTIONS[practice.direction].name}`; highlight('Tab'); drawBoard(); }
-    if (cursorStep() && pressed('circle')) { highlight('Tab'); rotate(); }
-    if (cursorStep() && pressed('cross')) { highlight('Space'); placeWall(); }
+    if (cursorStep() && input.tapped.has('circle')) { highlight('Tab'); rotate(); }
+    if (cursorStep() && input.tapped.has('cross')) { highlight('Space'); placeWall(); }
+  }
+  // The footer buttons fill up while their button is held, so the hold reads as deliberate.
+  function showHold(hold) {
+    find('.briefing-next').style.setProperty('--hold', hold.cross);
+    find('.briefing-launch').style.setProperty('--hold', hold.cross);
+    find('.briefing-previous').style.setProperty('--hold', step > 0 ? hold.circle : 0);
   }
 
   // Touch: tap a cell to put the cursor there, or to step the child toward it; the key hints are tappable.

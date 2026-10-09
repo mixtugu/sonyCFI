@@ -18,12 +18,13 @@ try {
   page.on('request', request => { if (/\/(connection-info|maze-api|maze-socket)(\?|$)/.test(new URL(request.url()).pathname)) roomRequests.push(request.url()); });
   const origin = `http://127.0.0.1:${app.port}`;
   const confirm = async () => { await page.locator('.briefing-next').click(); await page.locator('.briefing-next').click(); await page.locator('.briefing-launch').click(); await page.locator('#ready-start').click(); };
-  const pad = async buttons => { await page.evaluate(b => { window.__pad = b; }, buttons); await page.waitForTimeout(100); await page.evaluate(() => { window.__pad = []; }); await page.waitForTimeout(100); };
+  const pad = async (buttons, ms = 100) => { await page.evaluate(b => { window.__pad = b; }, buttons); await page.waitForTimeout(ms); await page.evaluate(() => { window.__pad = []; }); await page.waitForTimeout(100); };
+  const hold = buttons => pad(buttons, 900);
 
   await page.goto(`${origin}/test/1`);
   await expect(page.locator('#ready')).toBeVisible(); await expect(page.locator('.briefing-title')).toHaveText('壁を立ててエクスプローラーを守る');
   await expect(page.locator('#lobby')).toBeHidden(); await expect(page.locator('#board-parent')).toBeVisible(); await expect(page.locator('#board-child')).toBeHidden();
-  await expect(page.locator('#ready-invite')).toBeHidden(); await expect(page.locator('.mode-group')).toBeHidden(); await expect(page.locator('#room-chip-partner')).toHaveText('相手はCPU');
+  await expect(page.locator('#room-code')).toBeHidden(); await expect(page.locator('.mode-group')).toBeHidden(); await expect(page.locator('#room-chip-partner')).toHaveText('相手はCPU');
   await page.locator('#ready-settings').click(); await page.locator('[name=duration]').fill('5'); await page.locator('#settings button[type=submit]').click();
   await expect(page.locator('.briefing-count')).toHaveText('01 / 03');
   await page.screenshot({ path: 'artifacts/test-1-parent.png' });
@@ -48,16 +49,18 @@ try {
   await page.goto(`${origin}/test/2/`);
   await expect(page.locator('.briefing-title')).toHaveText('移動してアイテムを探し、報酬を獲得');
   await expect(page.locator('#board-child')).toBeVisible(); await expect(page.locator('#board-parent')).toBeHidden();
-  await pad([]); await expect(page.locator('.briefing-controller')).toBeVisible();
+  // With a controller only the stick, × and ○ are used: hold × to move on, × to confirm, hold ○ to pause.
+  await pad([]); await expect(page.locator('.briefing-next')).toContainText('長押しで次へ'); await expect(page.locator('.briefing-close')).toBeHidden();
   await pad([15]); await expect(page.locator('.practice-feedback')).toContainText('移動');
-  await pad([2]); await expect(page.locator('[name=duration]')).toBeDisabled(); await pad([1]);
   await page.screenshot({ path: 'artifacts/test-2-child.png' });
-  await pad([9]); await pad([9]); await pad([9]); await pad([9]);
+  await hold([0]); await hold([0]); await expect(page.locator('.briefing-launch')).toBeVisible(); await hold([0]);
+  await expect(page.locator('#ready-tutorial')).toBeHidden(); await pad([0]);
   await expect(page.locator('#phase')).toHaveText('探検中');
   await expect.poll(async () => await page.locator('#detail-parent').textContent()).not.toBe('0 / 12');
-  await pad([9]); await expect(page.locator('#phase')).toHaveText('ひと休み中');
-  await pad([9]); await expect(page.locator('#phase')).toHaveText('探検中');
-  await pad([2]); await expect(page.locator('#settings-dialog')).toBeVisible();
+  await hold([1]); await expect(page.locator('#phase')).toHaveText('ひと休み中');
+  await pad([0]); await expect(page.locator('#phase')).toHaveText('探検中');
+  await hold([1]); await expect(page.locator('#phase')).toHaveText('ひと休み中');
+  await page.locator('#ready-settings').click(); await expect(page.locator('#settings-dialog')).toBeVisible();
   await page.locator('#maze-leave').click(); await expect(page.locator('#test-restart')).toBeVisible(); await expect(page.locator('#ready')).toBeHidden();
   await page.locator('#test-restart').click(); await expect(page.locator('.briefing-title')).toHaveText('移動してアイテムを探し、報酬を獲得');
   await page.reload(); await expect(page.locator('.briefing-title')).toHaveText('移動してアイテムを探し、報酬を獲得');

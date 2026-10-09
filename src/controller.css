@@ -6,10 +6,13 @@
 .controller-guide,.controller-actions{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px 14px;font-size:11px;line-height:1.6}
 .controller-guide{flex:none;padding:10px 6px;margin-top:12px;border-top:1px solid #9dc9c33d;color:var(--ocean-text);text-align:left}.immersive .workspace>.controller-guide{margin:0;padding:4px 6px}
 .controller-focus{outline:3px solid #f2d5a1!important;outline-offset:3px!important;box-shadow:0 0 0 6px #eac99620!important}
-.briefing-controller{margin-top:10px;border-top:1px solid #9dc9c326}.briefing-controls .ps-action{font-size:11px}.briefing-controls kbd:has(.ps-button){display:inline-flex;align-items:center;gap:5px;padding:3px 5px}
+/* With a controller, holding × or ○ fills its footer button before it acts. */
+.pad-briefing .briefing-footer button{position:relative;overflow:hidden}
+.pad-briefing .briefing-footer button::after{content:"";position:absolute;inset:0;background:currentColor;opacity:.24;transform:scaleX(var(--hold,0));transform-origin:left;pointer-events:none}
+.briefing-controls .ps-action{font-size:11px}.briefing-controls kbd:has(.ps-button){display:inline-flex;align-items:center;gap:5px;padding:3px 5px}
 .briefing-footer .ps-button,.briefing-close .ps-button{margin-right:5px}.pad-help{background:var(--ocean-panel);border:1px solid #9dc9c326;border-radius:12px;padding:12px}.pad-help>b{display:block;text-align:center;font-size:12px}
 #help{max-height:calc(100dvh - 24px);overflow:auto}#controller-keyboard{width:min(420px,calc(100% - 24px));max-height:calc(100dvh - 24px);overflow:auto}#controller-keyboard output{display:block;text-align:center;letter-spacing:.22em;font:28px monospace;margin:18px 0}.controller-keypad{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.controller-keypad button{min-height:42px}#controller-keyboard .dialog-actions{flex-wrap:wrap}
-@media(max-width:620px){.controller-guide{gap:6px 10px;font-size:10px}.briefing-controller .ps-controller{width:210px}.briefing-footer{gap:6px}.briefing-footer .primary{min-width:0}.briefing-footer button{padding:8px}.ps-button{height:24px;min-width:24px}.ps-button svg{height:20px;width:20px}}
+@media(max-width:620px){.controller-guide{gap:6px 10px;font-size:10px}.briefing-footer{gap:6px}.briefing-footer .primary{min-width:0}.briefing-footer button{padding:8px}.ps-button{height:24px;min-width:24px}.ps-button svg{height:20px;width:20px}}
 /* Keep tutorial navigation reachable while larger instructions scroll. */
 .ready-dialog.briefing{max-height:calc(100dvh - 24px);overflow:auto}
 .ready-dialog.briefing .tutorial{display:flex;flex-direction:column;max-height:calc(100dvh - 150px);min-height:0}

@@ -27,6 +27,6 @@ export function controllerDiagram() {
   </svg>`;
 }
 export function playGuide(role) {
-  return (role === 'cpu' ? '' : padAction('left', role === 'parent' ? '位置を選択' : '移動') + padAction('dpad', '同じ操作')) +
+  return (role === 'cpu' ? '' : padAction('left', role === 'parent' ? '位置を選択' : '移動')) +
     (role === 'parent' ? padAction('right', '壁の向き') + padAction('circle', '向きを回転') + padAction('cross', '壁を設置') : '');
 }

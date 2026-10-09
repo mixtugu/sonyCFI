@@ -32,7 +32,10 @@ try {
   })).toBe(true);
   await parent.screenshot({ path: 'artifacts/room-created.png' });
 
-  await expect(parent.locator('#room-chip-code')).toHaveText(code);
+  // The code is a small label in the top-right corner, drawn above the ready dialog.
+  await expect(parent.locator('#room-code')).toHaveText(code); await expect(parent.locator('#room-code')).toBeVisible();
+  assert.equal(await parent.evaluate(() => { const rect = document.getElementById('room-code').getBoundingClientRect(); return rect.right > innerWidth - 40 && rect.top < 40 && rect.height < 30; }), true);
+  assert.equal(await parent.evaluate(() => document.getElementById('room-code').matches(':popover-open')), true);
   await child.goto(`${url}/?maze=${code}`); await expect(child.locator('#maze-join button')).toBeEnabled(); await child.locator('#maze-join button').click();
   await expect(child.locator('#maze-role')).toHaveText('エクスプローラー'); await expect(child.locator('#lobby')).toBeHidden();
   await expect(parent.locator('#maze-role')).toHaveText('ナビゲーター');   // the host always starts as the parent
