@@ -311,25 +311,24 @@ function update() {
     // A match is one round as the parent and one as the child; the second result closes it out.
     const match = network.active ? network.state.match : null, done = !!match?.done;
     $('result-title').textContent = done ? 'ふたりの探検が終わりました' : network.active ? `第${match.leg}ラウンド終了` : '探検完了';
-    // The report is the match's shared encyclopedia, with risk revealed so both can talk it over.
+    // Both players see this round's whole encyclopedia, with risk revealed so they can talk it over.
     const found = collection();
-    $('result-count-label').textContent = done ? 'ふたりで出会った生き物' : 'この海で出会った生き物';
+    $('result-count-label').textContent = network.active ? `第${match.leg}ラウンドで出会った生き物` : 'この海で出会った生き物';
     $('result-count').textContent = `${found.size} / ${CREATURES.length} 種`;
     $('result-zukan').innerHTML = zukan(found, '', { risk: true });
     $('final-stats').textContent = `${game.moves}マスの旅 · 出会い ${game.collected} · 壁 ${game.walls.size} · 秘密の通路 ${game.secrets.size}`;
     $('result-rounds').hidden = !done;
     if (done) $('result-rounds').textContent = match.results.map((leg, i) => `第${i + 1}ラウンド ${leg.caught.length}匹`).join('　/　');
     $('swap-note').hidden = done || game.mode === 'cpu';
-    $('close-result').className = network.active ? 'primary' : 'secondary'; $('again').className = network.active ? 'secondary' : 'primary';
-    $('close-result').hidden = false; $('close-result').textContent = network.active ? '終了する' : '閉じる';
+    $('close-result').className = done ? 'primary' : 'secondary'; $('again').className = done ? 'secondary' : 'primary';
+    // After round one the only way on is the swap; leaving is offered once the match is over.
+    $('close-result').hidden = network.active && !done; $('close-result').textContent = network.active ? '終了する' : '閉じる';
     reveal($('result')); resultScene.play();
   }
 }
-// Creatures met so far in this match: earlier rounds plus the one in progress.
+// The encyclopedia starts empty every round.
 function collection() {
-  const found = new Set((network.active ? network.state.match.results : []).flatMap(leg => leg?.caught || []));
-  for (const item of game.items) if (item.taken && item.creature) found.add(item.creature);
-  return found;
+  return new Set(game.items.filter(item => item.taken && item.creature).map(item => item.creature));
 }
 // Side panels change only when something happens, so they are rebuilt on change, not per frame.
 let shownHp = null, shownMet = null, shownFound = null;

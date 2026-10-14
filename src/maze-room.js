@@ -25,10 +25,9 @@ export class MazeRooms {
   }
   finish(room) {
     if (room.game.phase !== 'result') return;
-    // Each leg adds what its explorer met to the match's shared encyclopedia.
+    // Each round has its own encyclopedia. Both players review it on the result screen and both
+    // ask to go on before the roles swap (see 'again').
     room.results[room.leg - 1] = { caught: room.game.items.filter(i => i.taken).map(i => i.creature) };
-    // Only the completed match has a results screen. The first leg goes straight to a new briefing.
-    if (room.leg === 1) this.reset(room, undefined, true);
   }
   advance(room, elapsed) {
     if (room.game.phase === 'countdown') {

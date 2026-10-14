@@ -32,12 +32,13 @@ try {
   await page.locator('#countdown-pause').click(); await expect(page.locator('#phase')).toHaveText('ひと休み中');
   await page.locator('#ready-start').click(); await expect(page.locator('#phase')).toHaveText('探検中');
   await expect(page.locator('#ready')).toBeHidden();
-  await expect(page.locator('.briefing-title')).toHaveText('魚に触れて、図鑑に登録', { timeout: 10_000 });
+  // Each round ends on its encyclopedia; going on swaps the roles.
+  await expect(page.locator('#result')).toBeVisible({ timeout: 12_000 }); await expect(page.locator('#result-count-label')).toContainText('第1ラウンド'); await expect(page.locator('#close-result')).toBeHidden(); await page.locator('#again').click(); await expect(page.locator('.briefing-title')).toHaveText('魚に触れて、図鑑に登録', { timeout: 10_000 });
   await expect(page.locator('#board-child')).toBeVisible(); await expect(page.locator('#board-parent')).toBeHidden();
   await confirm(); await expect(page.locator('#result')).toBeVisible({ timeout: 12_000 });
   await expect(page.locator('#result-rounds')).toContainText('第2ラウンド');
   await page.locator('#again').click(); await expect(page.locator('.briefing-title')).toHaveText('壁を立ててエクスプローラーを守る');
-  await confirm(); await expect(page.locator('.briefing-title')).toHaveText('魚に触れて、図鑑に登録', { timeout: 12_000 });
+  await confirm(); await expect(page.locator('#result')).toBeVisible({ timeout: 12_000 }); await expect(page.locator('#result-count-label')).toContainText('第1ラウンド'); await expect(page.locator('#close-result')).toBeHidden(); await page.locator('#again').click(); await expect(page.locator('.briefing-title')).toHaveText('魚に触れて、図鑑に登録', { timeout: 12_000 });
   await confirm(); await expect(page.locator('#result')).toBeVisible({ timeout: 12_000 });
   await page.locator('#close-result').click(); await expect(page.locator('#ending')).toBeVisible(); await page.locator('#ending-finish').click();
   await expect(page.locator('#test-restart')).toBeVisible(); await expect(page.locator('#lobby')).not.toContainText('部屋をつくって');

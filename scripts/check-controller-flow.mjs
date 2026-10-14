@@ -117,6 +117,8 @@ try {
   await child.evaluate(() => { window.__pad = null; }); await expect(parent.locator('#phase')).toHaveText('ひと休み中');
   await press(child); await resume(parent); await resume(child); await expect(parent.locator('#phase')).toHaveText('探検中');
   room.game.time = room.game.settings.duration - .01;
+  // Round one's encyclopedia: × on the focused swap button takes each player on.
+  for (const page of [parent, child]) { await expect(page.locator('#result')).toBeVisible(); await expect(page.locator('#again')).toBeFocused(); await press(page, [0]); }
   await expect(parent.locator('.briefing-title')).toContainText('魚に触れて');
   await expect(child.locator('.briefing-description')).toContainText('左スティックで位置を選び、上下左右の方向キーで壁の向き');
   await complete(parent); await complete(child); await expect(parent.locator('#phase')).toHaveText('探検中');

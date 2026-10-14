@@ -78,14 +78,20 @@ test('a creature stays hidden until met and is then shared; only the navigator s
   assert.equal(viewItem('parent').creature, item.creature); assert.equal(viewItem('parent').damage, 3);
   assert.equal(viewItem('child').creature, item.creature); assert.equal('damage' in viewItem('child'), false);
 });
-test('first leg automatically swaps into a fresh briefing; the encyclopedia carries over to leg two', () => {
+test('each round ends on its own encyclopedia for both players; both go on before roles swap', () => {
   const { service, parent, room, both, ready } = setup(); ready(); service.tick(3);
   const [a, b] = room.game.items; a.taken = b.taken = true;
   room.game.time = room.game.settings.duration - .01; service.tick(.02);
+  assert.equal(room.leg, 1); assert.equal(room.game.phase, 'result'); assert.deepEqual(room.results, [{ caught: [a.creature, b.creature] }]);
+  for (const member of room.members) {
+    const view = service.view(room, member);
+    assert.equal(view.match.done, false); assert.deepEqual(view.game.items.filter(i => i.taken).map(i => i.creature), [a.creature, b.creature]);
+  }
+  service.handle(parent, { type: 'again' }); assert.equal(room.leg, 1);
+  both('again');
   assert.equal(room.leg, 2); assert.equal(room.game.phase, 'ready'); assert.deepEqual(room.members.map(m => m.role), ['child', 'parent']);
-  assert.deepEqual(room.results, [{ caught: [a.creature, b.creature] }]); assert.ok(room.members.every(m => !m.ready && !m.tutorialComplete));
-  assert.deepEqual(service.view(room, room.members[1]).match.results, room.results);
-  assert.ok(!parent.packets.some(p => p.game?.phase === 'result'));
+  assert.ok(room.game.items.every(i => !i.taken));   // the next round's encyclopedia starts empty
+  assert.ok(room.members.every(m => !m.ready && !m.tutorialComplete));
   both('ready'); assert.equal(room.game.phase, 'ready');
   ready(); assert.equal(room.game.phase, 'countdown'); service.tick(3);
   room.game.items[5].taken = true; room.game.time = room.game.settings.duration - .01; service.tick(.02);
@@ -110,11 +116,11 @@ test('settings invalidate tutorial approvals and cannot discard the second leg',
   service.handle(child, { type: 'settings', settings: { duration: 120 } }); assert.equal(room.game.settings.duration, 30);
   service.handle(parent, { type: 'settings', settings: { duration: 45 } }); assert.equal(room.game.settings.duration, 45);
   assert.ok(room.members.every(m => !m.ready && !m.tutorialComplete));
-  room.game.phase = 'result'; service.broadcast(room);
+  room.game.phase = 'result'; service.broadcast(room); both('again');
   service.handle(parent, { type: 'settings', settings: { duration: 120 } }); assert.equal(room.leg, 2); assert.equal(room.game.settings.duration, 45);
 });
 test('leaving after the report preserves the other player totals and rejects a departed token', () => {
-  const { service, parent, child, room } = setup(); room.game.phase = 'result'; service.broadcast(room); room.game.phase = 'result'; service.broadcast(room);
+  const { service, parent, child, room, both } = setup(); room.game.phase = 'result'; service.broadcast(room); both('again'); room.game.phase = 'result'; service.broadcast(room);
   const before = service.view(room, room.members[1]).match, token = room.members[0].token;
   service.handle(parent, { type: 'leave' }); assert.equal(parent.packets.at(-1).type, 'left');
   assert.equal(room.game.phase, 'result'); assert.deepEqual(service.view(room, room.members[1]).match, before);

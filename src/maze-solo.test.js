@@ -24,6 +24,8 @@ for (const role of ['parent', 'child']) {
     for (const number of [3, 2, 1]) { assert.equal(session.state.countdown, number); assert.equal(session.state.game.time, 0); session.advance(1); }
     assert.equal(session.state.game.phase, 'playing');
     session.advance(5.1);
+    assert.equal(session.state.match.leg, 1); assert.equal(session.state.game.phase, 'result');
+    session.send({ type: 'again' });   // the CPU partner follows into the swap
     assert.equal(session.state.match.leg, 2); assert.equal(session.state.game.phase, 'ready');
     assert.notEqual(session.state.role, role); assert.equal(session.state.tutorialComplete, false);
     assert.equal(session.state.partner.ready, true);

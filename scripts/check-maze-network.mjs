@@ -82,9 +82,17 @@ try {
   await child.reload(); await expect(parent.locator('#phase')).toHaveText('ひと休み中'); await expect(child.locator('#maze-role')).toHaveText('エクスプローラー');
   await parent.locator('#ready-start').click(); await child.locator('#ready-start').click(); await expect(child.locator('#phase')).toHaveText('探検中');
   room.game.time = room.game.settings.duration - .01;
+  // Round one ends on its own encyclopedia for both players; both go on before the roles swap.
+  for (const page of [parent, child]) {
+    await expect(page.locator('#result')).toBeVisible(); await expect(page.locator('#result-count-label')).toHaveText('第1ラウンドで出会った生き物');
+    await expect(page.locator('#result-zukan .zukan-cell')).toHaveCount(12); await expect(page.locator('#close-result')).toBeHidden();
+  }
+  assert.equal(room.leg, 1); assert.equal(room.results.length, 1);
+  await parent.locator('#again').click(); await expect(parent.locator('#again')).toHaveText('相手を待機中'); await child.locator('#again').click();
   await expect(parent.locator('#phase')).toHaveText('開始前');
   await expect(parent.locator('#result')).toBeHidden(); await expect(child.locator('#result')).toBeHidden();
-  assert.equal(room.leg, 2); assert.equal(room.results.length, 1);
+  assert.equal(room.leg, 2);
+  await expect(child.locator('#zukan-count')).toHaveText('0 / 12');   // the new round's encyclopedia is empty
   await expect(parent.locator('body')).toHaveAttribute('data-ocean-phase', 'ready');
   // The first round automatically changes both roles and reopens their new tutorials.
   await expect(parent.locator('#maze-role')).toHaveText('エクスプローラー'); await expect(child.locator('#maze-role')).toHaveText('ナビゲーター');
@@ -97,10 +105,10 @@ try {
   await expect(parent.locator('#phase')).toHaveText('探検中');
   room.game.time = room.game.settings.duration - .01;
   await expect(parent.locator('#result-title')).toHaveText('ふたりの探検が終わりました');
-  await expect(parent.locator('#result-count-label')).toHaveText('ふたりで出会った生き物'); await expect(parent.locator('#result-rounds')).toContainText('第2ラウンド');
+  await expect(parent.locator('#result-count-label')).toHaveText('第2ラウンドで出会った生き物'); await expect(parent.locator('#result-rounds')).toContainText('第2ラウンド');
   await expect(parent.locator('#swap-note')).toBeHidden(); await expect(parent.locator('#again')).toHaveText('もう一度あそぶ');
-  const met = new Set(room.results.flatMap(leg => leg.caught));
-  await expect(parent.locator('#result-count')).toHaveText(`${met.size} / 12 種`);   // the encyclopedia covers both rounds
+  const met = new Set(room.results[1].caught);
+  await expect(parent.locator('#result-count')).toHaveText(`${met.size} / 12 種`);   // only this round's encyclopedia
   await expect(parent.locator('#result-zukan .zukan-cell.is-found')).toHaveCount(met.size);
   await expect(parent.locator('body')).toHaveAttribute('data-ocean-phase', 'summary');
   await parent.locator('#close-result').click(); await expect(parent.locator('#ending')).toBeVisible();
