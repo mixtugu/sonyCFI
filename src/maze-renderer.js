@@ -4,6 +4,7 @@ import { drawDiverHD, drawRipple, disc, motionPreference, causticTile } from './
 // Presentation-only: reads the role's state, never mutates it. Each canvas keeps its own visual
 // state (clocks, caches, particles) in a WeakMap, including the tutorial boards.
 const scenes = new WeakMap();
+export function resetMazeScene(canvas) { scenes.delete(canvas); }
 const TAU = Math.PI * 2, CELL = 36, PAD = 14;
 const hash = n => { n |= 0; n = Math.imul(n ^ n >>> 16, 0x45d9f3b); n = Math.imul(n ^ n >>> 16, 0x45d9f3b); return ((n ^ n >>> 16) >>> 0) / 4294967296; };
 const layer = (w, h) => { const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h; return canvas; };
@@ -296,7 +297,7 @@ export function drawMaze(canvas, s, role, cursor, direction, options = {}) {
     const x = a % cols, y = Math.floor(a / cols);
     return Math.abs(a - b) === 1 ? [Math.max(x, b % cols) * cell, y * cell, Math.max(x, b % cols) * cell, (y + 1) * cell] : [x * cell, Math.max(y, Math.floor(b / cols)) * cell, (x + 1) * cell, Math.max(y, Math.floor(b / cols)) * cell];
   };
-  // Tutorial fixtures have no game clock: they move immediately and animate only ambient water.
+  // Timeless fixtures move immediately; live tutorial practice supplies a clock for round effects.
   const still = motionPreference.matches, onDemand = !Number.isFinite(s.time), animate = !still && !onDemand;
   const now = performance.now() / 1000;
   let v = scenes.get(canvas);
@@ -544,7 +545,7 @@ export function drawMaze(canvas, s, role, cursor, direction, options = {}) {
   c.restore();
   drawDiverHD(c, v.x, v.y, v.angle, amb + t, travel < 1 ? 1 : 0, .7);
 
-  if (role === 'parent' && s.mode === 'parent' && s.phase !== 'result') {
+  if (role === 'parent' && s.mode === 'parent' && s.phase !== 'result' && options.cursor !== false) {
     const [x, y] = center(cursor), pulse = .5 + .5 * Math.sin(amb * 4);
     c.save(); c.globalCompositeOperation = 'lighter';
     c.fillStyle = 'rgba(255,210,150,.08)'; c.beginPath(); c.roundRect(x - 16, y - 16, 32, 32, 6); c.fill();

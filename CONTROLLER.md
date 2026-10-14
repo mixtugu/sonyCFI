@@ -2,22 +2,22 @@
 
 The Gamepad API is polled in `src/maze-main.js`. Connecting a controller changes the tutorial, help, board accessibility labels and live action bar to PlayStation terminology. Keyboard and pointer controls remain available. The live bar stays visible in immersive mode and is moved inside the active modal.
 
+The layout targets a PlayStation Access controller profile: stick, centre ×, and the D-pad on the up/right/down/left petals (diagonal petals unused). A DualSense works the same way.
+
 | Context | Controls |
 | --- | --- |
-| Menus, lobby, results | D-pad / left stick selects, × activates the focused control |
-| Settings | Up/down selects fields; left/right adjusts numbers within their HTML limits; × selects a wall style or applies settings; ○ / □ closes |
+| Menus, lobby, results | Stick selects, × activates the focused control; hold ← (or press ○) goes back / closes |
+| Settings | Stick up/down selects fields, left/right adjusts numbers; × selects or applies; hold ← (or ○) closes |
 | Room entry | The join key is fixed to `A`; select Join and press × |
-| Navigator practice and play | D-pad / left stick selects a cell; right stick aims the wall; ○ rotates; × places |
-| Explorer practice and play | D-pad / left stick moves |
-| Tutorial | L1 goes back; R1 / OPTIONS advances or confirms the final step; CREATE closes without confirming; □ opens settings |
-| Ready / paused | Navigate to review, invite copy, settings or ready; OPTIONS also marks ready / resumes |
-| Playing | OPTIONS pauses; □ opens settings; touchpad click opens help; △ toggles immersive mode |
-| Countdown | ○ / OPTIONS returns to waiting |
-| Results | Select replay or finish with directions and ×; ○ closes / finishes |
+| Navigator practice and play | Left stick selects a cell; tap ↑ → ↓ ← (or the right stick) to aim the wall; × places |
+| Explorer practice and play | Left stick moves |
+| Tutorial | Hold → to advance or confirm the final step; hold ← to go back (650 ms). Short ← / → taps aim walls on release; ↑ / ↓ aim immediately. Movement stays on the left stick. × and ○ holds do not change tutorial steps |
+| Playing / ready | Hold ← (or ○) to pause / start |
+| Countdown | Hold ← (or ○ / ×) to return to waiting |
 | Ending | × / ○ returns to the lobby |
-| Test mode only | L1 / R1 switches roles; CREATE resets |
+| Test mode only | OPTIONS start/pause, □ settings, △ immersive, L1 / R1 switch roles, CREATE resets |
 
-Help is also reachable through Settings → 遊び方, including controllers that do not expose touchpad click. △ toggles immersive mode from menus and dialogs as well. Actual browser fullscreen may require browser-granted user activation; the immersive layout still works when that request is denied.
+Help is also reachable through Settings → 遊び方, including controllers that do not expose touchpad click. Actual browser fullscreen may require browser-granted user activation; the immersive layout still works when that request is denied.
 
 An unplug during play or countdown pauses the round and restores keyboard guidance. Reconnecting restores PlayStation guidance without discarding tutorial progress. The round requires an explicit resume. Browsers may expose a newly connected controller only after its first button press. Standard Gamepad API button/axis mapping is assumed; generic controllers use the same positional mapping and PlayStation labels.
 
@@ -37,6 +37,7 @@ npm test
 npm run build
 node scripts/check-gamepad.mjs
 node scripts/check-controller-flow.mjs
+node scripts/check-role-previews.mjs
 node scripts/check-maze-network.mjs
 ```
 

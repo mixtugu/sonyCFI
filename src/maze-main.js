@@ -2,7 +2,7 @@ import './maze.css';
 import './ocean-game.css';
 import oceanTitle from './ocean-title.svg';
 import './controller.css';
-import { padAction, playGuide } from './controller-guide.js';
+import { controllerDiagram, padAction, playGuide } from './controller-guide.js';
 import { createControllerUI } from './controller-ui.js';
 import { DEFAULTS, LIMITS, createMaze, start, tick, move, placeWall, neighbor } from './maze.js';
 import { drawMaze, pointerCell, setWallStyle, WALL_STYLES } from './maze-renderer.js';
@@ -58,7 +58,7 @@ ${['parent', 'child'].map(role => `<section class="board-card ${role}"><div clas
 <dialog id="ready" class="ready-dialog">${waterLight}${bubbles(12)}<p class="eyebrow" id="ready-eyebrow"></p><h2 id="ready-title"></h2><p id="ready-note"></p><div id="ready-tutorial" class="tutorial"></div><button type="button" id="ready-review" class="secondary wide">チュートリアルを確認</button><button type="button" id="ready-start" class="primary wide">準備完了</button><p class="ready-foot"><button type="button" id="ready-settings" class="text-button">⚙ 設定</button></p></dialog>
 <dialog id="countdown" class="countdown-dialog" aria-label="開始カウントダウン">${bubbles(14, 720)}<p class="eyebrow" id="countdown-round"></p><h2>まもなく探検が始まります</h2><div class="countdown-core"><span class="countdown-rings" aria-hidden="true"><i></i><i></i><i></i></span><strong id="countdown-number" aria-live="assertive" aria-atomic="true">3</strong></div><div class="depth-gauge" aria-hidden="true"><span>水面</span><i><b></b></i><span>海の底</span></div><p>ふたりで、海の向こうへ。</p><button id="countdown-pause" class="secondary">待機に戻る</button></dialog>
 <dialog id="ending" class="ending-dialog"><div class="ending-flash" aria-hidden="true"></div>${drops(24)}${sparkles(18)}<p class="eyebrow">THANK YOU FOR DIVING</p><h2>ふたりの旅は、ここまで。</h2><p>同じ海で見つけた景色を、<br>ふたりで話してみよう。</p><button id="ending-finish" class="primary">海から戻る</button></dialog>
-<dialog id="help">${waterLight}<h2>遊び方</h2><p>ナビゲーターは100点から。エクスプローラーがアイテムを取ると、隠れたリスク分だけナビゲーターの点が減り、エクスプローラーは報酬を得ます。</p><p>ナビゲーターは通路に壁を置けます。壁1枚ごとにナビゲーターは設定したコスト、エクスプローラーは1点を失うので、アイテムを取る前でもエクスプローラーの点はマイナスになることがあります。道がふさがると、エクスプローラーだけの秘密の通路が開きます。</p><p id="keyboard-help">矢印キー/WASDで操作。ナビゲーターはTabで向き、Spaceで設置。Escで一時停止。Fで全画面。</p><div class="pad-help" hidden><b>PlayStation コントローラー</b><p>すべてスティックと × ○ だけで操作できます。</p><p>ナビゲーター：位置を選んで壁を設置</p><div class="controller-actions">${playGuide('parent')}</div><p>エクスプローラー：移動してアイテムを探す</p><div class="controller-actions">${playGuide('child')}</div><p>共通の操作</p><div class="controller-actions">${padAction('circle', '長押しで一時停止')}</div><p>メニュー：左スティックで項目を選択、×で決定、○で戻る。設定の数値は左右で変更。設定と遊び方は一時停止中の画面から開けます。</p><p>チュートリアル：練習はふだんと同じ操作。×長押しで次へ・確認、○長押しで戻る。</p>${sandboxMode ? '<p>テストモード：L1 / R1で役割切替、CREATEでリセット。</p>' : ''}</div><button id="help-close" class="primary">OK</button></dialog>
+<dialog id="help">${waterLight}<h2>遊び方</h2><p>ナビゲーターは100点から。エクスプローラーがアイテムを取ると、隠れたリスク分だけナビゲーターの点が減り、エクスプローラーは報酬を得ます。</p><p>ナビゲーターは通路に壁を置けます。壁1枚ごとにナビゲーターは設定したコスト、エクスプローラーは1点を失うので、アイテムを取る前でもエクスプローラーの点はマイナスになることがあります。道がふさがると、エクスプローラーだけの秘密の通路が開きます。</p><p id="keyboard-help">矢印キー/WASDで操作。ナビゲーターはTabで向き、Spaceで設置。Escで一時停止。Fで全画面。</p><div class="pad-help" hidden><b>PlayStation コントローラー</b>${controllerDiagram()}<p>左スティックで移動、上下左右の方向キーで壁の向き、×で決定・壁の設置。</p><p>ナビゲーター：位置を選んで壁を設置</p><div class="controller-actions">${playGuide('parent')}</div><p>エクスプローラー：移動してアイテムを探す</p><div class="controller-actions">${playGuide('child')}</div><p>共通の操作</p><div class="controller-actions">${padAction('prev', '長押しで一時停止')}</div><p>メニュー：左スティックで項目を選択、×で決定、← 長押しで戻る。設定の数値はスティックの左右で変更。設定と遊び方は一時停止中の画面から開けます。</p><p>チュートリアル：練習はふだんと同じ操作。→ 長押しで次へ・確認、← 長押しで戻る。</p>${sandboxMode ? '<p>テストモード：L1 / R1で役割切替、CREATEでリセット。</p>' : ''}</div><button id="help-close" class="primary">OK</button></dialog>
 <div id="room-code" class="room-code" popover="manual" role="status" aria-label="部屋コード" hidden></div>`;
 
 const $ = id => document.getElementById(id);
@@ -122,7 +122,7 @@ function readyPrompt() {
   tutorial.setKicker(`${match.leg === 2 && !paused ? '役割交代 · ' : ''}${game.mode === 'parent' ? 'ナビゲーター' : 'エクスプローラー'} · ${$('ready-eyebrow').textContent}`);
   $('ready-eyebrow').hidden = $('ready-title').hidden = $('ready-note').hidden = $('ready-start').hidden = briefing;
   $('ready-tutorial').hidden = !briefing;
-  // A controller's briefing is only the practice board and hold × / hold ○; settings come after it.
+  // A controller's briefing is the practice board and hold → / hold ←; settings come after it.
   document.querySelector('.ready-foot').hidden = briefing && padSeen;
   $('ready-review').hidden = briefing || paused || ready;
   $('ready-review').textContent = tutorialComplete ? 'チュートリアルをもう一度見る' : 'チュートリアルを確認';
@@ -347,18 +347,18 @@ function controllerHints() {
   let scope = document.querySelector('.workspace'), hint = '';
   const menu = controllerUI.menuHint;
   // Only the sticks, × and ○ are ever offered; settings and help are reached through the menus.
-  if (controllerUI.editing) { scope = $('controller-keyboard'); hint = padAction('left', '文字を選択') + padAction('cross', '入力') + padAction('circle', '戻る'); }
-  else if ($('help').open) { scope = $('help'); hint = padAction('left', 'スクロール') + padAction('circle', '閉じる'); }
+  if (controllerUI.editing) { scope = $('controller-keyboard'); hint = padAction('left', '文字を選択') + padAction('cross', '入力') + padAction('prev', '長押しで戻る'); }
+  else if ($('help').open) { scope = $('help'); hint = padAction('left', 'スクロール') + padAction('prev', '長押しで閉じる'); }
   else if ($('settings-dialog').open) { scope = $('settings-dialog'); hint = menu + padAction('left', '数値は左右で変更'); }
   else if ($('ending').open) { scope = $('ending'); hint = padAction('cross', '海から戻る'); }
-  else if ($('countdown').open) { scope = $('countdown'); hint = padAction('circle', '待機に戻る'); }
-  else if ($('result').open) { scope = $('result'); hint = padAction('left', '項目を選択') + padAction('cross', '決定') + padAction('circle', network.active ? '終了する' : '閉じる'); }
+  else if ($('countdown').open) { scope = $('countdown'); hint = padAction('prev', '長押しで待機に戻る'); }
+  else if ($('result').open) { scope = $('result'); hint = padAction('left', '項目を選択') + padAction('cross', '決定') + padAction('prev', network.active ? '長押しで終了' : '長押しで閉じる'); }
   else if ($('ready').open) {
     scope = $('ready');
-    // During the briefing its own footer already says "hold × / hold ○", so nothing is repeated.
+    // During the briefing its footer already explains the horizontal direction holds.
     hint = !$('ready-tutorial').hidden ? '' : padAction('left', '項目を選択') + padAction('cross', '決定');
   } else if (!$('lobby').hidden) { scope = document.querySelector('.lobby-card'); hint = padAction('left', '項目を選択') + padAction('cross', '決定'); }
-  else hint = playGuide(game.mode) + padAction('circle', game.phase === 'playing' ? '長押しで一時停止' : '長押しで開始') + (sandboxMode ? padAction('l1', '前の役割') + padAction('r1', '次の役割') + padAction('create', 'リセット') : '');
+  else hint = playGuide(game.mode) + padAction('prev', game.phase === 'playing' ? '長押しで一時停止' : '長押しで開始') + (sandboxMode ? padAction('l1', '前の役割') + padAction('r1', '次の役割') + padAction('create', 'リセット') : '');
   controllerUI.hint(scope, hint, padSeen);
 }
 function pollPad(now) {
@@ -368,16 +368,17 @@ function pollPad(now) {
     document.body.classList.toggle('controller-connected', padSeen);
     $('keyboard-help').hidden = padSeen; document.querySelector('.pad-help').hidden = !padSeen;
     tutorial.setController(padSeen);
-    $('board-parent').setAttribute('aria-label', padSeen ? 'ナビゲーターの迷路。左スティックで位置、右スティックで向き、×で壁を設置' : 'ナビゲーターの迷路。マスの端をクリックして壁を設置');
+    $('board-parent').setAttribute('aria-label', padSeen ? 'ナビゲーターの迷路。左スティックで位置、上下左右の方向キーで向き、×で壁を設置' : 'ナビゲーターの迷路。マスの端をクリックして壁を設置');
     $('board-child').setAttribute('aria-label', padSeen ? 'エクスプローラーの迷路。左スティックで移動' : 'エクスプローラーの迷路。矢印キーで移動');
-    if (pad) notice('コントローラーを接続しました。スティックと × ○ で操作できます。');
+    if (pad) notice('コントローラーを接続しました。スティック・上下左右のボタン・× で操作できます。');
     else { suspend(); notice('コントローラーが切断されました。再接続するかキーボードで操作してください。'); }
     update();
   }
   controllerHints();
   if (!pad) return -1;
-  const on = name => input.pressed.has(name);
-  // × or ○ still held from the previous screen (e.g. the button that opened this one) must not
+  // ○ or a hold of ← goes back in menus; tutorial navigation uses its own directional holds.
+  const on = name => input.pressed.has(name) || (name === 'circle' && (input.long.has('circle') || input.long.has('left')));
+  // A button still held from the previous screen (e.g. the button that opened this one) must not
   // land here as a tap or hold.
   const screen = [...document.querySelectorAll('dialog[open]')].map(dialog => dialog.id).join() + `|${$('lobby').hidden}|${tutorial.running && !$('ready-tutorial').hidden ? tutorial.step : '-'}|${game.phase}`;
   if (screen !== padScreen) { padScreen = screen; readPad.consume(); input.tapped.clear(); input.long.clear(); }
@@ -405,17 +406,17 @@ function pollPad(now) {
   }
   if (!$('lobby').hidden) { controllerUI.navigate($('app'), input); return -1; }
   // Holding ○ starts or pauses; pausing opens the ready prompt, which leads on to settings and help.
-  if (input.long.has('circle')) { toggle(); return -1; }
+  if (input.long.has('circle') || input.long.has('left')) { toggle(); return -1; }
   // The sandbox keeps its developer shortcuts for switching roles and resetting.
   if (sandboxMode) {
     if (on('options')) { toggle(); return -1; }
     if (on('square')) { $('settings-open').click(); return -1; }
-    if (on('triangle')) { toggleImmersive(); return -1; }
     if (on('create')) reset();
+    if (on('triangle')) { toggleImmersive(); return -1; }
     if (on('l1') || on('r1')) { const modes = ['parent', 'child', 'cpu']; setMode(modes[(modes.indexOf(game.mode) + (on('r1') ? 1 : 2)) % 3]); }
   }
-  // A tap of ○ turns the wall; it acts on release, so a hold can mean pause instead.
-  if (game.mode === 'parent') { if (input.step >= 0) control(input.step); if (input.aim >= 0) { direction = input.aim; update(); } if (input.tapped.has('circle')) rotate(); if (on('cross')) wall(); }
+  // A D-pad tap aims the wall; holding ← pauses instead (handled above).
+  if (game.mode === 'parent') { if (input.step >= 0) control(input.step); if (input.aim >= 0) { direction = input.aim; update(); } if (on('cross')) wall(); }
   // Haptics follow the game state, so they also fire for moves the server applied.
   if (game.walls.size > feltWalls) rumble(pad, .2, .6, 60);
   if (game.collected > feltItems) rumble(pad, .8, .4, 140);

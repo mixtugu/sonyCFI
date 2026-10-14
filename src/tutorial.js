@@ -1,6 +1,6 @@
-import { drawMaze } from './maze-renderer.js';
-import { edge } from './maze.js';
-import { padIcon } from './controller-guide.js';
+import { drawMaze, resetMazeScene } from './maze-renderer.js';
+import { edge, DEFAULTS } from './maze.js';
+import { controllerDiagram, padIcon } from './controller-guide.js';
 
 // The pre-round briefing: three short steps per role, each a title, one line of description and one
 // line of controls. The first steps carry a 5×4 practice board to try the controls on.
@@ -51,13 +51,21 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
 <div class="briefing-maze"><canvas class="briefing-canvas" aria-hidden="true"></canvas><div class="briefing-board" role="grid" aria-label="練習用の迷路"></div></div>
 <div class="briefing-oxygen oxygen" hidden><span class="oxygen-valve" aria-hidden="true"><i class="oxygen-knob"></i><i class="oxygen-neck"></i></span><span class="oxygen-body"><span class="oxygen-track"><span class="oxygen-fill"></span><span class="oxygen-ticks"></span></span><span class="oxygen-band"></span><span class="oxygen-band"></span><strong></strong><span class="oxygen-label">O₂</span></span></div>
 <div class="practice-feedback" role="status" aria-live="polite"></div></div>
-<div class="briefing-copy"><div class="briefing-count"></div><h3 class="briefing-title"></h3><p class="briefing-description"></p><div class="briefing-controls"></div></div>
+<div class="briefing-copy"><div class="briefing-count"></div><h3 class="briefing-title"></h3><p class="briefing-description"></p><div class="briefing-controls"></div><div class="briefing-pad" hidden></div></div>
 </div>
 <div class="briefing-footer"><button type="button" class="secondary briefing-previous">戻る</button><div class="briefing-nav"><button type="button" class="secondary briefing-next">次へ</button><button type="button" class="primary briefing-launch" hidden>確認して待機へ</button></div></div>`;
   const find = selector => container.querySelector(selector);
   const art = find('.briefing-art'), board = find('.briefing-board'), feedback = find('.practice-feedback'), controls = find('.briefing-controls'), layout = find('.briefing-layout');
   let running = false, controller = false, role = 'parent', settings = {}, step = 0, keyTimer = 0, shownStep = -1, loop = 0, painted = 0;
   const practice = { cursor: { x: 2, y: 2 }, direction: 1, child: { x: 0, y: 3 }, placed: new Set(), fixed: new Set(FIXED_WALLS), passages: new Set(PASSAGES), feedback: '' };
+  let startedAt = 0;
+  let trail = [15];
+  const taken = new Set();
+
+  function resetPresentation() {
+    startedAt = performance.now();
+    resetMazeScene(find('.briefing-canvas'));
+  }
 
   const parent = () => role === 'parent';
   const steps = () => GUIDES[parent() ? 'parent' : 'child'];
@@ -67,9 +75,10 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
   const passageOpen = () => !parent() && step === 1;
 
   function start(nextRole, nextSettings) {
-    role = nextRole === 'parent' ? 'parent' : 'child'; settings = nextSettings; step = 0; running = true;
+    role = nextRole === 'parent' ? 'parent' : 'child'; settings = { ...DEFAULTS, ...nextSettings }; step = 0; running = true;
     practice.cursor = { x: 2, y: 2 }; practice.direction = 1; practice.child = { x: 0, y: 3 }; practice.placed.clear();
     practice.feedback = '';
+    trail = [15]; taken.clear(); resetPresentation();
     shownStep = -1;
     update();
     // Keys go to the practice board rather than to whichever button the dialog focused first.
@@ -83,14 +92,15 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
     if (now - painted > 33 && container.offsetParent !== null) { painted = now; paint(); }
     loop = requestAnimationFrame(tick);
   }
-  function stop() { running = false; }
-  function close() { if (!running) return; running = false; onClose?.(); }
+  function stop() { running = false; cancelAnimationFrame(loop); loop = 0; }
+  function close() { if (!running) return; stop(); onClose?.(); }
   function go(next) {
     if (!running) return;
     const target = Math.max(0, Math.min(steps().length - 1, next));
     if (target === step) return;
     step = target;
-    if (moveStep()) { practice.child = { x: 0, y: 3 }; practice.feedback = step === 1 ? '点線の通路の向こうへ進んでみましょう' : ''; }
+    if (moveStep()) { practice.child = { x: 0, y: 3 }; trail = [15]; taken.clear(); practice.feedback = step === 1 ? '点線の通路の向こうへ進んでみましょう' : ''; }
+    resetPresentation();
     update();
   }
   function setKicker(text) { find('.briefing-kicker').textContent = text; }
@@ -101,17 +111,19 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
     find('.briefing-title').textContent = guide.title;
     find('.briefing-description').textContent = guide.description(settings);
     controls.innerHTML = guide.controls(settings);
-    // With a controller the briefing needs only the sticks, × and ○: taps play the practice board,
-    // holding × moves on and holding ○ goes back.
+    // Left stick moves; directional taps aim walls and horizontal holds navigate the briefing.
     if (controller && (cursorStep() || moveStep())) {
-      if (cursorStep()) find('.briefing-description').textContent = 'スティックで位置と向きを選び、×で壁を設置して、エクスプローラーが危ないアイテムへ進む道をふさぎます。';
-      else if (step === 0) find('.briefing-description').textContent = '左スティックでエクスプローラーを隣のマスへ動かします。アイテムに触れると報酬を獲得します。';
-      controls.innerHTML = `<kbd data-practice-key="Arrow">${padIcon('left')} ${parent() ? '位置' : '移動'}</kbd>` + (parent() ? `<kbd data-practice-key="Tab">${padIcon('right')}${padIcon('circle')} 向き</kbd><kbd data-practice-key="Space">${padIcon('cross')} 設置</kbd>` : '点線は秘密の通路');
+      if (cursorStep()) find('.briefing-description').textContent = '左スティックで位置を選び、上下左右の方向キーで壁の向きを決め、×で壁を設置します。→ 長押しで次へ、← 長押しで戻ります。';
+      else if (step === 0) find('.briefing-description').textContent = '左スティックでエクスプローラーを隣のマスへ動かします。アイテムに触れると報酬を獲得します。→ 長押しで次へ、← 長押しで戻ります。';
+      controls.innerHTML = `<kbd data-practice-key="Arrow">${padIcon('left')} ${parent() ? '位置' : '移動'}</kbd>` + (parent() ? `<kbd data-practice-key="Tab">${padIcon('dpad')} 向き</kbd><kbd data-practice-key="Space">${padIcon('cross')} 設置</kbd>` : '点線は秘密の通路');
     }
+    // The controller drawing lights up the buttons this step uses.
+    find('.briefing-pad').hidden = !controller;
+    if (controller) find('.briefing-pad').innerHTML = controllerDiagram(cursorStep() ? ['left', 'dpad', 'cross'] : moveStep() ? ['left', 'dpad'] : ['dpad']);
     find('.briefing-close').hidden = controller;
-    find('.briefing-previous').innerHTML = controller ? `${padIcon('circle')} 長押しで戻る` : '戻る';
-    find('.briefing-next').innerHTML = controller ? `${padIcon('cross')} 長押しで次へ` : '次へ';
-    find('.briefing-launch').innerHTML = controller ? `${padIcon('cross')} 長押しで確認` : '確認して待機へ';
+    find('.briefing-previous').innerHTML = controller ? `${padIcon('prev')} 長押しで戻る` : '戻る';
+    find('.briefing-next').innerHTML = controller ? `${padIcon('next')} 長押しで次へ` : '次へ';
+    find('.briefing-launch').innerHTML = controller ? `${padIcon('next')} 長押しで確認` : '確認して待機へ';
     container.classList.toggle('pad-briefing', controller);
     find('.briefing-count').textContent = `${String(step + 1).padStart(2, '0')} / ${String(steps().length).padStart(2, '0')}`;
     art.dataset.step = step;
@@ -149,17 +161,17 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
     if (scoreExample) walls.add(edge(12, 13));
     drawMaze(find('.briefing-canvas'), {
       settings: { ...settings, cols: COLS, rows: ROWS, wallLimit: 20 },
-      mode: role, phase: cursorStep() ? 'playing' : 'result',
+      mode: role, phase: 'playing', time: (performance.now() - startedAt) / 1000, moves: trail.length - 1,
       avatar: scoreExample ? 6 : avatar, goal: COLS - 1,
-      trail: scoreExample ? [15, 10, 5, 6] : [avatar],
+      trail: scoreExample ? [15, 10, 5, 6] : trail,
       base: convertEdges(practice.fixed), walls,
       secrets: passageOpen() ? convertEdges(practice.passages) : new Set(),
       items: [
-        { cell: 7, category: 'red', risk: settings.redMin, taken: scoreExample },
-        { cell: 3, category: 'yellow', taken: false },
-        { cell: 13, category: 'green', taken: false },
+        { cell: 7, category: 'red', risk: settings.redMin, taken: scoreExample || taken.has(7) },
+        { cell: 3, category: 'yellow', risk: settings.yellowMin, taken: taken.has(3) },
+        { cell: 13, category: 'green', risk: settings.greenMin, taken: taken.has(13) },
       ],
-    }, role, practice.cursor.y * COLS + practice.cursor.x, (practice.direction + 3) % 4, { ambient: performance.now() / 1000 });
+    }, role, practice.cursor.y * COLS + practice.cursor.x, (practice.direction + 3) % 4, { cursor: cursorStep() });
   }
   function drawBoard() {
     const interactive = cursorStep() || moveStep();
@@ -170,7 +182,7 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
     const oxygen = find('.briefing-oxygen');
     oxygen.hidden = step !== 2;
     oxygen.querySelector('strong').textContent = String(Math.floor(settings.duration / 60)).padStart(2, '0') + ':' + String(settings.duration % 60).padStart(2, '0');
-    const practiceHint = `${controller ? '左スティック・方向キー' : '矢印キー'}で${parent() ? 'カーソル' : 'エクスプローラー'}を動かしてみましょう`;
+    const practiceHint = `${controller ? '左スティック' : '矢印キー'}で${parent() ? 'カーソル' : 'エクスプローラー'}を動かしてみましょう`;
     feedback.textContent = interactive ? practice.feedback || practiceHint : scoreExample ? '壁 −' + settings.wallCost + ' · アイテム −' + settings.redMin : '残り時間 · O₂';
     board.replaceChildren();
     if (!interactive) return;
@@ -196,7 +208,12 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
     else if (blocked(x, y, nx, ny)) practice.feedback = '壁で停止。別の方向へ進んでください';
     else {
       practice.child = { x: nx, y: ny };
+      const cell = ny * COLS + nx;
+      trail.push(cell);
+      const pickup = [7, 3, 13].includes(cell) && !taken.has(cell);
+      if (pickup) taken.add(cell);
       practice.feedback = passageOpen() && practice.passages.has(edgeKey(x, y, nx, ny)) ? '秘密の通路を通り抜けました' : `エクスプローラーが ${coordinate(nx, ny)} へ移動`;
+      if (pickup) practice.feedback += ' · アイテム獲得';
     }
     drawBoard();
   }
@@ -237,24 +254,25 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
     else if (event.key === 'ArrowRight') { event.preventDefault(); go(step + 1); }
     else if (event.key === 'Enter' && event.target.tagName !== 'BUTTON' && !event.repeat) { event.preventDefault(); if (last()) onFinish?.(); else go(step + 1); }
   }
-  // The pad mirrors the round on the practice board: stick moves, tap ○ turns the wall, tap × places
-  // it. Holding × moves on (or confirms on the last step); holding ○ goes back.
+  // Horizontal D-pad taps aim on release, so navigation holds never change the practice wall.
+  // The left stick moves exactly as in a round; × places walls.
   function pad(input) {
     if (!running) return;
     showHold(input.hold);
-    if (input.long.has('cross')) { if (last()) onFinish?.(); else go(step + 1); return; }
-    if (input.long.has('circle')) { go(step - 1); return; }
+    if (input.long.has('right')) { if (last()) onFinish?.(); else go(step + 1); return; }
+    if (input.long.has('left')) { go(step - 1); return; }
     // The game's directions run right, down, left, up; the board's run north, east, south, west.
     if (input.step >= 0 && (cursorStep() || moveStep())) arrow((input.step + 1) % 4);
-    if (cursorStep() && input.aim >= 0) { practice.direction = (input.aim + 1) % 4; practice.feedback = `設置方向: ${DIRECTIONS[practice.direction].name}`; highlight('Tab'); drawBoard(); }
-    if (cursorStep() && input.tapped.has('circle')) { highlight('Tab'); rotate(); }
+    const aim = input.tapped.has('right') ? 0 : input.tapped.has('left') ? 2
+      : input.pressed.has('right') || input.pressed.has('left') ? -1 : input.aim;
+    if (cursorStep() && aim >= 0) { practice.direction = (aim + 1) % 4; practice.feedback = `設置方向: ${DIRECTIONS[practice.direction].name}`; highlight('Tab'); drawBoard(); }
     if (cursorStep() && input.tapped.has('cross')) { highlight('Space'); placeWall(); }
   }
   // The footer buttons fill up while their button is held, so the hold reads as deliberate.
   function showHold(hold) {
-    find('.briefing-next').style.setProperty('--hold', hold.cross);
-    find('.briefing-launch').style.setProperty('--hold', hold.cross);
-    find('.briefing-previous').style.setProperty('--hold', step > 0 ? hold.circle : 0);
+    find('.briefing-next').style.setProperty('--hold', hold.right);
+    find('.briefing-launch').style.setProperty('--hold', hold.right);
+    find('.briefing-previous').style.setProperty('--hold', step > 0 ? hold.left : 0);
   }
 
   // Touch: tap a cell to put the cursor there, or to step the child toward it; the key hints are tappable.

@@ -67,7 +67,7 @@ export function createControllerUI() {
     get editing() { return keyboard.open; },
     keyboard(input) {
       // 1文字消す and 入力完了 are buttons on the keypad, so × and ○ cover everything.
-      if (input.pressed.has('circle')) { finish(false); return; }
+      if (input.pressed.has('circle') || input.long.has('circle')) { finish(false); return; }
       navigate(keyboard, input);
     },
     get menuHint() { return padAction('left', '項目を選択') + padAction('cross', '決定') + padAction('circle', '戻る'); },

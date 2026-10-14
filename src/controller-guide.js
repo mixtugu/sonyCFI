@@ -1,32 +1,52 @@
-// Shared PlayStation artwork and vocabulary for the briefing, help and live hints.
+// Shared PlayStation (Access controller) artwork and vocabulary for the briefing, help and live hints.
 const marks = {
   cross: '<path d="m8 8 16 16M24 8 8 24"/>',
   circle: '<circle cx="16" cy="16" r="10"/>',
+  // The Access controller's ← / → petals (D-pad): held, they go to the previous / next screen.
+  prev: '<path d="M6 16 18 6v6h8v8h-8v6Z"/>',
+  next: '<path d="M26 16 14 6v6H6v8h8v6Z"/>',
   square: '<rect x="7" y="7" width="18" height="18" rx="1"/>',
   triangle: '<path d="m16 6 12 20H4Z"/>',
   dpad: '<path d="M12 3h8v9h9v8h-9v9h-8v-9H3v-8h9Z"/>',
   touchpad: '<rect x="3" y="7" width="26" height="18" rx="4"/><path d="M9 13h1m5 0h1m5 0h1M9 19h1m5 0h1m5 0h1"/>',
 };
-const labels = { cross: '× ボタン', circle: '○ ボタン', square: '□ ボタン', triangle: '△ ボタン', dpad: '方向キー', left: '左スティック', right: '右スティック', options: 'OPTIONS', create: 'CREATE', l1: 'L1', r1: 'R1', touchpad: 'タッチパッドボタン' };
+const labels = { cross: '× ボタン', circle: '○ ボタン', prev: '← ボタン', next: '→ ボタン', square: '□ ボタン', triangle: '△ ボタン', dpad: '上下左右のボタン', left: '左スティック', right: '右スティック', options: 'OPTIONS', create: 'CREATE', l1: 'L1', r1: 'R1', touchpad: 'タッチパッドボタン' };
 export function padIcon(name) {
-  const graphic = marks[name] || (name === 'left' || name === 'right' ? `<circle cx="16" cy="16" r="12"/><text x="16" y="21">${name === 'left' ? 'L' : 'R'}</text>` : '');
+  const graphic = marks[name] || (name === 'left' || name === 'right' ? `<text x="16" y="21">${name === 'left' ? 'L' : 'R'}</text>` : '');
   return `<span class="ps-button ps-${name}" role="img" aria-label="${labels[name]}">${graphic ? `<svg viewBox="0 0 32 32" aria-hidden="true">${graphic}</svg>` : labels[name]}</span>`;
 }
 export const padAction = (name, text) => `<span class="ps-action">${padIcon(name)}<span>${text}</span></span>`;
-export function controllerDiagram() {
-  return `<svg class="ps-controller" viewBox="0 0 360 174" role="img" aria-label="PlayStation コントローラー。左側に方向キーと左スティック、右側に右スティックと△○×□ボタン、上部にL1・R1とCREATE・OPTIONS。">
-    <path fill="#dce9e8" stroke="#93b9bd" stroke-width="2" d="M80 32Q54 28 44 61L24 130Q19 156 38 159Q53 161 79 120L122 125Q180 143 238 125L281 120Q307 161 322 159Q341 156 336 130L316 61Q306 28 280 32Z"/>
-    <path fill="#122e40" d="m115 55 17 64q48 22 96 0l17-64Z"/>
-    <rect x="132" y="34" width="96" height="49" rx="9" fill="#78949c"/>
-    <g fill="#13374a" font-family="sans-serif" font-size="11" text-anchor="middle"><text x="80" y="21" fill="#d7e9e4">L1</text><text x="280" y="21" fill="#d7e9e4">R1</text><text x="112" y="43" font-size="8">CREATE</text><text x="250" y="43" font-size="8">OPTIONS</text></g>
-    <g stroke="#a4c7c8" fill="#19384a" stroke-width="2"><circle cx="133" cy="110" r="19"/><circle cx="227" cy="110" r="19"/></g>
-    <g fill="#e3f2ef" font-family="sans-serif" font-size="13" text-anchor="middle"><text x="133" y="115">L</text><text x="227" y="115">R</text></g>
-    <path d="M76 52h12v14h14v12H88v14H76V78H62V66h14Z" fill="#19384a"/>
-    <g fill="#19384a"><circle cx="279" cy="51" r="11"/><circle cx="300" cy="73" r="11"/><circle cx="279" cy="95" r="11"/><circle cx="258" cy="73" r="11"/></g>
-    <g fill="none" stroke-width="1.8"><path stroke="#8ad6bc" d="m279 45 6 11h-12Z"/><circle stroke="#f0a4ad" cx="300" cy="73" r="6"/><path stroke="#9ac7f4" d="m274 90 10 10m0-10-10 10"/><rect stroke="#e3a8d5" x="253" y="68" width="10" height="10"/></g>
+// Access controller: eight petal buttons and a centre button ring a round body, with the stick module beside it.
+const CX = 250, CY = 122;
+const point = (r, a) => `${(CX + r * Math.sin(a * Math.PI / 180)).toFixed(1)} ${(CY - r * Math.cos(a * Math.PI / 180)).toFixed(1)}`;
+const petal = (a0, a1, r0 = 57, r1 = 99) => `M${point(r1, a0)}A${r1} ${r1} 0 0 1 ${point(r1, a1)}L${point(r0, a1)}A${r0} ${r0} 0 0 0 ${point(r0, a0)}Z`;
+// Only the stick, the centre × and the up/right/down/left petals (which aim the wall) are mapped;
+// the diagonal petals are switched off.
+const PETALS = { 0: 'dpad', 90: 'dpad', 180: 'dpad', 270: 'dpad' };
+const ARROW = '<path d="M16 6 26 18h-6v8h-8v-8H6Z"/>';
+let diagrams = 0;
+export function controllerDiagram(active = []) {
+  // Each copy gets its own gradient ids, since a hidden copy's defs do not paint the visible one.
+  const id = `ps-${++diagrams}`;
+  const on = name => active.includes(name) ? ' is-active' : '';
+  const petals = Array.from({ length: 8 }, (_, i) => {
+    const angle = i * 45, name = PETALS[angle];
+    if (!name) return `<g class="ps-petal is-off"><path d="${petal(angle - 19, angle + 19)}"/></g>`;
+    const [x, y] = point(78, angle).split(' ').map(Number);
+    return `<g class="ps-petal${on(name)}" data-pad="${name}"><path d="${petal(angle - 19, angle + 19)}"/><g transform="translate(${x - 13} ${y - 13}) scale(.8125) rotate(${angle} 16 16)"><g class="ps-mark">${ARROW}</g></g></g>`;
+  }).join('');
+  return `<svg class="ps-controller" viewBox="0 0 370 240" role="img" aria-label="Access コントローラー。左にスティック、本体の中央に×ボタン、上下左右に向きのボタン。ほかのボタンは使いません。">
+    <defs><radialGradient id="${id}-ball" cx=".36" cy=".3" r=".75"><stop offset="0" stop-color="#5b6068"/><stop offset=".45" stop-color="#1d2025"/><stop offset="1" stop-color="#050608"/></radialGradient>
+    <radialGradient id="${id}-ring" r=".5"><stop offset=".78" stop-color="#2f6bff" stop-opacity="0"/><stop offset=".9" stop-color="#3f7dff"/><stop offset="1" stop-color="#2f6bff" stop-opacity="0"/></radialGradient></defs>
+    <ellipse cx="226" cy="226" rx="130" ry="9" fill="#0007"/>
+    <g class="ps-stick${on('left')}" data-pad="left"><path d="M38 196q2-20 40-22 38 2 40 22-2 18-40 20-38-2-40-20Z" fill="#202328"/><path d="M118 192l40-14v20l-40 12Z" fill="#202328"/><rect x="71" y="96" width="14" height="88" rx="6" fill="#16181c"/><circle class="ps-ball" cx="78" cy="78" r="34" fill="url(#${id}-ball)"/><ellipse cx="66" cy="64" rx="11" ry="7" fill="#fff" opacity=".18"/></g>
+    <circle cx="${CX}" cy="${CY}" r="108" fill="#1b1d22"/>
+    <g class="ps-petals">${petals}</g>
+    <circle cx="${CX}" cy="${CY}" r="53" fill="#15171b"/><circle cx="${CX}" cy="${CY}" r="56" fill="url(#${id}-ring)"/>
+    <g class="ps-petal ps-center${on('cross')}" data-pad="cross"><circle cx="${CX}" cy="${CY}" r="38"/><g transform="translate(${CX - 14} ${CY - 14}) scale(.875)"><g class="ps-mark">${marks.cross}</g></g></g>
   </svg>`;
 }
 export function playGuide(role) {
   return (role === 'cpu' ? '' : padAction('left', role === 'parent' ? '位置を選択' : '移動')) +
-    (role === 'parent' ? padAction('right', '壁の向き') + padAction('circle', '向きを回転') + padAction('cross', '壁を設置') : '');
+    (role === 'parent' ? padAction('dpad', '壁の向き') + padAction('cross', '壁を設置') : '');
 }

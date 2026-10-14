@@ -46,8 +46,7 @@ input[type=number]{width:calc(60px + 4px * var(--text-scale, 1))}.field span inp
 .briefing-progress span.is-active::before{content:'';position:absolute;inset:0;z-index:1;background:linear-gradient(90deg,transparent,#fffa 50%,transparent);transform:translateX(-100%);animation:progress-sheen 2.6s 1s ease-in-out infinite}
 @keyframes progress-fill{from{transform:scaleX(0)}to{transform:scaleX(1)}}
 @keyframes progress-sheen{to{transform:translateX(100%)}}
-.ocean-world .briefing-art{border-radius:18px;background:#031a29;border:1px solid #a4efe040;box-shadow:0 22px 50px #000a,0 0 0 5px #0b3246,0 0 0 6px #9fe8d82e,0 0 44px #4fd6c526}
-.briefing-art::after{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:2;background:linear-gradient(150deg,#ffffff1c,transparent 32%,transparent 72%,#8ff0dc10)}
+.ocean-world .briefing-art{background:#031a29;border:1px solid #a4efe040}
 .ocean-world .briefing-art-heading{background:#0c3346d9;border-color:#a4efe01f}
 .ocean-world .practice-feedback{background:#0c3346;color:#bfe9df;border-color:#a4efe01f}
 .briefing-count{color:#f3cf9a!important;letter-spacing:.18em!important}
@@ -74,7 +73,7 @@ input[type=number]{width:calc(60px + 4px * var(--text-scale, 1))}.field span inp
 .ocean-world .board-heading h2{letter-spacing:.14em;color:#e0eaff}
 .ocean-world .board-surface,.ocean-world.immersive .board-surface{background:transparent;padding:12px}
 .ocean-world.immersive .board-surface{grid-template:minmax(0,1fr)/minmax(0,1fr)}
-.ocean-world .board-surface canvas{border-radius:14px;box-shadow:0 0 0 1px #aef3e233,0 18px 50px #000b,0 0 70px #3fd0c01c}
+.ocean-world :is(.board-surface canvas,.briefing-art){border-radius:14px;box-shadow:0 0 0 1px #aef3e233,0 18px 50px #000b,0 0 70px #3fd0c01c}
 .ocean-world[data-ocean-phase=playing] .board-surface canvas{animation:board-breathe 6s ease-in-out infinite alternate}
 @keyframes board-breathe{to{box-shadow:0 0 0 1px #aef3e24d,0 18px 50px #000b,0 0 90px #4fe0cc38}}
 .ocean-world .score strong{display:inline-block}

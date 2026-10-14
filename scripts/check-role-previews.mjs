@@ -9,7 +9,7 @@ try {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: 'reduce' });
   await context.addInitScript(() => {
     window.__pad = null;
-    navigator.getGamepads = () => window.__pad ? [{ id: 'DualSense', connected: true, axes: [0, 0, 0, 0], buttons: Array.from({ length: 18 }, (_, i) => ({ pressed: window.__pad.includes(i) })) }] : [];
+    navigator.getGamepads = () => window.__pad ? [{ id: 'DualSense', connected: true, axes: window.__axes || [0, 0, 0, 0], buttons: Array.from({ length: 18 }, (_, i) => ({ pressed: window.__pad.includes(i) })) }] : [];
     sessionStorage.setItem('maze-session', JSON.stringify({ code: 'ABCDEF', token: 'existing-online-session' }));
   });
   const page = await context.newPage(), errors = [], roomRequests = [];
@@ -18,7 +18,7 @@ try {
   page.on('request', request => { if (/\/(connection-info|maze-api|maze-socket)(\?|$)/.test(new URL(request.url()).pathname)) roomRequests.push(request.url()); });
   const origin = `http://127.0.0.1:${app.port}`;
   const confirm = async () => { await page.locator('.briefing-next').click(); await page.locator('.briefing-next').click(); await page.locator('.briefing-launch').click(); await page.locator('#ready-start').click(); };
-  const pad = async (buttons, ms = 100) => { await page.evaluate(b => { window.__pad = b; }, buttons); await page.waitForTimeout(ms); await page.evaluate(() => { window.__pad = []; }); await page.waitForTimeout(100); };
+  const pad = async (buttons, ms = 100, axes = [0, 0, 0, 0]) => { await page.evaluate(({ buttons, axes }) => { window.__pad = buttons; window.__axes = axes; }, { buttons, axes }); await page.waitForTimeout(ms); await page.evaluate(() => { window.__pad = []; window.__axes = [0, 0, 0, 0]; }); await page.waitForTimeout(100); };
   const hold = buttons => pad(buttons, 900);
 
   await page.goto(`${origin}/test/1`);
@@ -49,11 +49,11 @@ try {
   await page.goto(`${origin}/test/2/`);
   await expect(page.locator('.briefing-title')).toHaveText('移動してアイテムを探し、報酬を獲得');
   await expect(page.locator('#board-child')).toBeVisible(); await expect(page.locator('#board-parent')).toBeHidden();
-  // With a controller only the stick, × and ○ are used: hold × to move on, × to confirm, hold ○ to pause.
+  // With a controller: left stick moves, hold → advances, × confirms and hold ○ pauses.
   await pad([]); await expect(page.locator('.briefing-next')).toContainText('長押しで次へ'); await expect(page.locator('.briefing-close')).toBeHidden();
-  await pad([15]); await expect(page.locator('.practice-feedback')).toContainText('移動');
+  await pad([], 100, [1, 0, 0, 0]); await expect(page.locator('.practice-feedback')).toContainText('移動');
   await page.screenshot({ path: 'artifacts/test-2-child.png' });
-  await hold([0]); await hold([0]); await expect(page.locator('.briefing-launch')).toBeVisible(); await hold([0]);
+  await hold([15]); await hold([15]); await expect(page.locator('.briefing-launch')).toBeVisible(); await hold([15]);
   await expect(page.locator('#ready-tutorial')).toBeHidden(); await pad([0]);
   await expect(page.locator('#phase')).toHaveText('探検中');
   await expect.poll(async () => await page.locator('#detail-parent').textContent()).not.toBe('0 / 12');

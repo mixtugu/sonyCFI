@@ -1,8 +1,16 @@
 :root{--ocean-base:#00194d;--ocean-text:#eaf0fa;--ocean-panel:#0b2457}
-.ps-button{display:inline-flex;align-items:center;justify-content:center;flex:none;vertical-align:middle;min-width:26px;height:26px;padding:2px;border:1px solid #99bdc366;border-radius:7px;background:var(--ocean-base);color:var(--ocean-text);font:600 9px/1 sans-serif;letter-spacing:.03em}
-.ps-button svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2.3;stroke-linecap:round;stroke-linejoin:round}.ps-button svg text{stroke:none;fill:currentColor;text-anchor:middle;font:600 14px sans-serif}
-.ps-cross{color:#a9d3ff}.ps-circle{color:#f6b5bb}.ps-square{color:#eebee6}.ps-triangle{color:#a6e2ce}.ps-options,.ps-create,.ps-touchpad{padding:3px 6px}
-.ps-action{display:inline-flex;align-items:center;gap:6px;line-height:1.5}.ps-controller{display:block;width:min(100%,280px);height:auto;margin:6px auto}
+.ps-button{display:inline-flex;align-items:center;justify-content:center;flex:none;vertical-align:middle;min-width:26px;height:26px;padding:2px;border:1px solid #fff;border-radius:9px;background:linear-gradient(#ffffff,#e6eaef);box-shadow:0 2px 0 #9aa3ad,0 3px 6px #0005;color:#59636e;font:700 9px/1 sans-serif;letter-spacing:.03em}
+.ps-button svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2.3;stroke-linecap:round;stroke-linejoin:round}.ps-button svg text{stroke:none;fill:currentColor;text-anchor:middle;font:700 14px sans-serif}
+/* Access controller: white petal caps with grey symbols; the stick is a black ball. */
+.ps-left,.ps-right{border-radius:50%;border-color:#3a3f46;background:radial-gradient(circle at 36% 30%,#5b6068,#1d2025 45%,#050608);box-shadow:0 2px 4px #0007;color:#e8ecf1}.ps-options,.ps-create,.ps-touchpad{padding:3px 6px}
+.ps-action{display:inline-flex;align-items:center;gap:6px;line-height:1.5}.ps-controller{display:block;width:min(100%,280px);height:auto;margin:6px auto;overflow:visible}
+.ps-petal>path,.ps-center>circle{fill:#f6f8fa;stroke:#cdd3da;stroke-width:1.5;stroke-linejoin:round;transition:fill .15s}
+.ps-petal .ps-mark{fill:none;stroke:#8a939d;stroke-width:3.2;stroke-linecap:round;stroke-linejoin:round}.ps-petal-text{fill:#8a939d;font:700 11px sans-serif;text-anchor:middle}.ps-petal-text.is-small{font-size:7.5px;letter-spacing:.02em}
+.ps-petal.is-off>path{fill:#5d636b;stroke:#4a4f56;opacity:.55}
+.ps-petal.is-active>path,.ps-center.is-active>circle{fill:#fff;stroke:#5b8dff;stroke-width:3.5}.ps-petal.is-active .ps-mark{stroke:#2f5fd0}.ps-petal.is-active .ps-petal-text{fill:#2f5fd0}
+.ps-stick.is-active .ps-ball{stroke:#5b8dff;stroke-width:3.5}
+.briefing-pad{margin-top:16px}.briefing-pad .ps-controller{width:min(100%,300px);margin:0}
+@media(max-width:620px),(max-height:700px){.briefing-pad{display:none}}
 .controller-guide,.controller-actions{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px 14px;font-size:11px;line-height:1.6}
 .controller-guide{flex:none;padding:10px 6px;margin-top:12px;border-top:1px solid #9dc9c33d;color:var(--ocean-text);text-align:left}.immersive .workspace>.controller-guide{margin:0;padding:4px 6px}
 .controller-focus{outline:3px solid #f2d5a1!important;outline-offset:3px!important;box-shadow:0 0 0 6px #eac99620!important}

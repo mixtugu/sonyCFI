@@ -18,12 +18,12 @@ const press = async (page, buttons = [], axes = [0, 0, 0, 0], ms = 70) => {
 async function select(page, selector) {
   for (let i = 0; i < 60; i++) {
     if (await page.locator(selector).evaluate(el => el === document.activeElement)) return;
-    await press(page, [13]);
+    await press(page, [], [0, 1, 0, 0]);   // menus are walked with the stick; the D-pad aims
   }
   throw new Error(`Controller could not reach ${selector}`);
 }
 async function activate(page, selector) { await select(page, selector); await press(page, [0]); }
-// × and ○ held past the hold time: × moves the briefing on, ○ goes back or pauses the round.
+// Tutorial navigation uses dedicated → / ← holds; × places walls and ○ never advances a step.
 const hold = (page, buttons) => press(page, buttons, [0, 0, 0, 0], 900);
 const app = await createApp({ port: 0, host: '127.0.0.1' });
 let browser;
@@ -36,24 +36,33 @@ try {
   await activate(parent, '#lobby-settings-open');
   await select(parent, '[name=cols]');
   const cols = +(await parent.locator('[name=cols]').inputValue());
-  await press(parent, [15]); await expect(parent.locator('[name=cols]')).toHaveValue(String(cols + 1));
-  await press(parent, [14]); await expect(parent.locator('[name=cols]')).toHaveValue(String(cols));
+  await press(parent, [], [1, 0, 0, 0]); await expect(parent.locator('[name=cols]')).toHaveValue(String(cols + 1));
+  await press(parent, [], [-1, 0, 0, 0]); await expect(parent.locator('[name=cols]')).toHaveValue(String(cols));
   await activate(parent, '[name=wall-style][value=reef]'); await expect(parent.locator('[name=wall-style][value=reef]')).toBeChecked();
   await activate(parent, '#settings-help'); await expect(parent.locator('.pad-help')).toBeVisible(); await expect(parent.locator('#keyboard-help')).toBeHidden();
-  await press(parent, [1]); await expect(parent.locator('#settings-dialog')).toBeVisible();
+  await hold(parent, [14]); await expect(parent.locator('#settings-dialog')).toBeVisible();   // hold ← closes help
   await activate(parent, '#settings button[type=submit]'); await expect(parent.locator('#settings-dialog')).toBeHidden();
   await activate(parent, '#maze-create button'); await expect(parent.locator('#ready')).toBeVisible();
-  // The briefing uses only the sticks, × and ○: taps play the practice board, holds move between steps.
+  // Left stick moves, D-pad taps aim walls, and → / ← holds move between tutorial steps.
   await expect(parent.locator('.briefing-description')).toContainText('スティック');
   await expect(parent.locator('.briefing-close')).toBeHidden();
   await expect(parent.locator('.briefing-next')).toContainText('長押しで次へ');
   await expect(parent.locator('.briefing-controls')).not.toContainText('Tab');
   await press(parent, [], [0, 0, 0, -1]); await expect(parent.locator('.practice-feedback')).toHaveText('設置方向: 北');
-  await press(parent, [1]); await expect(parent.locator('.practice-feedback')).toHaveText('設置方向: 東');
+  for (const [button, name] of [[12, '北'], [13, '南'], [14, '西'], [15, '東']]) {
+    await press(parent, [button]);
+    await expect(parent.locator('.practice-feedback')).toHaveText(`設置方向: ${name}`);
+    await expect(parent.locator('.briefing-count')).toHaveText('01 / 03');
+  }
+  await hold(parent, [0]); await expect(parent.locator('.briefing-count')).toHaveText('01 / 03');
+  await hold(parent, [1]); await expect(parent.locator('.briefing-count')).toHaveText('01 / 03');
   await press(parent, [0]); await expect(parent.locator('.practice-feedback')).toHaveText('東側に壁を設置しました');
   await expect(parent.locator('.briefing-count')).toHaveText('01 / 03');   // taps never change the step
-  await hold(parent, [0]); await expect(parent.locator('.briefing-count')).toHaveText('02 / 03');
-  await hold(parent, [1]); await expect(parent.locator('.briefing-count')).toHaveText('01 / 03');
+  await hold(parent, [15]); await expect(parent.locator('.briefing-count')).toHaveText('02 / 03');   // hold → advances
+  await hold(parent, [14]); await expect(parent.locator('.briefing-count')).toHaveText('01 / 03');   // hold ← goes back
+  await expect(parent.locator('.practice-feedback')).toHaveText('東側に壁を設置しました'); // navigation holds never aim
+  await press(parent, [], [-1, 0, 0, 0]); await expect(parent.locator('.practice-feedback')).toHaveText('選択: B-02');
+  await press(parent, [], [1, 0, 0, 0]); await expect(parent.locator('.practice-feedback')).toHaveText('選択: C-02');
   // Hot unplug/replug preserves the current tutorial and restores keyboard guidance.
   await parent.evaluate(() => { window.__pad = null; });
   await expect(parent.locator('.briefing-controls')).toContainText('Space'); await expect(parent.locator('.briefing-close')).toBeVisible();
@@ -67,7 +76,10 @@ try {
   await expect(child.locator('#maze-join input')).toHaveAttribute('readonly', '');
   await activate(child, '#maze-join button'); await expect(child.locator('#ready')).toBeVisible();
   await expect(child.locator('.briefing-description')).toContainText('左スティック');
-  await press(child, [15]); await expect(child.locator('.practice-feedback')).toContainText('移動');
+  const childHint = await child.locator('.practice-feedback').textContent();
+  for (const button of [12, 13, 14, 15]) await press(child, [button]);
+  await expect(child.locator('.practice-feedback')).toHaveText(childHint);
+  await press(child, [], [1, 0, 0, 0]); await expect(child.locator('.practice-feedback')).toContainText('移動');
   // Buttons other than the sticks, × and ○ do nothing outside the sandbox.
   const shownStep = await child.locator('.briefing-count').textContent();
   for (const button of [3, 2, 9, 8, 4, 5, 17]) await press(child, [button]);
@@ -79,10 +91,10 @@ try {
   await expect(child.locator('.briefing-next')).toBeInViewport();
   await child.screenshot({ path: 'artifacts/controller-tutorial-mobile.png' });
   await child.setViewportSize({ width: 1280, height: 900 });
-  // Hold × through the steps; the ready button then has focus, so a tap of × confirms.
-  const complete = async page => { await hold(page, [0]); await hold(page, [0]); await hold(page, [0]); await expect(page.locator('#ready-tutorial')).toBeHidden(); await expect(page.locator('#ready-start')).toBeFocused(); await press(page, [0]); };
+  // Hold → through the steps; the ready button then has focus, so a tap of × confirms.
+  const complete = async page => { await hold(page, [15]); await hold(page, [15]); await hold(page, [15]); await expect(page.locator('#ready-tutorial')).toBeHidden(); await expect(page.locator('#ready-start')).toBeFocused(); await press(page, [0]); };
   await complete(parent); await complete(child);
-  await expect(parent.locator('#countdown')).toBeVisible(); await press(parent, [1]); await expect(parent.locator('#phase')).toHaveText('ひと休み中');
+  await expect(parent.locator('#countdown')).toBeVisible(); await hold(parent, [14]); await expect(parent.locator('#phase')).toHaveText('ひと休み中');
   const resume = async page => { await expect(page.locator('#ready-start')).toBeFocused(); await press(page, [0]); };
   await resume(parent); await resume(child);
   await expect(parent.locator('#phase')).toHaveText('探検中');
@@ -95,10 +107,8 @@ try {
   const direction = [0, 1, 2, 3].find(d => { const n = neighbor(room.game, cursor, d); return n >= 0 && !room.game.base.has(edge(cursor, n)); });
   await press(parent, [], [0, 0, ...[[1, 0], [0, 1], [-1, 0], [0, -1]][direction]]); await press(parent, [0]);
   await expect.poll(() => room.game.walls.size).toBe(1);
-  // Holding ○ pauses; settings and help are then reached through the menu with the stick and ×.
-  const rotation = await parent.locator('#direction').textContent();
-  await hold(parent, [1]); await expect(parent.locator('#phase')).toHaveText('ひと休み中');
-  await expect(parent.locator('#direction')).toHaveText(rotation);   // a held ○ pauses without turning the wall
+  // Holding ← (or ○) pauses; settings and help are then reached through the menu with the stick and ×.
+  await hold(parent, [14]); await expect(parent.locator('#phase')).toHaveText('ひと休み中');
   await activate(parent, '#ready-settings'); await activate(parent, '#settings-help');
   await expect(parent.locator('#help')).toBeVisible();
   await expect.poll(() => parent.locator('#help h2').evaluate(el => { const r = el.getBoundingClientRect(); return el.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)); })).toBe(true);
@@ -108,7 +118,7 @@ try {
   await press(child); await resume(parent); await resume(child); await expect(parent.locator('#phase')).toHaveText('探検中');
   room.game.time = room.game.settings.duration - .01;
   await expect(parent.locator('.briefing-title')).toContainText('移動してアイテム');
-  await expect(child.locator('.briefing-description')).toContainText('スティックで位置と向き');
+  await expect(child.locator('.briefing-description')).toContainText('左スティックで位置を選び、上下左右の方向キーで壁の向き');
   await complete(parent); await complete(child); await expect(parent.locator('#phase')).toHaveText('探検中');
   room.game.time = room.game.settings.duration - .01;
   await expect(parent.locator('#result')).toBeVisible();
@@ -116,8 +126,8 @@ try {
   await expect(child.locator('#result')).toBeVisible(); await press(child, [1]); await press(child, [0]); await expect(child.locator('#lobby')).toBeVisible();
   // Leaving from nested settings must also dismiss the underlying ready dialog.
   await activate(parent, '#maze-create button'); await expect(parent.locator('#ready')).toBeVisible();
-  await hold(parent, [0]); await hold(parent, [0]); await hold(parent, [0]); await activate(parent, '#ready-settings'); await activate(parent, '#maze-leave');
+  await hold(parent, [15]); await hold(parent, [15]); await hold(parent, [15]); await activate(parent, '#ready-settings'); await activate(parent, '#maze-leave');
   await expect(parent.locator('#lobby')).toBeVisible(); await expect(parent.locator('#ready')).toBeHidden();
   assert.deepEqual(errors, []);
-  console.log('PASS: stick/×/○-only lobby, hold-to-advance tutorial, corner room code, settings, help, fixed-key room entry, both tutorials, reconnect guidance, mobile layout, countdown cancel, movement/wall, pause, unplug pause, role swap, result, ending and room exit.');
+  console.log('PASS: stick movement, four-way wall aiming, dedicated →/← tutorial holds, lobby, corner room code, settings, help, fixed-key room entry, both tutorials, reconnect guidance, mobile layout, countdown cancel, movement/wall, pause, unplug pause, role swap, result, ending and room exit.');
 } finally { await browser?.close(); await app.close(); }

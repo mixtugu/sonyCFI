@@ -27,7 +27,7 @@ button:focus-visible,a:focus-visible,canvas:focus-visible,input:focus-visible,su
 .ready-dialog .eyebrow{margin:0;font-size:calc(16.5px * var(--text-scale, 1));letter-spacing:.08em;color:var(--sea)}.ready-dialog h2{font-size:calc(33px * var(--text-scale, 1));margin:6px 0 12px}.ready-dialog p{margin:0}
 #ready-note{font-size:calc(19.5px * var(--text-scale, 1));line-height:1.8;color:var(--muted);margin-bottom:18px}
 /* Pre-round briefing: kicker and close, progress, art beside the copy, back/next. */
-.ready-dialog.briefing{width:min(760px,calc(100% - 32px));padding:24px 28px 22px;text-align:left}
+.ready-dialog.briefing{width:min(1120px,calc(100% - 32px));padding:24px 28px 22px;text-align:left}
 .tutorial{margin-bottom:14px}
 .briefing-top{display:flex;align-items:center;justify-content:space-between;gap:16px}
 .briefing-kicker{color:var(--sea);font-size:calc(16.5px * var(--text-scale, 1));letter-spacing:.08em}
@@ -35,8 +35,8 @@ button:focus-visible,a:focus-visible,canvas:focus-visible,input:focus-visible,su
 .briefing-progress{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:16px 0 20px}
 .briefing-progress span{height:3px;background:var(--line);transition:background .18s}
 .briefing-progress span.is-done{background:var(--sea)}.briefing-progress span.is-active{background:var(--coral)}
-.briefing-layout{display:grid;grid-template-columns:204px minmax(0,1fr);align-items:center;gap:24px;min-height:204px}
-.briefing-art{position:relative;align-self:center;width:204px;overflow:hidden;border:1px solid var(--line);border-radius:12px;outline:none;background:#f4fafc}
+.briefing-layout{display:grid;grid-template-columns:minmax(0,auto) minmax(260px,1fr);align-items:center;gap:32px;min-height:204px}
+.briefing-art{position:relative;align-self:center;width:min(600px,calc((100dvh - 330px) * 1.08),58vw);min-width:204px;overflow:hidden;border:1px solid var(--line);border-radius:12px;outline:none;background:#f4fafc}
 .briefing-art:focus-visible{outline:3px solid #f2b56b;outline-offset:3px}
 .briefing-art-heading{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:10px 12px;background:#fff;border-bottom:1px solid var(--line)}
 .briefing-art-tag{color:var(--sea);font-size:calc(13.5px * var(--text-scale, 1));letter-spacing:.06em}
@@ -60,7 +60,7 @@ button:focus-visible,a:focus-visible,canvas:focus-visible,input:focus-visible,su
 .briefing-controls kbd.is-pressed{border-color:var(--sea);background:var(--sea);color:#fff}
 .briefing-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:20px;padding-top:14px;border-top:1px solid var(--line)}
 .briefing-nav{display:flex;gap:8px}.briefing-footer .primary{min-width:128px}
-@media(max-width:620px){.briefing-layout{grid-template-columns:1fr;justify-items:center;gap:14px}.briefing-art{width:min(240px,100%)}.briefing-title{font-size:calc(27px * var(--text-scale, 1))}}
+@media(max-width:620px){.briefing-layout{grid-template-columns:1fr;justify-items:center;gap:14px}.briefing-art{width:min(100%,calc((100dvh - 360px) * 1.08));min-width:min(240px,100%)}.briefing-title{font-size:calc(27px * var(--text-scale, 1))}}
 /* Room code: tiny, top-right, above every dialog (it is a popover in the top layer). */
 .room-code{position:fixed;inset:6px 10px auto auto;margin:0;padding:1px 7px;border:0;border-radius:5px;background:#06283bb3;color:#cfebd8;font-size:11px;font-weight:700;letter-spacing:.14em;line-height:1.5;pointer-events:none;z-index:60}
 .room-code:empty{display:none}

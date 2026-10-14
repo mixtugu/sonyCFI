@@ -20,11 +20,11 @@ try {
   const press = async (buttons, axes) => { await page.evaluate(([b, a]) => { window.__pad = { buttons: b, axes: a }; }, [buttons, axes]); await page.waitForTimeout(120); await page.evaluate(() => { window.__pad = { buttons: [] }; }); await page.waitForTimeout(120); };
   await press([]); await expect(page.locator('#pad-status')).toBeVisible();
   await press([9]); await expect(page.locator('#phase')).toHaveText('探検中');             // OPTIONS starts
-  await press([15]); await press([1]); await expect(page.locator('#direction')).toHaveText('下'); // ○ rotates
+  await press([13]); await expect(page.locator('#direction')).toHaveText('下'); // D-pad aims
   await press([], [0, 0, 0, -1]); await expect(page.locator('#direction')).toHaveText('上'); // right stick aims
   await press([], [0, 0, -1, 0]); await expect(page.locator('#direction')).toHaveText('左');
   await press([], [0, 0, 1, 0]); await expect(page.locator('#direction')).toHaveText('右');
-  for (const dir of [15, 12, 14, 13]) { await press([1]); await press([0]); if (await page.locator('#detail-parent').textContent() !== '0 / 12') break; } // × places
+  for (const dir of [15, 12, 14, 13]) { await press([dir]); await press([0]); if (await page.locator('#detail-parent').textContent() !== '0 / 12') break; } // × places
   await expect(page.locator('#detail-parent')).toHaveText('1 / 12');
   assert.ok(await page.evaluate(() => window.__rumbles) > 0, 'wall placement rumbles');
   await press([9]); await expect(page.locator('#phase')).toHaveText('ひと休み中');          // OPTIONS pauses
@@ -47,5 +47,5 @@ try {
   await press([3]); await expect(page.locator('body')).not.toHaveClass(/immersive/); await press([3]); await expect(page.locator('body')).toHaveClass(/immersive/); // △ fullscreen
   await press([4]); await expect(page.locator('[data-mode=parent]')).toHaveAttribute('aria-pressed', 'true'); // L1 previous mode
   assert.deepEqual(errors, []);
-  console.log('Gamepad: connect indicator, OPTIONS start/pause, ○ rotate, × wall + rumble, L1/R1 modes, CREATE reset, □ settings, △ fullscreen, stick movement passed.');
+  console.log('Gamepad: connect indicator, OPTIONS start/pause, D-pad aim, × wall + rumble, L1/R1 modes, CREATE reset, □ settings, △ fullscreen, stick movement passed.');
 } finally { await browser?.close(); await app.close(); }
