@@ -37,7 +37,7 @@ try {
   const box = await page.locator('#board-parent').boundingBox();
   await page.mouse.click(box.x + target.x / target.w * box.width, box.y + target.y / target.h * box.height);
   await expect(page.locator('#detail-parent')).toHaveText('1 / 12');
-  await expect(page.locator('#score-parent')).toHaveText('99');
+  await expect(page.locator('#hp-hearts .heart')).toHaveCount(16);   // walls cost no HP
   // The round ends with an exchange: the next one puts this player on the other side.
   await expect(page.locator('#result')).toBeVisible({ timeout: 9000 });
   await expect(page.locator('#again')).toHaveText('交代してもう一度');

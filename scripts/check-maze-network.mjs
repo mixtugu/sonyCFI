@@ -45,7 +45,7 @@ try {
   await expect(child.locator('#ready-title')).toHaveText('あなたはエクスプローラーです。');
   // Each round opens with a three-step briefing; the first steps carry a small practice board.
   await expect(parent.locator('.briefing-title')).toHaveText('壁を立ててエクスプローラーを守る');
-  await expect(child.locator('.briefing-title')).toHaveText('移動してアイテムを探し、報酬を獲得');
+  await expect(child.locator('.briefing-title')).toHaveText('魚に触れて、図鑑に登録');
   await expect(parent.locator('#ready-start')).toBeHidden();
   const practiceImage = await parent.locator('.briefing-canvas').evaluate(canvas => canvas.toDataURL());
   await parent.keyboard.press('Space');
@@ -57,7 +57,7 @@ try {
   await child.locator('.briefing-next').click();
   await expect(child.locator('.briefing-count')).toHaveText('02 / 03');
   for (const key of ['ArrowRight', 'ArrowUp', 'ArrowUp', 'ArrowRight']) await child.keyboard.press(key);
-  await expect(child.locator('.practice-feedback')).toHaveText('秘密の通路を通り抜けました');
+  await expect(child.locator('.practice-feedback')).toContainText('秘密の通路を通り抜けました');
   await parent.screenshot({ path: 'artifacts/tuto-1-parent.png' }); await child.screenshot({ path: 'artifacts/tuto-2-child.png' });
   await parent.locator('.briefing-next').click(); await parent.locator('.briefing-next').click();
   await expect(parent.locator('.briefing-count')).toHaveText('03 / 03');
@@ -90,17 +90,18 @@ try {
   await expect(parent.locator('#maze-role')).toHaveText('エクスプローラー'); await expect(child.locator('#maze-role')).toHaveText('ナビゲーター');
   await expect(parent.locator('#board-child')).toBeVisible(); await expect(child.locator('#board-parent')).toBeVisible();
   await expect(parent.locator('#ready-title')).toHaveText('あなたはエクスプローラーです。');
-  await expect(parent.locator('.briefing-title')).toHaveText('移動してアイテムを探し、報酬を獲得');   // the briefing follows the new role
+  await expect(parent.locator('.briefing-title')).toHaveText('魚に触れて、図鑑に登録');   // the briefing follows the new role
   // The second leg ends the match: totals for both people and a fresh start.
   for (const page of [parent, child]) { await page.locator('.briefing-next').click(); await page.locator('.briefing-next').click(); await page.locator('.briefing-launch').click(); await page.locator('#ready-start').click(); }
   for (const n of ['3', '2', '1']) { await expect(parent.locator('#countdown-number')).toHaveText(n); await expect(child.locator('#countdown-number')).toHaveText(n); assert.equal(room.game.time, 0); }
   await expect(parent.locator('#phase')).toHaveText('探検中');
   room.game.time = room.game.settings.duration - .01;
   await expect(parent.locator('#result-title')).toHaveText('ふたりの探検が終わりました');
-  await expect(parent.locator('#result-label-a')).toHaveText('あなた'); await expect(parent.locator('#result-rounds')).toContainText('第2ラウンド');
+  await expect(parent.locator('#result-count-label')).toHaveText('ふたりで出会った生き物'); await expect(parent.locator('#result-rounds')).toContainText('第2ラウンド');
   await expect(parent.locator('#swap-note')).toBeHidden(); await expect(parent.locator('#again')).toHaveText('もう一度あそぶ');
-  const totals = await parent.evaluate(() => [+document.getElementById('final-parent').textContent, +document.getElementById('final-child').textContent]);
-  assert.equal(totals[0] + totals[1], room.results.reduce((sum, leg) => sum + leg.parent + leg.child, 0), 'totals cover both rounds');
+  const met = new Set(room.results.flatMap(leg => leg.caught));
+  await expect(parent.locator('#result-count')).toHaveText(`${met.size} / 12 種`);   // the encyclopedia covers both rounds
+  await expect(parent.locator('#result-zukan .zukan-cell.is-found')).toHaveCount(met.size);
   await expect(parent.locator('body')).toHaveAttribute('data-ocean-phase', 'summary');
   await parent.locator('#close-result').click(); await expect(parent.locator('#ending')).toBeVisible();
   await expect(parent.locator('body')).toHaveAttribute('data-ocean-phase', 'ending');

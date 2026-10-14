@@ -1,5 +1,7 @@
-export const DEFAULTS = Object.freeze({ cols: 14, rows: 10, duration: 30, wallLimit: 12, wallCost: 1, moveMs: 500, redMin: 14, redMax: 18, yellowMin: 8, yellowMax: 13, greenMin: 3, greenMax: 7, rewardMin: 3, rewardMax: 18 });
-export const LIMITS = { cols: [10, 28], rows: [8, 18], duration: [5, 120], wallLimit: [0, 30], wallCost: [0, 20], moveMs: [100, 1200], redMin: [1, 50], redMax: [1, 50], yellowMin: [1, 50], yellowMax: [1, 50], greenMin: [1, 50], greenMax: [1, 50], rewardMin: [1, 50], rewardMax: [1, 50] };
+export const DEFAULTS = Object.freeze({ cols: 14, rows: 10, duration: 30, wallLimit: 12, moveMs: 500 });
+export const LIMITS = { cols: [10, 28], rows: [8, 18], duration: [5, 120], wallLimit: [0, 30], moveMs: [100, 1200] };
+import { HP_MAX, SIZE_MIX, applyDamage, pickCreature, rollDamage } from './creatures.js';
+
 export const DIRS = [[1, 0], [0, 1], [-1, 0], [0, -1]];
 export const edge = (a, b) => a < b ? `${a}:${b}` : `${b}:${a}`;
 export function normalize(settings = {}) {
@@ -23,7 +25,7 @@ export function reachable(s, from = s.avatar) {
 }
 export function createMaze(settings = {}, seed = 260830) {
   const config = normalize(settings), random = rng(seed), count = config.cols * config.rows;
-  const s = { settings: config, seed, random, phase: 'ready', mode: 'parent', time: 0, avatar: (config.rows - 1) * config.cols, goal: config.cols - 1, base: new Set(), walls: new Set(), secrets: new Set(), items: [], parentScore: 100, childScore: 0, collected: 0, moves: 0, trail: [], logs: [], moveClock: 0, cpuClock: 0, nextCpu: 2.4, cooldown: 0 };
+  const s = { settings: config, seed, random, phase: 'ready', mode: 'parent', time: 0, avatar: (config.rows - 1) * config.cols, goal: config.cols - 1, base: new Set(), walls: new Set(), secrets: new Set(), items: [], hp: HP_MAX, collected: 0, moves: 0, trail: [], logs: [], moveClock: 0, cpuClock: 0, nextCpu: 2.4, cooldown: 0 };
   for (let a = 0; a < count; a++) for (const b of neighbors(s, a)) s.base.add(edge(a, b));
   const seen = new Set([s.avatar]), stack = [s.avatar];
   while (stack.length) {
@@ -35,18 +37,18 @@ export function createMaze(settings = {}, seed = 260830) {
   // A few loops offer choices without losing the character of a carved maze.
   const closed = [...s.base];
   for (let i = 0; i < Math.floor(count / 32); i++) s.base.delete(closed.splice(Math.floor(random() * closed.length), 1)[0]);
-  const roll = (lo, hi) => Math.min(lo, hi) + Math.floor(random() * (Math.abs(hi - lo) + 1));
-  // One item per zone of a 4×3 grid keeps them spread evenly, so no item is far from the next;
+  const sizes = [...SIZE_MIX];
+  for (let i = sizes.length - 1; i > 0; i--) { const j = Math.floor(random() * (i + 1)); [sizes[i], sizes[j]] = [sizes[j], sizes[i]]; }
+  // One fish per zone of a 4×3 grid keeps them spread evenly, so no item is far from the next;
   // none sits within two steps of the start, where the child would grab it instantly.
   for (let i = 0; i < 12; i++) {
-    const category = ['green', 'yellow', 'red'][i % 3], zx = i % 4, zy = Math.floor(i / 4), cells = [];
+    const zx = i % 4, zy = Math.floor(i / 4), cells = [];
     for (let y = Math.floor(zy * config.rows / 3); y < Math.floor((zy + 1) * config.rows / 3); y++)
       for (let x = Math.floor(zx * config.cols / 4); x < Math.floor((zx + 1) * config.cols / 4); x++) { const n = y * config.cols + x; if (n !== s.goal && x + (config.rows - 1 - y) > 2) cells.push(n); }
     const cell = cells[Math.floor(random() * cells.length)];
-    const risk = roll(config[category + 'Min'], config[category + 'Max']), reward = roll(config.rewardMin, config.rewardMax);
-    const fishSize = ['small', 'medium', 'large'][Math.floor(random() * 3)];
-    const fishKind = fishSize === 'large' ? random() < .5 ? 'shark' : 'mermaid' : 'fish';
-    s.items.push({ cell, category, risk, reward, fishSize, fishKind, taken: false });
+    // The creature is drawn when the maze is made, so the navigator's「!」shows its real risk.
+    const found = pickCreature(sizes[i], random);
+    s.items.push({ cell, size: sizes[i], creature: found.id, risk: found.risk, taken: false });
   }
   s.trail.push(s.avatar);
   return s;
@@ -56,7 +58,7 @@ export function start(s) { if (s.phase === 'ready' || s.phase === 'paused') s.ph
 export function placeWall(s, cell, dir) {
   const b = neighbor(s, cell, dir), e = edge(cell, b);
   if (s.phase !== 'playing' || b < 0 || s.base.has(e) || s.walls.has(e) || s.walls.size >= s.settings.wallLimit) return false;
-  s.walls.add(e); s.parentScore -= s.settings.wallCost; s.childScore -= 1;
+  s.walls.add(e);
   // Restore full reachability through child-only passages, preferring original walls.
   let area = reachable(s);
   while (area.size < s.settings.cols * s.settings.rows) {
@@ -68,7 +70,7 @@ export function placeWall(s, cell, dir) {
     s.secrets.add(options[Math.floor(s.random() * options.length)]);
     area = reachable(s);
   }
-  log(s, `壁を設置 · ナビゲーター −${s.settings.wallCost}, エクスプローラー −1`);
+  log(s, '壁を設置');
   return true;
 }
 export function move(s, dir) {
@@ -78,7 +80,11 @@ export function move(s, dir) {
   if (s.secrets.has(edge(s.avatar, b))) log(s, 'エクスプローラーだけが知る秘密の通路を通りました。');
   s.avatar = b; s.moves++; s.trail.push(b); s.cooldown = s.settings.moveMs / 1000;
   const item = s.items.find(i => i.cell === b && !i.taken);
-  if (item) { item.taken = true; s.collected++; s.parentScore -= item.risk; s.childScore += item.reward; log(s, `未知のアイテムを発見 · ナビゲーター −${item.risk}, エクスプローラー +${item.reward}`); }
+  if (item) {
+    item.taken = true; item.damage = rollDamage(item.risk, s.random); s.collected++;
+    s.hp = applyDamage(s.hp, item.damage);
+    log(s, `生き物に出会った · HP ${item.damage > 0 ? '−' + item.damage : item.damage < 0 ? '+' + -item.damage : '±0'}`);
+  }
   return true;
 }
 export function autoDirection(s) {

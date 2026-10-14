@@ -32,12 +32,12 @@ try {
   await page.locator('#countdown-pause').click(); await expect(page.locator('#phase')).toHaveText('ひと休み中');
   await page.locator('#ready-start').click(); await expect(page.locator('#phase')).toHaveText('探検中');
   await expect(page.locator('#ready')).toBeHidden();
-  await expect(page.locator('.briefing-title')).toHaveText('移動してアイテムを探し、報酬を獲得', { timeout: 10_000 });
+  await expect(page.locator('.briefing-title')).toHaveText('魚に触れて、図鑑に登録', { timeout: 10_000 });
   await expect(page.locator('#board-child')).toBeVisible(); await expect(page.locator('#board-parent')).toBeHidden();
   await confirm(); await expect(page.locator('#result')).toBeVisible({ timeout: 12_000 });
   await expect(page.locator('#result-rounds')).toContainText('第2ラウンド');
   await page.locator('#again').click(); await expect(page.locator('.briefing-title')).toHaveText('壁を立ててエクスプローラーを守る');
-  await confirm(); await expect(page.locator('.briefing-title')).toHaveText('移動してアイテムを探し、報酬を獲得', { timeout: 12_000 });
+  await confirm(); await expect(page.locator('.briefing-title')).toHaveText('魚に触れて、図鑑に登録', { timeout: 12_000 });
   await confirm(); await expect(page.locator('#result')).toBeVisible({ timeout: 12_000 });
   await page.locator('#close-result').click(); await expect(page.locator('#ending')).toBeVisible(); await page.locator('#ending-finish').click();
   await expect(page.locator('#test-restart')).toBeVisible(); await expect(page.locator('#lobby')).not.toContainText('部屋をつくって');
@@ -47,7 +47,7 @@ try {
 
   // A fresh route starts as the child, even with an existing online room ticket.
   await page.goto(`${origin}/test/2/`);
-  await expect(page.locator('.briefing-title')).toHaveText('移動してアイテムを探し、報酬を獲得');
+  await expect(page.locator('.briefing-title')).toHaveText('魚に触れて、図鑑に登録');
   await expect(page.locator('#board-child')).toBeVisible(); await expect(page.locator('#board-parent')).toBeHidden();
   // With a controller: left stick moves, hold → advances, × confirms and hold ○ pauses.
   await pad([]); await expect(page.locator('.briefing-next')).toContainText('長押しで次へ'); await expect(page.locator('.briefing-close')).toBeHidden();
@@ -62,8 +62,8 @@ try {
   await hold([1]); await expect(page.locator('#phase')).toHaveText('ひと休み中');
   await page.locator('#ready-settings').click(); await expect(page.locator('#settings-dialog')).toBeVisible();
   await page.locator('#maze-leave').click(); await expect(page.locator('#test-restart')).toBeVisible(); await expect(page.locator('#ready')).toBeHidden();
-  await page.locator('#test-restart').click(); await expect(page.locator('.briefing-title')).toHaveText('移動してアイテムを探し、報酬を獲得');
-  await page.reload(); await expect(page.locator('.briefing-title')).toHaveText('移動してアイテムを探し、報酬を獲得');
+  await page.locator('#test-restart').click(); await expect(page.locator('.briefing-title')).toHaveText('魚に触れて、図鑑に登録');
+  await page.reload(); await expect(page.locator('.briefing-title')).toHaveText('魚に触れて、図鑑に登録');
   assert.equal(await page.evaluate(() => JSON.parse(sessionStorage.getItem('maze-session')).token), 'existing-online-session');
   assert.deepEqual(roomRequests, []); assert.equal(app.mazeRooms.rooms.size, 0); assert.deepEqual(errors, []);
   console.log('PASS: /test/2 direct child entry, controller tutorial/start/pause, CPU parent, room-exit/reload, no room requests and unchanged online session.');

@@ -7,24 +7,24 @@ import { controllerDiagram, padIcon } from './controller-guide.js';
 const GUIDES = {
   parent: [
     { title: '壁を立ててエクスプローラーを守る', symbol: 'ナ', tag: 'NAVIGATOR',
-      description: () => '矢印キーで壁の位置を選択。Tabで向きを選び、Spaceで壁を設置して、エクスプローラーが危ないアイテムへ進む道をふさぎます。',
+      description: () => '矢印キーで壁の位置を選択。Tabで向きを選び、Spaceで壁を設置して、エクスプローラーが危ない魚へ進む道をふさぎます。',
       controls: () => '<kbd data-practice-key="Arrow">矢印キー</kbd>で位置を選択 · <kbd data-practice-key="Tab" role="button" tabindex="0">Tab</kbd> で向き · <kbd data-practice-key="Space" role="button" tabindex="0">Space</kbd> で設置' },
-    { title: '壁も接触もナビゲーターの点を下げる', symbol: '!', tag: 'NAVIGATOR SCORE',
-      description: s => `壁を立てるたびにナビゲーターの点が${s.wallCost}点減ります。エクスプローラーがアイテムに触れた場合も、そのアイテムの危険度に応じてナビゲーターの点が下がります。`,
-      controls: s => `壁の設置: ナビゲーター −${s.wallCost} · アイテムとの接触: 危険度分減点` },
-    { title: '制限時間内にナビゲーターの点を守る', symbol: 'O₂', tag: 'TIME LIMIT',
-      description: s => `酸素ボンベの残量が制限時間（${s.duration}秒）です。時間内に危ないアイテムとの接触を抑え、ナビゲーターの点を保ちましょう。`,
+    { title: '「!」の数が危険のサイン', symbol: '!', tag: 'RISK',
+      description: () => '魚の危険度は「!」の数で見えます。エクスプローラーが魚に触れると、危険度に応じてエクスプローラーのHPが減ります。HPが見えるのはナビゲーターだけです。',
+      controls: () => '<b class="risk-1">!</b> 低リスク · <b class="risk-2">!!</b> 中リスク · <b class="risk-3">!!!</b> 高リスク' },
+    { title: '制限時間内にエクスプローラーを守る', symbol: 'O₂', tag: 'TIME LIMIT',
+      description: s => `酸素ボンベの残量が制限時間（${s.duration}秒）です。危ない魚へ向かう道を壁でふさぎ、エクスプローラーのHPを守りましょう。`,
       controls: () => '残り時間は上の酸素ボンベで確認' },
   ],
   child: [
-    { title: '移動してアイテムを探し、報酬を獲得', symbol: 'エ', tag: 'EXPLORER',
-      description: () => '矢印キーを押すとエクスプローラーが隣のマスへ1歩移動します。アイテムに触れると報酬を獲得します。',
+    { title: '魚に触れて、図鑑に登録', symbol: 'エ', tag: 'EXPLORER',
+      description: () => '矢印キーでエクスプローラーが隣のマスへ1歩移動します。魚のシルエットに触れると正体の生き物が図鑑に登録されます。大きい魚ほどレアな生き物かも。',
       controls: () => '<kbd data-practice-key="Arrow">矢印キー</kbd>でエクスプローラーを操縦 · マスをタップしても移動' },
     { title: '壁を避け、秘密の通路を通り抜ける', symbol: '↗', tag: 'SECRET PASSAGE',
       description: () => 'ふつうの壁の先へは進めません。点線の「秘密の通路」はエクスプローラーだけが通り抜けできます。',
       controls: () => '<kbd data-practice-key="Arrow">矢印キー</kbd>でエクスプローラーを操縦 · マスをタップしても移動' },
     { title: '酸素が尽きる前に探す', symbol: 'O₂', tag: 'TIME LIMIT',
-      description: s => `酸素ボンベが空になると探検終了です（${s.duration}秒）。残量を見ながら、制限時間内にできるだけ多くの報酬を集めましょう。`,
+      description: s => `酸素ボンベが空になると探検終了です（${s.duration}秒）。残量を見ながら、制限時間内にできるだけ多くの生き物と出会い、図鑑を埋めましょう。`,
       controls: () => '残り時間は上の酸素ボンベで確認' },
   ],
 };
@@ -39,7 +39,11 @@ const edgeKey = (ax, ay, bx, by) => { const a = `${ax},${ay}`, b = `${bx},${by}`
 const inBounds = (x, y) => x >= 0 && y >= 0 && x < COLS && y < ROWS;
 const coordinate = (x, y) => `${String.fromCharCode(65 + x)}-${String(ROWS - y).padStart(2, '0')}`;
 const FIXED_WALLS = [edgeKey(1, 1, 2, 1), edgeKey(3, 1, 3, 2)];
+// The secret-passage step splits the board with a wall whose only gap is the passage, so every
+// fish lies beyond it and the explorer has to go through.
+const PASSAGE_WALLS = [0, 1, 2, 3].map(y => edgeKey(1, y, 2, y)).concat(edgeKey(3, 1, 3, 2));
 const PASSAGES = [edgeKey(1, 1, 2, 1)];
+const BOARD_WIDTH = COLS * 36 + 28;
 
 export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
   container.innerHTML = `
@@ -57,7 +61,7 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
   const find = selector => container.querySelector(selector);
   const art = find('.briefing-art'), board = find('.briefing-board'), feedback = find('.practice-feedback'), controls = find('.briefing-controls'), layout = find('.briefing-layout');
   let running = false, controller = false, role = 'parent', settings = {}, step = 0, keyTimer = 0, shownStep = -1, loop = 0, painted = 0;
-  const practice = { cursor: { x: 2, y: 2 }, direction: 1, child: { x: 0, y: 3 }, placed: new Set(), fixed: new Set(FIXED_WALLS), passages: new Set(PASSAGES), feedback: '' };
+  const practice = { cursor: { x: 2, y: 2 }, direction: 1, child: { x: 0, y: 3 }, placed: new Set(), passages: new Set(PASSAGES), feedback: '' };
   let startedAt = 0;
   let trail = [15];
   const taken = new Set();
@@ -73,6 +77,7 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
   const cursorStep = () => parent() && step === 0;
   const moveStep = () => !parent() && step < 2;
   const passageOpen = () => !parent() && step === 1;
+  const fixed = () => new Set(passageOpen() ? PASSAGE_WALLS : FIXED_WALLS);
 
   function start(nextRole, nextSettings) {
     role = nextRole === 'parent' ? 'parent' : 'child'; settings = { ...DEFAULTS, ...nextSettings }; step = 0; running = true;
@@ -113,8 +118,8 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
     controls.innerHTML = guide.controls(settings);
     // Left stick moves; directional taps aim walls and horizontal holds navigate the briefing.
     if (controller && (cursorStep() || moveStep())) {
-      if (cursorStep()) find('.briefing-description').textContent = '左スティックで位置を選び、上下左右の方向キーで壁の向きを決め、×で壁を設置します。→ 長押しで次へ、← 長押しで戻ります。';
-      else if (step === 0) find('.briefing-description').textContent = '左スティックでエクスプローラーを隣のマスへ動かします。アイテムに触れると報酬を獲得します。→ 長押しで次へ、← 長押しで戻ります。';
+      if (cursorStep()) find('.briefing-description').textContent = '左スティックで位置を選び、上下左右の方向キーで壁の向きを決め、×で壁を設置して危ない魚への道をふさぎます。→ 長押しで次へ、← 長押しで戻ります。';
+      else if (step === 0) find('.briefing-description').textContent = '左スティックでエクスプローラーを隣のマスへ動かします。魚に触れると生き物が図鑑に登録されます。→ 長押しで次へ、← 長押しで戻ります。';
       controls.innerHTML = `<kbd data-practice-key="Arrow">${padIcon('left')} ${parent() ? '位置' : '移動'}</kbd>` + (parent() ? `<kbd data-practice-key="Tab">${padIcon('dpad')} 向き</kbd><kbd data-practice-key="Space">${padIcon('cross')} 設置</kbd>` : '点線は秘密の通路');
     }
     // The controller drawing lights up the buttons this step uses.
@@ -144,11 +149,11 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
   function blocked(x, y, nx, ny) {
     const e = edgeKey(x, y, nx, ny);
     if (passageOpen() && practice.passages.has(e)) return false;
-    return practice.fixed.has(e) || practice.placed.has(e);
+    return fixed().has(e) || practice.placed.has(e);
   }
   // Share the round renderer, including its role-specific symbols and colors.
   function paint() {
-    const scoreExample = parent() && step === 1;
+    const riskExample = parent() && step === 1;
     const avatar = practice.child.y * COLS + practice.child.x;
     const convertEdges = edges => new Set([...edges].map(value => {
       const [a, b] = value.split('|').map(point => {
@@ -158,24 +163,27 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
       return edge(a, b);
     }));
     const walls = convertEdges(practice.placed);
-    if (scoreExample) walls.add(edge(12, 13));
-    drawMaze(find('.briefing-canvas'), {
+    if (riskExample) walls.add(edge(12, 13));
+    // Draw at the size the board is shown (in device pixels), in half steps so resizing seldom repaints layers.
+    const canvas = find('.briefing-canvas'), shown = (canvas.clientWidth || BOARD_WIDTH) * (devicePixelRatio || 1);
+    const resolution = Math.min(6, Math.max(2, Math.ceil(shown / BOARD_WIDTH * 2) / 2));
+    drawMaze(canvas, {
       settings: { ...settings, cols: COLS, rows: ROWS, wallLimit: 20 },
       mode: role, phase: 'playing', time: (performance.now() - startedAt) / 1000, moves: trail.length - 1,
-      avatar: scoreExample ? 6 : avatar, goal: COLS - 1,
-      trail: scoreExample ? [15, 10, 5, 6] : trail,
-      base: convertEdges(practice.fixed), walls,
+      avatar: riskExample ? 6 : avatar, goal: COLS - 1,
+      trail: riskExample ? [15, 10, 5, 6] : trail,
+      base: convertEdges(fixed()), walls,
       secrets: passageOpen() ? convertEdges(practice.passages) : new Set(),
       items: [
-        { cell: 7, category: 'red', risk: settings.redMin, taken: scoreExample || taken.has(7) },
-        { cell: 3, category: 'yellow', risk: settings.yellowMin, taken: taken.has(3) },
-        { cell: 13, category: 'green', risk: settings.greenMin, taken: taken.has(13) },
+        { cell: 7, size: 'large', creature: 'shark', risk: 3, damage: 4, taken: riskExample || taken.has(7) },
+        { cell: 3, size: 'medium', creature: 'octopus', risk: 2, damage: 2, taken: taken.has(3) },
+        { cell: 13, size: 'small', creature: 'clownfish', risk: 1, damage: 0, taken: taken.has(13) },
       ],
-    }, role, practice.cursor.y * COLS + practice.cursor.x, (practice.direction + 3) % 4, { cursor: cursorStep() });
+    }, role, practice.cursor.y * COLS + practice.cursor.x, (practice.direction + 3) % 4, { cursor: cursorStep(), resolution });
   }
   function drawBoard() {
     const interactive = cursorStep() || moveStep();
-    const scoreExample = parent() && step === 1;
+    const riskExample = parent() && step === 1;
     paint();
     board.classList.toggle('is-visible', interactive);
     find('.briefing-example').textContent = interactive ? '練習' : '表示例';
@@ -183,7 +191,7 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
     oxygen.hidden = step !== 2;
     oxygen.querySelector('strong').textContent = String(Math.floor(settings.duration / 60)).padStart(2, '0') + ':' + String(settings.duration % 60).padStart(2, '0');
     const practiceHint = `${controller ? '左スティック' : '矢印キー'}で${parent() ? 'カーソル' : 'エクスプローラー'}を動かしてみましょう`;
-    feedback.textContent = interactive ? practice.feedback || practiceHint : scoreExample ? '壁 −' + settings.wallCost + ' · アイテム −' + settings.redMin : '残り時間 · O₂';
+    feedback.textContent = interactive ? practice.feedback || practiceHint : riskExample ? 'サメ（!!!）に接触 · HP −4' : '残り時間 · O₂';
     board.replaceChildren();
     if (!interactive) return;
     for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
@@ -213,7 +221,7 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
       const pickup = [7, 3, 13].includes(cell) && !taken.has(cell);
       if (pickup) taken.add(cell);
       practice.feedback = passageOpen() && practice.passages.has(edgeKey(x, y, nx, ny)) ? '秘密の通路を通り抜けました' : `エクスプローラーが ${coordinate(nx, ny)} へ移動`;
-      if (pickup) practice.feedback += ' · アイテム獲得';
+      if (pickup) practice.feedback += ' · 生き物を発見';
     }
     drawBoard();
   }
@@ -227,7 +235,7 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
     if (!inBounds(nx, ny)) practice.feedback = '迷路の外には壁を立てられません';
     else {
       const e = edgeKey(x, y, nx, ny);
-      if (practice.fixed.has(e)) practice.feedback = '既存の壁です。黄色い辺を選んでください';
+      if (fixed().has(e)) practice.feedback = '既存の壁です。黄色い辺を選んでください';
       else if (practice.placed.has(e)) practice.feedback = 'そこにはすでに壁があります';
       else { practice.placed.add(e); practice.feedback = `${direction.name}側に壁を設置しました`; }
     }

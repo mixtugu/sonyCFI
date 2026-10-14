@@ -2,6 +2,7 @@ import './maze.css';
 import './ocean-game.css';
 import oceanTitle from './ocean-title.svg';
 import './controller.css';
+import './encyclopedia.css';
 import { controllerDiagram, padAction, playGuide } from './controller-guide.js';
 import { createControllerUI } from './controller-ui.js';
 import { DEFAULTS, LIMITS, createMaze, start, tick, move, placeWall, neighbor } from './maze.js';
@@ -11,16 +12,11 @@ import { connectSoloMaze } from './maze-solo.js';
 import { createPadReader, firstPad, rumble } from './gamepad.js';
 import { createTutorial } from './tutorial.js';
 import { createResultScene } from './result-scene.js';
+import { CREATURES } from './creatures.js';
+import { contactCard, explorerPanel, hearts, navigatorPanel, zukan } from './encyclopedia-ui.js';
 
-const fields = [['cols', '横のマス数'], ['rows', '縦のマス数'], ['duration', '制限時間（秒）'], ['wallLimit', '壁の枚数'], ['wallCost', 'ナビゲーターの壁コスト'], ['moveMs', '移動間隔（ms）']];
-const ranges = [['red', '高リスク', 'redMin', 'redMax'], ['yellow', '中リスク', 'yellowMin', 'yellowMax'], ['green', '低リスク', 'greenMin', 'greenMax'], ['gold', 'エクスプローラーの報酬', 'rewardMin', 'rewardMax']];
+const fields = [['cols', '横のマス数'], ['rows', '縦のマス数'], ['duration', '制限時間（秒）'], ['wallLimit', '壁の枚数'], ['moveMs', '移動間隔（ms）']];
 const input = (key, label) => `<input type="number" name="${key}" aria-label="${label}" min="${LIMITS[key][0]}" max="${LIMITS[key][1]}" step="${key === 'moveMs' ? 50 : 1}" value="${DEFAULTS[key]}" required>`;
-const catchIcon = item => {
-  const kind = item.fishSize === 'large' ? item.fishKind || 'shark' : item.fishSize;
-  const icons = { small: ['🐟', '小さい魚'], medium: ['🐠', '中くらいの魚'], shark: ['🦈', 'サメ'], mermaid: ['🧜‍♀️', '人魚'] };
-  const [icon, label] = icons[kind] || icons.small;
-  return `<span class="catch-icon" role="listitem" title="${label}" aria-label="${label}">${icon}</span>`;
-};
 // Decorative particles for the in-game dialogs, laid out deterministically and animated by CSS.
 const seeded = (i, k) => { const x = Math.sin(i * 127.1 + k * 311.7) * 43758.5453; return x - Math.floor(x); };
 const particles = (className, n, style, rise) => `<div class="${className}" aria-hidden="true"${rise ? ` style="--rise:${rise}px"` : ''}>${Array.from({ length: n }, (_, i) => `<i style="${style(i)}"></i>`).join('')}</div>`;
@@ -48,17 +44,17 @@ document.querySelector('#app').innerHTML = `
 <section class="toolbar" aria-label="ゲーム操作"><div class="mode-group" aria-label="プレイモード"><button data-mode="parent" class="selected" aria-pressed="true">ナビゲーター</button><button data-mode="child" aria-pressed="false">エクスプローラー</button><button data-mode="cpu" aria-pressed="false">CPU</button></div><span id="room-chip" class="room-chip" hidden><b id="room-chip-code"></b><i id="room-chip-partner"></i></span><div class="status"><i id="phase-dot"></i><b id="phase">開始前</b><div class="oxygen" id="oxygen" role="meter" aria-label="残りの酸素" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span class="oxygen-bubbles" aria-hidden="true"><i></i><i></i><i></i></span><span class="oxygen-valve" aria-hidden="true"><i class="oxygen-knob"></i><i class="oxygen-neck"></i></span><span class="oxygen-body"><span class="oxygen-track"><span class="oxygen-fill" id="oxygen-fill"></span><span class="oxygen-ticks" aria-hidden="true"></span></span><span class="oxygen-band" aria-hidden="true"></span><span class="oxygen-band" aria-hidden="true"></span><strong id="timer">00:30</strong><span class="oxygen-label" aria-hidden="true">O₂</span></span></div></div><div class="run-controls"><button id="reset" class="secondary" aria-label="リセット">↺</button><button id="start" class="primary">スタート</button><button id="settings-open" class="secondary" aria-label="設定と部屋コード" title="設定と部屋コード (□)">⚙</button><button id="fullscreen" class="secondary" aria-label="全画面" aria-pressed="false" title="全画面 (F)">⛶</button></div></section>
 <p id="mode-description" class="hint"></p>
 <div class="boards">
-${['parent', 'child'].map(role => `<section class="board-card ${role}"><div class="board-heading"><h2>${role === 'parent' ? 'ナビゲーター' : 'エクスプローラー'} <span class="role-badge" id="badge-${role}"></span></h2><span class="score"><strong id="score-${role}">${role === 'parent' ? '100' : '0'}</strong><small id="detail-${role}">0 / 12</small></span><aside class="catch-tray" aria-label="獲得した魚"><span class="catch-label">獲得した魚</span><div class="catch-icons" id="catch-icons-${role}" role="list" aria-label="魚の一覧"></div></aside></div><div class="board-surface"><canvas id="board-${role}" tabindex="0" aria-label="${role === 'parent' ? 'ナビゲーターの迷路。マスの端をクリックして壁を設置' : 'エクスプローラーの迷路。矢印キーで移動'}"></canvas></div></section>`).join('')}
+${['parent', 'child'].map(role => `<section class="board-card ${role}"><div class="board-heading"><h2>${role === 'parent' ? 'ナビゲーター' : 'エクスプローラー'} <span class="role-badge" id="badge-${role}"></span></h2><span class="score"><small>${role === 'parent' ? '壁' : '出会い'}</small><strong id="detail-${role}">0 / 12</strong></span></div><div class="board-body"><div class="board-surface"><canvas id="board-${role}" tabindex="0" aria-label="${role === 'parent' ? 'ナビゲーターの迷路。マスの端をクリックして壁を設置' : 'エクスプローラーの迷路。矢印キーで移動'}"></canvas></div><aside class="board-side ${role}-side" aria-label="${role === 'parent' ? 'エクスプローラーの様子' : '図鑑'}">${role === 'parent' ? navigatorPanel() : explorerPanel()}</aside></div></section>`).join('')}
 </div>
 <div class="interaction-panel"><div class="touch-controls"><div class="dpad"><button data-dir="3" aria-label="上">↑</button><button data-dir="2" aria-label="左">←</button><button data-dir="1" aria-label="下">↓</button><button data-dir="0" aria-label="右">→</button></div><button id="rotate" class="secondary">↻ <span id="direction">右</span></button><button id="place" class="primary">壁を置く</button></div><p id="control-hint" class="hint"></p></div>
 </main>
-<dialog id="settings-dialog" class="settings-dialog"><div class="dialog-head"><h2>設定</h2><button id="settings-close" class="text-button" aria-label="閉じる">✕</button></div><button type="button" id="settings-help" class="secondary">遊び方</button><div id="net-room-mount"></div><div class="wall-style" role="radiogroup" aria-label="壁のデザイン"><span>壁のデザイン</span><label><input type="radio" name="wall-style" value="ridge">岩の壁</label><label><input type="radio" name="wall-style" value="reef">サンゴと岩</label><small>この画面だけに反映されます</small></div><form id="settings"><div class="fields">${fields.map(([key, label]) => `<label class="field">${label}${input(key, label)}</label>`).join('')}${ranges.map(([color, label, min, max]) => `<div class="field"><label for="${min}"><i class="legend-dot ${color}"></i>${label}</label><span>${input(min, label + ' 最小値').replace('type="number"', `id="${min}" type="number"`)}–${input(max, label + ' 最大値')}</span></div>`).join('')}</div><div class="form-actions"><button type="button" id="defaults" class="text-button">初期値</button><button class="primary" type="submit">適用</button></div></form></dialog>
+<dialog id="settings-dialog" class="settings-dialog"><div class="dialog-head"><h2>設定</h2><button id="settings-close" class="text-button" aria-label="閉じる">✕</button></div><button type="button" id="settings-help" class="secondary">遊び方</button><div id="net-room-mount"></div><div class="wall-style" role="radiogroup" aria-label="壁のデザイン"><span>壁のデザイン</span><label><input type="radio" name="wall-style" value="ridge">岩の壁</label><label><input type="radio" name="wall-style" value="reef">サンゴと岩</label><small>この画面だけに反映されます</small></div><form id="settings"><div class="fields">${fields.map(([key, label]) => `<label class="field">${label}${input(key, label)}</label>`).join('')}</div><div class="form-actions"><button type="button" id="defaults" class="text-button">初期値</button><button class="primary" type="submit">適用</button></div></form></dialog>
 <div id="notice" role="status"></div>
-<dialog id="result">${waterLight}<div class="return-art" aria-hidden="true"><canvas id="result-scene"></canvas></div><p class="eyebrow">BACK TO THE LIGHT</p><h2 id="result-title">探検完了</h2><div class="result-scores"><div><small id="result-label-a">ナビゲーター</small><strong id="final-parent"></strong></div><div><small id="result-label-b">エクスプローラー</small><strong id="final-child"></strong></div></div><p id="final-stats"></p><p id="result-rounds" class="result-rounds" hidden></p><p id="swap-note" class="swap-note">次のラウンドは役割を交代します。</p><div class="dialog-actions"><button id="close-result" class="secondary">閉じる</button><button id="again" class="primary">もう一度</button></div></dialog>
+<dialog id="result">${waterLight}<div class="return-art" aria-hidden="true"><canvas id="result-scene"></canvas></div><p class="eyebrow">BACK TO THE LIGHT</p><h2 id="result-title">探検完了</h2><p class="result-count"><span id="result-count-label">出会った生き物</span><strong id="result-count"></strong></p><div class="zukan result-zukan" id="result-zukan" role="list" aria-label="図鑑"></div><p id="final-stats"></p><p id="result-rounds" class="result-rounds" hidden></p><p id="swap-note" class="swap-note">次のラウンドは役割を交代します。</p><div class="dialog-actions"><button id="close-result" class="secondary">閉じる</button><button id="again" class="primary">もう一度</button></div></dialog>
 <dialog id="ready" class="ready-dialog">${waterLight}${bubbles(12)}<p class="eyebrow" id="ready-eyebrow"></p><h2 id="ready-title"></h2><p id="ready-note"></p><div id="ready-tutorial" class="tutorial"></div><button type="button" id="ready-review" class="secondary wide">チュートリアルを確認</button><button type="button" id="ready-start" class="primary wide">準備完了</button><p class="ready-foot"><button type="button" id="ready-settings" class="text-button">⚙ 設定</button></p></dialog>
 <dialog id="countdown" class="countdown-dialog" aria-label="開始カウントダウン">${bubbles(14, 720)}<p class="eyebrow" id="countdown-round"></p><h2>まもなく探検が始まります</h2><div class="countdown-core"><span class="countdown-rings" aria-hidden="true"><i></i><i></i><i></i></span><strong id="countdown-number" aria-live="assertive" aria-atomic="true">3</strong></div><div class="depth-gauge" aria-hidden="true"><span>水面</span><i><b></b></i><span>海の底</span></div><p>ふたりで、海の向こうへ。</p><button id="countdown-pause" class="secondary">待機に戻る</button></dialog>
 <dialog id="ending" class="ending-dialog"><div class="ending-flash" aria-hidden="true"></div>${drops(24)}${sparkles(18)}<p class="eyebrow">THANK YOU FOR DIVING</p><h2>ふたりの旅は、ここまで。</h2><p>同じ海で見つけた景色を、<br>ふたりで話してみよう。</p><button id="ending-finish" class="primary">海から戻る</button></dialog>
-<dialog id="help">${waterLight}<h2>遊び方</h2><p>ナビゲーターは100点から。エクスプローラーがアイテムを取ると、隠れたリスク分だけナビゲーターの点が減り、エクスプローラーは報酬を得ます。</p><p>ナビゲーターは通路に壁を置けます。壁1枚ごとにナビゲーターは設定したコスト、エクスプローラーは1点を失うので、アイテムを取る前でもエクスプローラーの点はマイナスになることがあります。道がふさがると、エクスプローラーだけの秘密の通路が開きます。</p><p id="keyboard-help">矢印キー/WASDで操作。ナビゲーターはTabで向き、Spaceで設置。Escで一時停止。Fで全画面。</p><div class="pad-help" hidden><b>PlayStation コントローラー</b>${controllerDiagram()}<p>左スティックで移動、上下左右の方向キーで壁の向き、×で決定・壁の設置。</p><p>ナビゲーター：位置を選んで壁を設置</p><div class="controller-actions">${playGuide('parent')}</div><p>エクスプローラー：移動してアイテムを探す</p><div class="controller-actions">${playGuide('child')}</div><p>共通の操作</p><div class="controller-actions">${padAction('prev', '長押しで一時停止')}</div><p>メニュー：左スティックで項目を選択、×で決定、← 長押しで戻る。設定の数値はスティックの左右で変更。設定と遊び方は一時停止中の画面から開けます。</p><p>チュートリアル：練習はふだんと同じ操作。→ 長押しで次へ・確認、← 長押しで戻る。</p>${sandboxMode ? '<p>テストモード：L1 / R1で役割切替、CREATEでリセット。</p>' : ''}</div><button id="help-close" class="primary">OK</button></dialog>
+<dialog id="help">${waterLight}<h2>遊び方</h2><p>目標は、ふたりで海の生き物の図鑑を埋めること。迷路の魚のシルエットにエクスプローラーが触れると、正体の生き物が図鑑に登録されます。大きい魚ほどレアな生き物に出会えます。</p><p>ナビゲーターには、魚の危険度が「!」の数（! 低・!! 中・!!! 高）で見えます。触れるとエクスプローラーのHPが危険度に応じて減ります。HPはナビゲーターにしか見えず、0にはなりません。大きい魚ほど危険なことが多いので、壁で道をふさぐかどうかはナビゲーター次第です。道がふさがると、エクスプローラーだけの秘密の通路が開きます。</p><p id="keyboard-help">矢印キー/WASDで操作。ナビゲーターはTabで向き、Spaceで設置。Escで一時停止。Fで全画面。</p><div class="pad-help" hidden><b>PlayStation コントローラー</b>${controllerDiagram()}<p>左スティックで移動、上下左右の方向キーで壁の向き、×で決定・壁の設置。</p><p>ナビゲーター：位置を選んで壁を設置</p><div class="controller-actions">${playGuide('parent')}</div><p>エクスプローラー：移動してアイテムを探す</p><div class="controller-actions">${playGuide('child')}</div><p>共通の操作</p><div class="controller-actions">${padAction('prev', '長押しで一時停止')}</div><p>メニュー：左スティックで項目を選択、×で決定、← 長押しで戻る。設定の数値はスティックの左右で変更。設定と遊び方は一時停止中の画面から開けます。</p><p>チュートリアル：練習はふだんと同じ操作。→ 長押しで次へ・確認、← 長押しで戻る。</p>${sandboxMode ? '<p>テストモード：L1 / R1で役割切替、CREATEでリセット。</p>' : ''}</div><button id="help-close" class="primary">OK</button></dialog>
 <div id="room-code" class="room-code" popover="manual" role="status" aria-label="部屋コード" hidden></div>`;
 
 const $ = id => document.getElementById(id);
@@ -79,7 +75,7 @@ const restart = (el, name) => { el.classList.remove(name); void el.offsetWidth; 
 function countdownTick() { restart($('countdown'), 'tick'); window.dispatchEvent(new CustomEvent('ocean-pulse')); }
 function diveIn() { const boards = document.querySelector('.boards'); restart(boards, 'is-diving'); clearTimeout(diveTimer); diveTimer = setTimeout(() => boards.classList.remove('is-diving'), 1500); }
 const keyDirection = { ArrowRight: 0, d: 0, ArrowDown: 1, s: 1, ArrowLeft: 2, a: 2, ArrowUp: 3, w: 3 };
-const descriptions = { parent: '壁を置いてエクスプローラーCPUを導こう', child: 'アイテムを集めよう', cpu: 'CPU同士を観察' };
+const descriptions = { parent: '壁を置いてエクスプローラーCPUを守ろう', child: '魚に触れて図鑑を埋めよう', cpu: 'CPU同士を観察' };
 function oceanPhase() { return !$('lobby').hidden ? 'lobby' : game.phase === 'result' && network.active ? 'summary' : game.phase; }
 function showLobby(on) { if ($('ending').open && !on) return; $('lobby').hidden = !on; document.querySelector('.workspace').hidden = on; if (on) lobbySummary(); window.dispatchEvent(new CustomEvent('ocean-phase', { detail: oceanPhase() })); }
 const network = sandboxMode ? { active: false, connected: false, state: null, send() {} } : (testRole ? connectSoloMaze : connectMaze)({ role: testRole, settings: () => Object.fromEntries(new FormData($('settings'))), notice,
@@ -241,7 +237,7 @@ document.querySelectorAll('[name=wall-style]').forEach(radio => radio.onchange =
   try { localStorage.setItem('maze-wall-style', radio.value); } catch { /* storage unavailable */ }
 });
 $('settings-close').onclick =() => { $('settings-dialog').close(); lobbySummary(); };
-$('settings').onsubmit = event => { event.preventDefault(); const values = Object.fromEntries(new FormData(event.target)); for (const [, , min, max] of ranges) if (+values[min] > +values[max]) { notice('最小値は最大値以下にしてください。'); event.target.elements[min].focus(); return; } $('settings-dialog').close(); lobbySummary(); if (network.active) { network.send({ type: 'settings', settings: values }); return; } reset(values, seed + 1); if (!$('lobby').hidden) return; notice('新しい設定で迷路を作りました。'); };
+$('settings').onsubmit = event => { event.preventDefault(); const values = Object.fromEntries(new FormData(event.target)); $('settings-dialog').close(); lobbySummary(); if (network.active) { network.send({ type: 'settings', settings: values }); return; } reset(values, seed + 1); if (!$('lobby').hidden) return; notice('新しい設定で迷路を作りました。'); };
 $('defaults').onclick = () => { for (const [key, value] of Object.entries(DEFAULTS)) $('settings').elements[key].value = value; reset(DEFAULTS, 260830); lobbySummary(); notice('初期設定に戻しました。'); };
 $('board-parent').onpointermove = event => { if (game.mode !== 'parent') return; const hit = pointerCell(event.currentTarget, game, event); if (hit) { cursor = hit.cell; direction = hit.direction; } };
 $('board-parent').onclick = event => { if (game.mode !== 'parent') return; const hit = pointerCell(event.currentTarget, game, event); if (hit) { cursor = hit.cell; direction = hit.direction; event.currentTarget.focus(); wall(); } };
@@ -302,14 +298,8 @@ function update() {
       else if (changed) countdownTick();
     } else if ($('countdown').open) $('countdown').close();
   } else { if ($('ready').open) { $('ready').close(); tutorial.stop(); } $('again').disabled = false; $('again').textContent = game.mode === 'cpu' ? 'もう一度' : '交代してもう一度'; if (game.phase === 'result' && game.mode !== 'cpu') $('start').textContent = '交代してもう一度'; }
-  for (const role of ['parent', 'child']) {
-    const score = $('score-' + role), value = String(game[role + 'Score']);
-    if (score.textContent !== value) { score.textContent = value; if (game.phase === 'playing') restart(score, 'bump'); }
-    $('badge-' + role).textContent = game.mode === role ? 'あなた' : 'CPU';
-    const tray = $('catch-icons-' + role), caught = game.items.filter(item => item.taken);
-    const key = caught.map(item => `${item.cell}:${item.fishSize}:${item.fishKind || ''}`).join('|');
-    if (tray.dataset.caught !== key) { tray.dataset.caught = key; tray.innerHTML = caught.length ? caught.map(catchIcon).join('') : '<span class="catch-empty" role="listitem">まだいない</span>'; }
-  }
+  for (const role of ['parent', 'child']) $('badge-' + role).textContent = game.mode === role ? 'あなた' : 'CPU';
+  sidePanels();
   $('detail-parent').textContent = `${game.walls.size} / ${game.settings.wallLimit}`; $('detail-child').textContent = `${game.collected} / ${game.items.length}`;
   document.querySelectorAll('[data-mode]').forEach(b => { b.classList.toggle('selected', b.dataset.mode === game.mode); b.setAttribute('aria-pressed', b.dataset.mode === game.mode); });
   $('rotate').hidden = $('place').hidden = game.mode !== 'parent';
@@ -321,15 +311,47 @@ function update() {
     // A match is one round as the parent and one as the child; the second result closes it out.
     const match = network.active ? network.state.match : null, done = !!match?.done;
     $('result-title').textContent = done ? 'ふたりの探検が終わりました' : network.active ? `第${match.leg}ラウンド終了` : '探検完了';
-    $('result-label-a').textContent = done ? 'あなた' : 'ナビゲーター'; $('result-label-b').textContent = done ? '相手' : 'エクスプローラー';
-    $('final-parent').textContent = done ? match.you : game.parentScore; $('final-child').textContent = done ? match.partner : game.childScore;
-    $('final-stats').textContent = `${game.moves}マスの旅 · アイテム ${game.collected} · 壁 ${game.walls.size} · 秘密の通路 ${game.secrets.size}`;
+    // The report is the match's shared encyclopedia, with risk revealed so both can talk it over.
+    const found = collection();
+    $('result-count-label').textContent = done ? 'ふたりで出会った生き物' : 'この海で出会った生き物';
+    $('result-count').textContent = `${found.size} / ${CREATURES.length} 種`;
+    $('result-zukan').innerHTML = zukan(found, '', { risk: true });
+    $('final-stats').textContent = `${game.moves}マスの旅 · 出会い ${game.collected} · 壁 ${game.walls.size} · 秘密の通路 ${game.secrets.size}`;
     $('result-rounds').hidden = !done;
-    if (done) $('result-rounds').textContent = match.results.map((leg, i) => `第${i + 1}ラウンド ナビゲーター ${leg.parent} · エクスプローラー ${leg.child}`).join('　/　');
+    if (done) $('result-rounds').textContent = match.results.map((leg, i) => `第${i + 1}ラウンド ${leg.caught.length}匹`).join('　/　');
     $('swap-note').hidden = done || game.mode === 'cpu';
     $('close-result').className = network.active ? 'primary' : 'secondary'; $('again').className = network.active ? 'secondary' : 'primary';
     $('close-result').hidden = false; $('close-result').textContent = network.active ? '終了する' : '閉じる';
     reveal($('result')); resultScene.play();
+  }
+}
+// Creatures met so far in this match: earlier rounds plus the one in progress.
+function collection() {
+  const found = new Set((network.active ? network.state.match.results : []).flatMap(leg => leg?.caught || []));
+  for (const item of game.items) if (item.taken && item.creature) found.add(item.creature);
+  return found;
+}
+// Side panels change only when something happens, so they are rebuilt on change, not per frame.
+let shownHp = null, shownMet = null, shownFound = null;
+function sidePanels() {
+  if (Number.isFinite(game.hp) && game.hp !== shownHp) {
+    const hit = shownHp !== null && game.hp < shownHp && game.phase === 'playing';
+    shownHp = game.hp; $('hp-hearts').innerHTML = hearts(game.hp); $('hp-hearts').setAttribute('aria-valuenow', game.hp);
+    if (hit) restart(document.querySelector('.hp-panel'), 'is-hit');
+  }
+  const met = game.items.filter(item => item.taken && item.creature), metKey = met.map(item => item.cell).join();
+  let fresh;
+  if (metKey !== shownMet) {
+    const before = new Set((shownMet || '').split(','));
+    fresh = shownMet === null ? undefined : met.filter(item => !before.has(String(item.cell))).at(-1);
+    shownMet = metKey;
+    if (!met.length) $('contact-card').innerHTML = '<p class="contact-empty">エクスプローラーが魚に触れると、<br>出会った生き物がここに出ます。</p>';
+    else if (fresh && 'damage' in fresh) $('contact-card').innerHTML = contactCard(fresh);
+  }
+  const found = collection(), foundKey = [...found].sort().join();
+  if (foundKey !== shownFound) {
+    shownFound = foundKey;
+    $('zukan').innerHTML = zukan(found, fresh?.creature); $('zukan-count').textContent = `${found.size} / ${CREATURES.length}`;
   }
 }
 function render() { for (const role of ['parent', 'child']) if (!network.active || game.mode === role) drawMaze($('board-' + role), game, role, cursor, direction); }

@@ -61,32 +61,37 @@ test('playing keeps private views and role restrictions with no CPU actions', ()
     service.handle(parent, { type: 'wall', cell, direction: 0 }); assert.equal(room.game.walls.size, 1); break;
   }
   const parentView = service.view(room, room.members[0]).game, childView = service.view(room, room.members[1]).game;
-  assert.deepEqual(parentView.secrets, []); assert.equal(parentView.childScore, null); assert.equal(childView.parentScore, null); assert.equal(childView.goal, null);
-  assert.ok(parentView.items.filter(i => !i.taken).every(i => ['small', 'medium', 'large'].includes(i.fishSize) && typeof i.highRisk === 'boolean' && !('risk' in i) && !('reward' in i) && !('category' in i) && !('fishKind' in i)));
-  assert.ok(childView.items.every(i => ['small', 'medium', 'large'].includes(i.fishSize) && !('highRisk' in i)));
+  assert.deepEqual(parentView.secrets, []); assert.equal(childView.goal, null);
+  // HP and risk are the navigator's alone; neither role learns a creature before it is met.
+  assert.equal(parentView.hp, 16); assert.equal(childView.hp, null);
+  assert.ok(parentView.items.filter(i => !i.taken).every(i => ['small', 'medium', 'large'].includes(i.size) && [1, 2, 3].includes(i.risk) && !('creature' in i) && !('damage' in i)));
+  assert.ok(childView.items.every(i => ['small', 'medium', 'large'].includes(i.size) && !('risk' in i) && !('damage' in i)));
   assert.equal('seed' in childView, false);
 });
-test('fish kind stays hidden until collection and is then shared with both roles', () => {
+test('a creature stays hidden until met and is then shared; only the navigator sees the damage', () => {
   const { service, room } = setup(), item = room.game.items[0];
   const member = role => room.members.find(m => m.role === role);
   const viewItem = role => service.view(room, member(role)).game.items.find(i => i.cell === item.cell);
-  assert.equal('fishKind' in viewItem('parent'), false);
-  assert.equal('fishKind' in viewItem('child'), false);
-  item.taken = true;
-  assert.equal(viewItem('parent').fishKind, item.fishKind);
-  assert.equal(viewItem('child').fishKind, item.fishKind);
+  assert.equal('creature' in viewItem('parent'), false);
+  assert.equal('creature' in viewItem('child'), false);
+  item.taken = true; item.damage = 3;
+  assert.equal(viewItem('parent').creature, item.creature); assert.equal(viewItem('parent').damage, 3);
+  assert.equal(viewItem('child').creature, item.creature); assert.equal('damage' in viewItem('child'), false);
 });
-test('first leg automatically swaps into a fresh briefing; only leg two exposes final totals', () => {
+test('first leg automatically swaps into a fresh briefing; the encyclopedia carries over to leg two', () => {
   const { service, parent, room, both, ready } = setup(); ready(); service.tick(3);
-  room.game.parentScore = 80; room.game.childScore = 30; room.game.time = room.game.settings.duration - .01; service.tick(.02);
+  const [a, b] = room.game.items; a.taken = b.taken = true;
+  room.game.time = room.game.settings.duration - .01; service.tick(.02);
   assert.equal(room.leg, 2); assert.equal(room.game.phase, 'ready'); assert.deepEqual(room.members.map(m => m.role), ['child', 'parent']);
-  assert.deepEqual(room.results, [{ parent: 80, child: 30 }]); assert.ok(room.members.every(m => !m.ready && !m.tutorialComplete));
+  assert.deepEqual(room.results, [{ caught: [a.creature, b.creature] }]); assert.ok(room.members.every(m => !m.ready && !m.tutorialComplete));
+  assert.deepEqual(service.view(room, room.members[1]).match.results, room.results);
   assert.ok(!parent.packets.some(p => p.game?.phase === 'result'));
   both('ready'); assert.equal(room.game.phase, 'ready');
   ready(); assert.equal(room.game.phase, 'countdown'); service.tick(3);
-  room.game.parentScore = 90; room.game.childScore = 12; room.game.time = room.game.settings.duration - .01; service.tick(.02);
+  room.game.items[5].taken = true; room.game.time = room.game.settings.duration - .01; service.tick(.02);
   const host = service.view(room, room.members[0]).match;
-  assert.equal(room.game.phase, 'result'); assert.equal(host.done, true); assert.equal(host.you, 92); assert.equal(host.partner, 120);
+  assert.equal(room.game.phase, 'result'); assert.equal(host.done, true);
+  assert.deepEqual(host.results.map(leg => leg.caught.length), [2, 1]);
   service.handle(parent, { type: 'again' }); assert.equal(room.game.phase, 'result');
   both('again'); assert.equal(room.leg, 1); assert.deepEqual(room.results, []); assert.deepEqual(room.members.map(m => m.role), ['parent', 'child']);
 });

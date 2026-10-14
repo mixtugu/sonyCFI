@@ -32,9 +32,9 @@ function extrude(c, path, { height, width, side, top, edge: rim, alpha = 1, shad
   c.restore();
 }
 
-function paintSeabed(cols, rows, variant) {
-  const w = cols * CELL + PAD * 2, h = rows * CELL + PAD * 2, canvas = layer(w * 2, h * 2), c = canvas.getContext('2d');
-  c.scale(2, 2);
+function paintSeabed(cols, rows, variant, res) {
+  const w = cols * CELL + PAD * 2, h = rows * CELL + PAD * 2, canvas = layer(w * res, h * res), c = canvas.getContext('2d');
+  c.scale(res, res);
   const sand = c.createLinearGradient(0, 0, w * .35, h);
   sand.addColorStop(0, '#3474ad'); sand.addColorStop(.5, '#1c4d80'); sand.addColorStop(1, '#0b2857');
   c.fillStyle = sand; c.fillRect(0, 0, w, h);
@@ -156,10 +156,10 @@ function paintReefEdge(c, [x1, y1, x2, y2], id) {
   }
 }
 
-function paintWalls(s, role, cols, rows, segment) {
-  if (wallStyle === 'reef') return paintReef(s, role, cols, rows, segment);
-  const w = cols * CELL + PAD * 2, h = rows * CELL + PAD * 2, canvas = layer(w * 2, h * 2), c = canvas.getContext('2d');
-  c.scale(2, 2); c.translate(PAD, PAD);
+function paintWalls(s, role, cols, rows, segment, res) {
+  if (wallStyle === 'reef') return paintReef(s, role, cols, rows, segment, res);
+  const w = cols * CELL + PAD * 2, h = rows * CELL + PAD * 2, canvas = layer(w * res, h * res), c = canvas.getContext('2d');
+  c.scale(res, res); c.translate(PAD, PAD);
   const path = new Path2D(), frame = new Path2D(), segments = [];
   frame.rect(0, 0, cols * CELL, rows * CELL);
   for (const e of s.base) {
@@ -182,9 +182,9 @@ function paintWalls(s, role, cols, rows, segment) {
   return { canvas, path };
 }
 
-function paintReef(s, role, cols, rows, segment) {
-  const w = cols * CELL + PAD * 2, h = rows * CELL + PAD * 2, canvas = layer(w * 2, h * 2), c = canvas.getContext('2d');
-  c.scale(2, 2); c.translate(PAD, PAD);
+function paintReef(s, role, cols, rows, segment, res) {
+  const w = cols * CELL + PAD * 2, h = rows * CELL + PAD * 2, canvas = layer(w * res, h * res), c = canvas.getContext('2d');
+  c.scale(res, res); c.translate(PAD, PAD);
   const path = new Path2D(), frame = new Path2D(), segments = [], joints = new Map();
   frame.rect(0, 0, cols * CELL, rows * CELL);
   for (const e of s.base) {
@@ -203,12 +203,34 @@ function paintReef(s, role, cols, rows, segment) {
   return { canvas, path };
 }
 
-function drawFishIcon(c, x, y, size, color, eyeColor) {
-  const scale = size === 'small' ? 1 : size === 'large' ? 1.8 : 1.4;
-  c.save(); c.translate(x, y); c.scale(scale, scale * 1.3); c.fillStyle = color;
-  c.beginPath(); c.ellipse(0, 0, 5, 3, 0, 0, TAU); c.fill();
-  c.beginPath(); c.moveTo(-4, 0); c.lineTo(-7.5, -2.8); c.lineTo(-7.5, 2.8); c.closePath(); c.fill();
-  disc(c, 2.5, -.65, .55, eyeColor); c.restore();
+// One glowing fish silhouette in three sizes; the size hints at how rare the creature may be.
+const FISH_SCALE = { small: 1.15, medium: 1.6, large: 2.15 };
+const fishPath = (() => {
+  const p = new Path2D();
+  p.moveTo(7, 0); p.bezierCurveTo(5, -5.4, -3, -5.4, -5, 0); p.bezierCurveTo(-3, 5.4, 5, 5.4, 7, 0);
+  p.moveTo(-4.2, 0); p.lineTo(-8.6, -3.6); p.quadraticCurveTo(-7.2, 0, -8.6, 3.6); p.closePath();
+  return p;
+})();
+// Navigator risk marks: one to three「!」, yellow → orange → red.
+const RISK_COLORS = { 1: '#ffd84a', 2: '#ffa23a', 3: '#ff5b3f' };
+function drawFishIcon(c, x, y, size, light = 1, alpha = 1) {
+  const scale = FISH_SCALE[size] || 1;
+  c.save(); c.translate(x, y); c.scale(scale, scale); c.globalAlpha = alpha;
+  // Glow from wide translucent strokes rather than shadowBlur, which does not repaint identically.
+  c.lineJoin = 'round';
+  for (const [width, a] of [[4.2, .1], [2.6, .18]]) { c.strokeStyle = `rgba(110,200,255,${a * light})`; c.lineWidth = width; c.stroke(fishPath); }
+  c.fillStyle = `rgba(120,200,255,${.28 + .14 * light})`; c.fill(fishPath);
+  c.strokeStyle = `rgba(205,240,255,${.75 + .25 * light})`; c.lineWidth = 1.15 / scale + .35; c.lineJoin = 'round'; c.stroke(fishPath);
+  disc(c, 3.6, -1, .75, `rgba(225,248,255,${.8 * light})`);
+  c.restore();
+}
+function drawRiskMarks(c, x, y, size, risk, light) {
+  const scale = FISH_SCALE[size] || 1, marks = '!'.repeat(risk), px = Math.round(9 + 3.2 * scale);
+  c.save(); c.font = `900 ${px}px sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.lineJoin = 'round'; c.globalAlpha = .35 * light; c.lineWidth = 7; c.strokeStyle = RISK_COLORS[risk]; c.strokeText(marks, x + .5 * scale, y + .5);
+  c.globalAlpha = 1; c.lineWidth = 3; c.strokeStyle = 'rgba(10,24,48,.85)'; c.strokeText(marks, x + .5 * scale, y + .5);
+  c.fillStyle = RISK_COLORS[risk]; c.fillText(marks, x + .5 * scale, y + .5);
+  c.restore();
 }
 
 function drawKelp(c, cols, rows, amb, variant) {
@@ -290,8 +312,10 @@ function drawAnchor(c, x, y) {
 export function drawMaze(canvas, s, role, cursor, direction, options = {}) {
   const { cols, rows } = s.settings, cell = CELL, pad = PAD;
   const width = cols * cell + pad * 2, height = rows * cell + pad * 2;
-  if (canvas.width !== width * 2 || canvas.height !== height * 2) { canvas.width = width * 2; canvas.height = height * 2; }
-  const c = canvas.getContext('2d'); c.setTransform(2, 0, 0, 2, 0, 0); c.globalCompositeOperation = 'source-over'; c.globalAlpha = 1;
+  // Pixels per maze unit: 2 by default; callers that show the board larger (the tutorial) ask for more.
+  const res = options.resolution || 2;
+  if (canvas.width !== Math.round(width * res) || canvas.height !== Math.round(height * res)) { canvas.width = Math.round(width * res); canvas.height = Math.round(height * res); }
+  const c = canvas.getContext('2d'); c.setTransform(res, 0, 0, res, 0, 0); c.globalCompositeOperation = 'source-over'; c.globalAlpha = 1;
   const center = n => [(n % cols + .5) * cell, (Math.floor(n / cols) + .5) * cell];
   const segment = (a, b) => {
     const x = a % cols, y = Math.floor(a / cols);
@@ -302,11 +326,11 @@ export function drawMaze(canvas, s, role, cursor, direction, options = {}) {
   const now = performance.now() / 1000;
   let v = scenes.get(canvas);
   // Server snapshots replace the state object: reset by maze identity and round progress.
-  if (!v || v.cols !== cols || v.rows !== rows || (!onDemand && (s.time < v.gameTime || s.moves < v.moves || (s.phase === 'ready' && v.phase !== 'ready')))) {
+  if (!v || v.cols !== cols || v.rows !== rows || v.res !== res || (!onDemand && (s.time < v.gameTime || s.moves < v.moves || (s.phase === 'ready' && v.phase !== 'ready')))) {
     const [x, y] = center(s.avatar);
-    v = { cols, rows, x, y, fromX: x, fromY: y, avatar: s.avatar, angle: -.6, movedAt: 0, last: now, time: 0, ambient: 0, beat: -1,
+    v = { cols, rows, res, x, y, fromX: x, fromY: y, avatar: s.avatar, angle: -.6, movedAt: 0, last: now, time: 0, ambient: 0, beat: -1,
       bubbles: [], events: [], sparks: [], puffs: [], births: new Map(), walls: new Set(s.walls), taken: new Set(s.items.filter(i => i.taken).map(i => i.cell)),
-      explored: layer(width, height), fog: layer(width, height), stamped: 0, stampedAvatar: -1, fogLevel: null, phase: s.phase };
+      explored: layer(width * res, height * res), fog: layer(width * res, height * res), stamped: 0, stampedAvatar: -1, fogLevel: null, phase: s.phase };
     scenes.set(canvas, v);
   }
   const dt = Math.min(.05, Math.max(0, now - v.last)); v.last = now;
@@ -333,7 +357,7 @@ export function drawMaze(canvas, s, role, cursor, direction, options = {}) {
   v.x = v.fromX + (targetX - v.fromX) * ease; v.y = v.fromY + (targetY - v.fromY) * ease;
 
   // Explored water stays lit: every visited cell is stamped once into a persistent light mask.
-  const ex = v.explored.getContext('2d');
+  const ex = v.explored.getContext('2d'); ex.setTransform(res, 0, 0, res, 0, 0);
   const stamp = n => {
     const [x, y] = center(n), r = cell * 1.2, g = ex.createRadialGradient(x + pad, y + pad, 4, x + pad, y + pad, r);
     g.addColorStop(0, 'rgba(255,255,255,.95)'); g.addColorStop(1, 'rgba(255,255,255,0)'); ex.fillStyle = g; ex.fillRect(x + pad - r, y + pad - r, r * 2, r * 2);
@@ -344,10 +368,10 @@ export function drawMaze(canvas, s, role, cursor, direction, options = {}) {
 
   const [baseCount, baseHash] = signature(s.base);
   const variant = (baseHash % 997) + baseCount;
-  const seabedKey = `${cols}x${rows}:${variant}`;
-  if (v.seabedKey !== seabedKey) { v.seabed = paintSeabed(cols, rows, variant); v.seabedKey = seabedKey; }
+  const seabedKey = `${cols}x${rows}:${variant}@${res}`;
+  if (v.seabedKey !== seabedKey) { v.seabed = paintSeabed(cols, rows, variant, res); v.seabedKey = seabedKey; }
   const wallsKey = `${seabedKey}:${wallStyle}:${role}:${role === 'child' ? signature(s.base, s.secrets).join(':') : ''}`;
-  if (v.wallsKey !== wallsKey) { v.wallsLayer = paintWalls(s, role, cols, rows, segment); v.wallsKey = wallsKey; }
+  if (v.wallsKey !== wallsKey) { v.wallsLayer = paintWalls(s, role, cols, rows, segment, res); v.wallsKey = wallsKey; }
   c.drawImage(v.seabed, 0, 0, width, height);
 
   // Two drifting caustic sheets at different scales interfere into a living light net on the sand.
@@ -378,23 +402,20 @@ export function drawMaze(canvas, s, role, cursor, direction, options = {}) {
   }
   drawKelp(c, cols, rows, amb, variant);
   drawAnchor(c, ...center((rows - 1) * cols));
-  const palette = { red: '#e58a78', yellow: '#e8c170', green: '#72d4b5' };
   for (const item of s.items) {
     const [x, y] = center(item.cell);
     if (item.taken && !v.taken.has(item.cell)) {
       v.taken.add(item.cell);
       if (animate) { v.events.push({ x, y, at: t, color: '#ffe4a7', radius: 32 }); v.sparks.push({ x, y, at: t }); }
     }
-    if (!item.taken) {
-      const size = item.fishSize ?? (item.category === 'red' ? 'large' : item.category === 'yellow' ? 'medium' : 'small');
-      const highRisk = item.highRisk ?? item.category === 'red';
-      drawFishIcon(c, x, y, size, role === 'parent' ? highRisk ? '#e4554f' : '#489fca' : '#246a72', role === 'parent' ? '#fff4e5' : '#e9f4dd');
-    }
+    // A met fish leaves a faint outline; the navigator also sees what it did to the explorer's HP.
     if (item.taken) {
-      disc(c, x, y - 3, 11, role === 'parent' ? palette[item.category] : '#1f5f5c');
-      c.strokeStyle = 'rgba(255,255,255,.35)'; c.lineWidth = 1; c.beginPath(); c.arc(x, y - 3, 11, 0, TAU); c.stroke();
-      c.fillStyle = role === 'parent' ? '#172f3b' : '#b7f8e6'; c.font = `bold ${13.5 * (Number(getComputedStyle(document.documentElement).getPropertyValue('--text-scale')) || 1)}px sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
-      c.fillText(role === 'parent' ? `−${item.risk}` : '✓', x, y - 2);
+      drawFishIcon(c, x, y, item.size, .2, .35);
+      if (role === 'parent' && Number.isFinite(item.damage)) {
+        const text = item.damage > 0 ? `♥−${item.damage}` : item.damage < 0 ? `♥+${-item.damage}` : '♥±0';
+        c.save(); c.font = `800 ${11 * (Number(getComputedStyle(document.documentElement).getPropertyValue('--text-scale')) || 1)}px sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
+        c.lineWidth = 3; c.strokeStyle = 'rgba(10,24,48,.85)'; c.strokeText(text, x, y); c.fillStyle = item.damage > 0 ? '#ff9d8a' : '#9ff0c8'; c.fillText(text, x, y); c.restore();
+      }
     }
   }
   c.drawImage(v.wallsLayer.canvas, -pad, -pad, width, height);
@@ -432,11 +453,11 @@ export function drawMaze(canvas, s, role, cursor, direction, options = {}) {
   v.fogLevel = v.fogLevel === null || !animate ? fogGoal : v.fogLevel + (fogGoal - v.fogLevel) * (1 - Math.exp(-dt / .8));
   const dx = v.x + pad, dy = v.y + pad;
   if (v.fogLevel > .005) {
-    const f = v.fog.getContext('2d');
+    const f = v.fog.getContext('2d'); f.setTransform(res, 0, 0, res, 0, 0);
     f.globalCompositeOperation = 'source-over'; f.clearRect(0, 0, width, height);
     f.fillStyle = `rgba(1,9,20,${v.fogLevel})`; f.fillRect(0, 0, width, height);
     f.globalCompositeOperation = 'destination-out';
-    f.globalAlpha = .72; f.drawImage(v.explored, 0, 0); f.globalAlpha = 1;
+    f.globalAlpha = .72; f.drawImage(v.explored, 0, 0, width, height); f.globalAlpha = 1;
     const flicker = 1 + Math.sin(amb * 9) * .015 + Math.sin(amb * 23) * .01, r = cell * 2.3 * flicker;
     const pool = f.createRadialGradient(dx, dy, 6, dx, dy, r); pool.addColorStop(0, 'rgba(0,0,0,1)'); pool.addColorStop(.55, 'rgba(0,0,0,.6)'); pool.addColorStop(1, 'rgba(0,0,0,0)');
     f.fillStyle = pool; f.beginPath(); f.arc(dx, dy, r, 0, TAU); f.fill();
@@ -465,15 +486,15 @@ export function drawMaze(canvas, s, role, cursor, direction, options = {}) {
   c.restore();
 
   c.save(); c.translate(pad, pad);
-  c.save(); c.globalCompositeOperation = 'lighter';
+  // Fish sit above the fog so neither player loses track of them. Their light rises and falls
+  // slowly (faster for「!!!」), so a risk mark is hard to overlook.
   for (const item of s.items) {
     if (item.taken) continue;
-    const [x, y] = center(item.cell), pulse = .75 + .25 * Math.sin(amb * 2.2 + item.cell * 1.3), r = 20 + pulse * 3;
-    const glow = c.createRadialGradient(x, y, 2, x, y, r); glow.addColorStop(0, `rgba(255,228,165,${.3 * pulse})`); glow.addColorStop(1, 'rgba(255,228,165,0)'); disc(c, x, y, r, glow);
-    const tw = Math.max(0, Math.sin(amb * 1.7 + item.cell * 2.1)) ** 6;
-    if (tw > .02) { c.strokeStyle = `rgba(255,250,225,${tw * .9})`; c.lineWidth = .8; c.beginPath(); c.moveTo(x - 2 - 5 * tw, y - 3); c.lineTo(x - 2 + 5 * tw, y - 3); c.moveTo(x - 2, y - 3 - 5 * tw); c.lineTo(x - 2, y - 3 + 5 * tw); c.stroke(); }
+    const [x, y] = center(item.cell), risk = role === 'parent' ? item.risk : 0;
+    const light = .6 + .4 * (.5 + .5 * Math.sin(amb * (risk === 3 ? 3.4 : 1.6) + item.cell * 1.3));
+    drawFishIcon(c, x, y, item.size, light);
+    if (risk) drawRiskMarks(c, x, y, item.size, risk, light);
   }
-  c.restore();
   if (role === 'parent') {
     // The exit is a column of daylight from an opening in the surface.
     const [x, y] = center(s.goal), sway = Math.sin(amb * 1.3) * .06;

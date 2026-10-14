@@ -1,0 +1,55 @@
+/* Encyclopedia game: the navigator's HP / contact panel, the explorer's 図鑑 and the result report. */
+.board-card{container-type:inline-size}
+.board-body{display:grid;grid-template-columns:minmax(0,1fr) clamp(220px,28%,320px);align-items:start}
+.board-side{display:flex;flex-direction:column;gap:12px;min-width:0;padding:12px 12px 12px 0}
+@container (max-width:720px){.board-body{grid-template-columns:minmax(0,1fr)}.board-side{padding:0 12px 12px}}
+.immersive .board-body{flex:1;min-height:0}.immersive .board-body>.board-surface{height:100%}.immersive .board-side{max-height:100%;overflow:auto}
+
+.risk-marks{font-weight:900;letter-spacing:.06em;font-style:normal}.risk-1{color:#ffd84a;text-shadow:0 0 8px #ffd84a88}.risk-2{color:#ffa23a;text-shadow:0 0 8px #ffa23a88}.risk-3{color:#ff5b3f;text-shadow:0 0 8px #ff5b3f99}
+.board-side>*{flex:none}
+.board-side>*,.zukan-head{border:1px solid #9bbaff30;border-radius:12px;background:linear-gradient(160deg,#123a72cc,#0a2350d9);box-shadow:inset 0 1px 0 #d8e4ff1a}
+
+/* HP: hearts the navigator watches drain. */
+.hp-panel{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:10px;padding:10px 12px}
+.hp-label{font:700 calc(22px * var(--text-scale,1))/1 sans-serif;letter-spacing:.04em;color:#e8f0ff}
+.hp-hearts{display:grid;grid-template-columns:repeat(8,minmax(0,26px));gap:4px}
+.heart{display:block;aspect-ratio:1;background:linear-gradient(#ffd66b,#ff9a2e);-webkit-mask:var(--heart) center/contain no-repeat;mask:var(--heart) center/contain no-repeat;filter:drop-shadow(0 0 3px #ffb34766);transition:background .3s,opacity .3s;--heart:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 22'%3E%3Cpath d='M12 21.5 10.3 20C4.2 14.4 0 10.7 0 6.3 0 2.7 2.8 0 6.4 0c2 0 4.1.9 5.6 2.5C13.5.9 15.6 0 17.6 0 21.2 0 24 2.7 24 6.3c0 4.4-4.2 8.1-10.3 13.7Z'/%3E%3C/svg%3E")}
+.heart.is-lost{background:#ffffff26;filter:none}
+.hp-panel.is-hit{animation:hp-hit .7s cubic-bezier(.3,.7,.4,1)}
+@keyframes hp-hit{0%,100%{transform:none;box-shadow:inset 0 1px 0 #d8e4ff1a}15%{transform:translateX(-5px);box-shadow:0 0 0 2px #ff5b3f,0 0 30px #ff5b3f88}35%{transform:translateX(4px)}55%{transform:translateX(-2px)}}
+
+/* The creature the explorer just met, shown to the navigator only after contact. */
+.contact-card{padding:10px;text-align:center;min-height:120px;display:grid;place-items:center}
+.contact-empty{margin:0;color:#9fb6d9;font-size:calc(13px * var(--text-scale,1));line-height:1.7}
+.contact-hit{width:100%;animation:contact-in .5s cubic-bezier(.2,.9,.3,1.2) both}
+.contact-hit .creature-art{width:min(100%,200px);height:auto;border-radius:10px;background:radial-gradient(ellipse at 50% 60%,#2c5fa8,#0b2457 70%)}
+.contact-name{margin:6px 0 0;display:flex;justify-content:center;align-items:center;gap:8px;font-weight:700;font-size:calc(16px * var(--text-scale,1));color:#f2f6ff}
+.contact-damage{margin:2px 0 0;font-weight:800;font-size:calc(18px * var(--text-scale,1));color:#9ff0c8}.contact-hit.is-hurt .contact-damage{color:#ff8c78}
+@keyframes contact-in{from{opacity:0;transform:scale(.8) translateY(8px)}}
+.risk-legend{list-style:none;margin:0;padding:10px 14px;display:grid;gap:4px}.risk-legend li{display:grid;grid-template-columns:3em 1fr;align-items:center;font-size:calc(15px * var(--text-scale,1));color:#e8f0ff}.risk-legend .risk-marks{font-size:calc(20px * var(--text-scale,1))}
+
+/* 図鑑: one row per size; undiscovered entries are pale silhouettes. */
+.board-side .zukan-head{border:0;background:none;box-shadow:none}
+.explorer-side,.child-side{gap:8px}
+.zukan-head{display:flex;justify-content:space-between;align-items:baseline;padding:8px 12px}.zukan-head b{font-size:calc(18px * var(--text-scale,1));letter-spacing:.12em;color:#e8f0ff}.zukan-head span{font-variant-numeric:tabular-nums;color:#bfe0ff}
+.zukan{display:grid;gap:8px;padding:8px}
+.board-side .zukan{border:1px solid #9bbaff30;border-radius:12px;background:linear-gradient(160deg,#123a72cc,#0a2350d9)}
+.zukan-row{display:grid;grid-template-columns:1.6em minmax(0,1fr);gap:6px;align-items:start}
+.zukan-size{display:grid;place-items:center;aspect-ratio:1;border-radius:8px;background:#1d4c8c;color:#d9e8ff;font-weight:700;font-size:calc(13px * var(--text-scale,1))}
+.zukan-cells{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px}
+.zukan-cell{display:flex;flex-direction:column;align-items:center;gap:1px;padding:4px 3px 5px;border:1px solid #9bbaff22;border-radius:9px;background:#0b2457b3;text-align:center;min-width:0}
+.zukan-cell .creature-art{width:100%;height:auto}
+.creature-art.is-hidden{filter:brightness(0) invert(1);opacity:.16}
+.zukan-name{font-size:calc(10.5px * var(--text-scale,1));line-height:1.3;color:#d9e8ff;overflow-wrap:anywhere}.zukan-cell:not(.is-found) .zukan-name{color:#7f98c0}
+.zukan-cell .stars{color:#ffd66b;font-size:calc(9px * var(--text-scale,1));letter-spacing:-.05em}.zukan-cell .risk-marks{font-size:calc(12px * var(--text-scale,1))}
+.zukan-cell.is-found{border-color:#9fd8ff55;background:linear-gradient(170deg,#1d4f95cc,#0b2457cc)}
+.zukan-cell.is-new{animation:zukan-new 1.6s cubic-bezier(.2,.9,.3,1.2)}
+@keyframes zukan-new{0%{transform:scale(.6);box-shadow:0 0 0 0 #ffe08a}30%{transform:scale(1.12);box-shadow:0 0 0 3px #ffe08a,0 0 26px #ffe08a}100%{transform:none;box-shadow:0 0 0 0 #ffe08a00}}
+
+/* Result: the shared encyclopedia replaces the score cards. */
+.ocean-world #result,#result{width:min(720px,calc(100% - 32px));max-height:calc(100dvh - 32px);overflow:auto}
+.result-count{display:flex;justify-content:center;align-items:baseline;gap:12px;margin:4px 0 10px!important;color:#cfe2ff}.result-count strong{font-size:calc(30px * var(--text-scale,1));color:#ffe2a8;font-variant-numeric:tabular-nums}
+.result-zukan{text-align:left;border:1px solid #9bbaff30;border-radius:14px;background:#0a2350b3}
+.result-zukan .zukan-cells{grid-template-columns:repeat(auto-fill,minmax(96px,1fr))}.result-zukan .zukan-name{font-size:calc(12px * var(--text-scale,1))}
+#result[open] .result-zukan{animation:rise-in .7s .6s both}
+@media(prefers-reduced-motion:reduce){.zukan-cell.is-new,.hp-panel.is-hit,.contact-hit{animation:none}}

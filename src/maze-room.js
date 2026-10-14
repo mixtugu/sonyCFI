@@ -25,7 +25,8 @@ export class MazeRooms {
   }
   finish(room) {
     if (room.game.phase !== 'result') return;
-    room.results[room.leg - 1] = { parent: room.game.parentScore, child: room.game.childScore };
+    // Each leg adds what its explorer met to the match's shared encyclopedia.
+    room.results[room.leg - 1] = { caught: room.game.items.filter(i => i.taken).map(i => i.creature) };
     // Only the completed match has a results screen. The first leg goes straight to a new briefing.
     if (room.leg === 1) this.reset(room, undefined, true);
   }
@@ -73,7 +74,7 @@ export class MazeRooms {
     if (data.type === 'leave') {
       this.bindings.delete(socket);
       if (g.phase === 'result' && room.leg === 2) {
-        // Keep both scores readable for the partner who is still reviewing the match.
+        // Keep the match's encyclopedia readable for the partner who is still reviewing the match.
         member.socket = null; member.token = null; member.ready = false; member.again = false;
       } else { room.members = room.members.filter(m => m !== member); this.reset(room); }
       this.send(socket, { type: 'left' }); this.broadcast(room);
@@ -112,21 +113,17 @@ export class MazeRooms {
     if (['playing', 'countdown'].includes(room.game.phase)) this.pause(room, '相手との接続が切れたため探検を停止しました。再接続を待っています。');
     this.broadcast(room);
   }
-  total(room, member) {
-    const other = role => role === 'parent' ? 'child' : 'parent';
-    return room.results.reduce((sum, leg, i) => sum + (leg ? leg[i === 0 ? member.seat : other(member.seat)] : 0), 0);
-  }
   view(room, member) {
     const g = room.game, review = g.phase === 'result', parent = member.role === 'parent';
-    const partner = room.members.find(m => m !== member);
     // Only send public state plus this role's information; never send the seed or hidden item values.
     return { type: 'state', code: room.code, round: room.round, role: member.role, host: member === room.members[0], ready: member.ready, tutorialComplete: !!member.tutorialComplete, countdown: Math.ceil(room.countdown || 0), again: member.again,
-      match: { leg: room.leg, done: review && room.leg === 2, results: room.results, you: this.total(room, member), partner: partner ? this.total(room, partner) : 0 },
+      match: { leg: room.leg, done: review && room.leg === 2, results: room.results },
       partner: { connected: room.members.some(m => m !== member && m.socket?.readyState === 1), ready: room.members.some(m => m !== member && m.ready), tutorialComplete: room.members.some(m => m !== member && m.tutorialComplete), again: room.members.some(m => m !== member && m.again) }, reason: room.reason,
       game: { settings: g.settings, phase: g.phase, time: g.time, avatar: g.avatar, goal: parent || review ? g.goal : null,
         base: [...g.base], walls: [...g.walls], secrets: !parent || review ? [...g.secrets] : [],
-        items: g.items.map(i => ({ cell: i.cell, taken: i.taken, fishSize: i.fishSize, ...(i.taken ? { fishKind: i.fishKind } : {}), ...(!i.taken && parent ? { highRisk: i.category === 'red' } : {}), ...(i.taken && (parent || review) ? { category: i.category, risk: i.risk } : {}), ...(i.taken && (!parent || review) ? { reward: i.reward } : {}) })),
-        parentScore: parent || review ? g.parentScore : null, childScore: !parent || review ? g.childScore : null,
+        // Both see a fish's size and, once met, the creature. Only the navigator sees risk and HP.
+        items: g.items.map(i => ({ cell: i.cell, taken: i.taken, size: i.size, ...(i.taken ? { creature: i.creature } : {}), ...(parent || review ? { risk: i.risk } : {}), ...(i.taken && parent ? { damage: i.damage } : {}) })),
+        hp: parent ? g.hp : null,
         collected: g.collected, moves: g.moves, trail: g.trail, logs: review ? g.logs : g.logs.filter(l => l.text.startsWith('壁を設置')).map(l => ({ time: l.time, text: 'ナビゲーターが壁を置きました。' })) } };
   }
   broadcast(room) { this.finish(room); for (const member of room.members) this.send(member.socket, this.view(room, member)); }

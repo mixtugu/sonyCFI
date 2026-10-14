@@ -46,7 +46,7 @@ try {
     }
   };
   await collect();
-  await expect(page.locator('.practice-feedback')).toContainText('アイテム獲得');
+  await expect(page.locator('.practice-feedback')).toContainText('生き物を発見');
   assert.ok(await page.evaluate(() => window.effectStrokes.includes('#8ee4df')), 'movement wake uses the round effect');
   assert.ok(await page.evaluate(() => window.effectStrokes.includes('#ffe4a7')), 'pickup ripple uses the round effect');
   await page.screenshot({ path: 'artifacts/tutorial-shared-pickup-effects.png' });
@@ -61,16 +61,16 @@ try {
   await page.locator('.briefing-next').dispatchEvent('click');
   await page.locator('.briefing-previous').dispatchEvent('click');
   await collect();
-  await expect(page.locator('.practice-feedback')).toContainText('アイテム獲得');
+  await expect(page.locator('.practice-feedback')).toContainText('生き物を発見');
   const repeated = await pixels();
   await page.locator('.briefing-next').dispatchEvent('click');
   await page.locator('.briefing-previous').dispatchEvent('click');
   await collect();
-  await expect(page.locator('.practice-feedback')).toContainText('アイテム獲得');
+  await expect(page.locator('.practice-feedback')).toContainText('生き物を発見');
   assert.ok(await pixels() === repeated, 'repeated practice has the same collected state');
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('ArrowUp');
-  await expect(page.locator('.practice-feedback')).not.toContainText('アイテム獲得');
+  await expect(page.locator('.practice-feedback')).not.toContainText('生き物を発見');
   await page.locator('.briefing-next').click();
   await page.keyboard.press('ArrowUp');
   await page.keyboard.press('ArrowUp');

@@ -45,11 +45,11 @@ try {
   }
   await expect(parent.locator('#detail-parent')).toHaveText('1 / 12');
   assert.deepEqual(await parent.evaluate(() => window.packet.game.secrets), []);
-  assert.equal(await child.evaluate(() => window.packet.game.parentScore), null);
+  assert.equal(await child.evaluate(() => window.packet.game.hp), null);
   await child.reload(); await expect(child.locator('#maze-role')).toHaveText('エクスプローラー'); await expect(parent.locator('#phase')).toHaveText('ひと休み中');
   await expect(parent.locator('#detail-parent')).toHaveText('1 / 12');
   await parent.locator('#ready-start').click(); await child.locator('#ready-start').click();
-  await expect(parent.locator('.briefing-title')).toHaveText('移動してアイテムを探し、報酬を獲得', { timeout: 18000 });
+  await expect(parent.locator('.briefing-title')).toHaveText('魚に触れて、図鑑に登録', { timeout: 18000 });
   await expect(child.locator('.briefing-title')).toHaveText('壁を立ててエクスプローラーを守る');
   await expect(parent.locator('#result')).toBeHidden();
   assert.equal(await parent.evaluate(() => window.packet.match.leg), 2);

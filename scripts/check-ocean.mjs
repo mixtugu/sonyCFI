@@ -49,13 +49,13 @@ try {
   const invariants = await page.evaluate(() => {
     const { createMaze, start, move, autoDirection, drawMaze } = window.fixture;
     const s = createMaze(); start(s);
-    // The navigator's public high-risk warning is independent of exact hidden values.
-    s.items = s.items.map(item => ({ ...item, highRisk: item.category === 'red' }));
+    // Unmet creatures draw only as size silhouettes (plus risk for the navigator), so the hidden
+    // creature never shows, and the explorer's view does not depend on risk either.
     const render = (state, role) => { const c = document.createElement('canvas'); drawMaze(c, state, role, state.avatar, 0); return c.toDataURL(); };
     const child = render(s, 'child'), parent = render(s, 'parent');
-    const changedSecretData = { ...s, goal: 0, items: s.items.map(i => ({ ...i, category: 'red', risk: 49, reward: 49 })) };
+    const changedSecretData = { ...s, goal: 0, items: s.items.map(i => ({ ...i, creature: 'mermaid', risk: i.risk % 3 + 1 })) };
     const sameChild = child === render(changedSecretData, 'child');
-    const sealedPearls = parent === render({ ...changedSecretData, goal: s.goal }, 'parent');
+    const sealedPearls = parent === render({ ...changedSecretData, goal: s.goal, items: s.items.map(i => ({ ...i, creature: 'mermaid' })) }, 'parent');
     const before = JSON.stringify(s, (_, value) => value instanceof Set ? [...value] : value);
     render(s, 'child'); render(s, 'parent');
     const noMutation = before === JSON.stringify(s, (_, value) => value instanceof Set ? [...value] : value);
