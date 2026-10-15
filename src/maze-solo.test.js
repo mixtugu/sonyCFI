@@ -11,7 +11,7 @@ function setup(role, settings = {}) {
   return { session, ready, get left() { return left; } };
 }
 for (const role of ['parent', 'child']) {
-  test(`offline ${role} starts privately, confirms, counts down, swaps, totals and replays without a partner`, () => {
+  test(`offline ${role} starts privately, confirms, counts down, ends and starts a new game without a partner`, () => {
     const run = setup(role), { session, ready } = run;
     assert.equal(session.state.role, role); assert.equal(session.state.game.phase, 'ready');
     assert.equal(session.state.tutorialComplete, false); assert.equal(session.state.partner.ready, true);
@@ -24,16 +24,12 @@ for (const role of ['parent', 'child']) {
     for (const number of [3, 2, 1]) { assert.equal(session.state.countdown, number); assert.equal(session.state.game.time, 0); session.advance(1); }
     assert.equal(session.state.game.phase, 'playing');
     session.advance(5.1);
-    assert.equal(session.state.match.leg, 1); assert.equal(session.state.game.phase, 'result');
-    session.send({ type: 'again' });   // the CPU partner follows into the swap
-    assert.equal(session.state.match.leg, 2); assert.equal(session.state.game.phase, 'ready');
-    assert.notEqual(session.state.role, role); assert.equal(session.state.tutorialComplete, false);
-    assert.equal(session.state.partner.ready, true);
-    ready(); session.advance(8.1);
-    assert.equal(session.state.match.done, true); assert.equal(session.state.match.results.length, 2);
-    assert.ok(session.state.match.results.every(leg => Array.isArray(leg.caught)));
-    session.send({ type: 'again' }); assert.equal(session.state.role, role); assert.equal(session.state.match.leg, 1);
-    assert.equal(session.state.tutorialComplete, false);
+    assert.equal(session.state.game.phase, 'result'); assert.equal(session.state.match.done, true);
+    assert.equal(session.state.match.results.length, 1); assert.ok(Array.isArray(session.state.match.results[0].caught));
+    const round = session.state.round;
+    session.send({ type: 'again' });   // the CPU partner ends too, so a new game starts in the same seat
+    assert.equal(session.state.round, round + 1); assert.equal(session.state.game.phase, 'ready');
+    assert.equal(session.state.role, role); assert.equal(session.state.tutorialComplete, false);
     session.send({ type: 'leave' }); assert.equal(run.left, true); assert.equal(session.active, false);
     session.start(); assert.equal(session.state.role, role); assert.equal(session.state.game.phase, 'ready');
   });

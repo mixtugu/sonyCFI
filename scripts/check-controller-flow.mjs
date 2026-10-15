@@ -8,11 +8,13 @@ const fakePad = () => {
   navigator.getGamepads = () => window.__pad ? [{ id: 'DualSense Wireless Controller', connected: true, mapping: 'standard',
     axes: window.__pad.axes || [0, 0, 0, 0], buttons: Array.from({ length: 18 }, (_, i) => ({ pressed: window.__pad.buttons.includes(i), value: window.__pad.buttons.includes(i) ? 1 : 0 })) }] : [];
 };
-const press = async (page, buttons = [], axes = [0, 0, 0, 0], ms = 70) => {
+// Presses and releases last a few frames: the software-rendered test browsers can take over 70 ms
+// per frame, and an input shorter than a frame is never polled.
+const press = async (page, buttons = [], axes = [0, 0, 0, 0], ms = 150) => {
   await page.evaluate(state => { window.__pad = state; }, { buttons, axes });
   await page.waitForTimeout(ms);
   await page.evaluate(() => { window.__pad = { buttons: [], axes: [0, 0, 0, 0] }; });
-  await page.waitForTimeout(70);
+  await page.waitForTimeout(150);
 };
 // Selection is performed exclusively with the pad; DOM reads only assert the current focus.
 async function select(page, selector) {
@@ -117,17 +119,11 @@ try {
   await child.evaluate(() => { window.__pad = null; }); await expect(parent.locator('#phase')).toHaveText('ひと休み中');
   await press(child); await resume(parent); await resume(child); await expect(parent.locator('#phase')).toHaveText('探検中');
   room.game.time = room.game.settings.duration - .01;
-  // Round one's encyclopedia: × on the focused swap button takes each player on.
-  for (const page of [parent, child]) { await expect(page.locator('#result')).toBeVisible(); await expect(page.locator('#again')).toBeFocused(); await press(page, [0]); }
-  await expect(parent.locator('.briefing-title')).toContainText('魚に触れて');
-  await expect(child.locator('.briefing-description')).toContainText('左スティックで位置を選び、上下左右の方向キーで壁の向き');
-  await complete(parent); await complete(child); await expect(parent.locator('#phase')).toHaveText('探検中');
-  room.game.time = room.game.settings.duration - .01;
-  await expect(parent.locator('#result')).toBeVisible();
-  await activate(parent, '#close-result'); await expect(parent.locator('#ending')).toBeVisible(); await press(parent, [0]); await expect(parent.locator('#lobby')).toBeVisible();
-  await expect(child.locator('#result')).toBeVisible(); await press(child, [1]); await press(child, [0]); await expect(child.locator('#lobby')).toBeVisible();
+  // One round: × on the only button ends the game, × again skips the ending, and a new game opens in the same seats.
+  for (const page of [parent, child]) { await expect(page.locator('#result')).toBeVisible(); await expect(page.locator('#close-result')).toBeFocused(); await press(page, [0]); await expect(page.locator('#ending')).toBeVisible(); }
+  for (const page of [parent, child]) { await press(page, [0]); await expect(page.locator('#ready')).toBeVisible(); }
+  await expect(parent.locator('.briefing-title')).toHaveText('壁を立ててエクスプローラーを守る'); await expect(child.locator('.briefing-title')).toContainText('魚に触れて');
   // Leaving from nested settings must also dismiss the underlying ready dialog.
-  await activate(parent, '#maze-create button'); await expect(parent.locator('#ready')).toBeVisible();
   await hold(parent, [15]); await hold(parent, [15]); await hold(parent, [15]); await activate(parent, '#ready-settings'); await activate(parent, '#maze-leave');
   await expect(parent.locator('#lobby')).toBeVisible(); await expect(parent.locator('#ready')).toBeHidden();
   assert.deepEqual(errors, []);

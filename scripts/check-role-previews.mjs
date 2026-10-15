@@ -32,19 +32,16 @@ try {
   await page.locator('#countdown-pause').click(); await expect(page.locator('#phase')).toHaveText('ひと休み中');
   await page.locator('#ready-start').click(); await expect(page.locator('#phase')).toHaveText('探検中');
   await expect(page.locator('#ready')).toBeHidden();
-  // Each round ends on its encyclopedia; going on swaps the roles.
-  await expect(page.locator('#result')).toBeVisible({ timeout: 12_000 }); await expect(page.locator('#result-count-label')).toContainText('第1ラウンド'); await expect(page.locator('#close-result')).toBeHidden(); await page.locator('#again').click(); await expect(page.locator('.briefing-title')).toHaveText('魚に触れて、図鑑に登録', { timeout: 10_000 });
-  await expect(page.locator('#board-child')).toBeVisible(); await expect(page.locator('#board-parent')).toBeHidden();
+  // One round: the result offers only 終了する; the ending then opens a new game in the same seat.
+  await expect(page.locator('#result')).toBeVisible({ timeout: 12_000 }); await expect(page.locator('#result .dialog-actions button')).toHaveCount(1);
+  await page.locator('#close-result').click(); await expect(page.locator('#ending')).toBeVisible();
+  await expect(page.locator('#ending')).toBeHidden({ timeout: 8000 });   // moves on by itself
+  await expect(page.locator('.briefing-title')).toHaveText('壁を立ててエクスプローラーを守る'); await expect(page.locator('#board-parent')).toBeVisible();
   await confirm(); await expect(page.locator('#result')).toBeVisible({ timeout: 12_000 });
-  await expect(page.locator('#result-rounds')).toContainText('第2ラウンド');
-  await page.locator('#again').click(); await expect(page.locator('.briefing-title')).toHaveText('壁を立ててエクスプローラーを守る');
-  await confirm(); await expect(page.locator('#result')).toBeVisible({ timeout: 12_000 }); await expect(page.locator('#result-count-label')).toContainText('第1ラウンド'); await expect(page.locator('#close-result')).toBeHidden(); await page.locator('#again').click(); await expect(page.locator('.briefing-title')).toHaveText('魚に触れて、図鑑に登録', { timeout: 12_000 });
-  await confirm(); await expect(page.locator('#result')).toBeVisible({ timeout: 12_000 });
-  await page.locator('#close-result').click(); await expect(page.locator('#ending')).toBeVisible(); await page.locator('#ending-finish').click();
-  await expect(page.locator('#test-restart')).toBeVisible(); await expect(page.locator('#lobby')).not.toContainText('部屋をつくって');
-  await page.locator('#test-restart').click(); await expect(page.locator('.briefing-title')).toHaveText('壁を立ててエクスプローラーを守る');
+  await page.locator('#close-result').click(); await page.locator('#ending-finish').click();
+  await expect(page.locator('.briefing-title')).toHaveText('壁を立ててエクスプローラーを守る');
   assert.equal(new URL(page.url()).pathname, '/test/1');
-  console.log('PASS: /test/1 direct entry, private parent view, settings, pause/countdown, role swap, report, replay, ending and restart.');
+  console.log('PASS: /test/1 direct entry, private parent view, settings, pause/countdown, one-round report, ending and automatic new game.');
 
   // A fresh route starts as the child, even with an existing online room ticket.
   await page.goto(`${origin}/test/2/`);

@@ -6,10 +6,11 @@ import './encyclopedia.css';
 import { controllerDiagram, padAction, playGuide } from './controller-guide.js';
 import { createControllerUI } from './controller-ui.js';
 import { DEFAULTS, LIMITS, createMaze, start, tick, move, placeWall, neighbor } from './maze.js';
-import { drawMaze, pointerCell, setWallStyle, WALL_STYLES } from './maze-renderer.js';
+import { drawMaze, pointerCell, setTextScale, setWallStyle, WALL_STYLES } from './maze-renderer.js';
 import { connectMaze } from './maze-network.js';
 import { connectSoloMaze } from './maze-solo.js';
 import { createPadReader, firstPad, rumble } from './gamepad.js';
+import { accessConnected, accessSupported, onAccessChange, reconnectAccess, requestAccess } from './access-controller.js';
 import { createTutorial } from './tutorial.js';
 import { createResultScene } from './result-scene.js';
 import { CREATURES } from './creatures.js';
@@ -26,6 +27,8 @@ const drops = n => particles('fx-drops', n, i => { const a = -Math.PI * (.12 + .
 const waterLight = '<div class="fx-caustics" aria-hidden="true"></div><div class="fx-rays" aria-hidden="true"></div>';
 // /test retains the sandbox; /test/1 and /test/2 preview a real match from either starting seat.
 const route = location.pathname.replace(/\/+$/, '');
+// ?pad shows the raw controller readout (see gamepad-debug.js).
+if (new URLSearchParams(location.search).has('pad')) import('./gamepad-debug.js').then(m => m.showGamepadDebug());
 const sandboxMode = route === '/test';
 const testRole = route === '/test/1' ? 'parent' : route === '/test/2' ? 'child' : null;
 const testMode = sandboxMode || !!testRole;
@@ -36,8 +39,9 @@ document.querySelector('#app').innerHTML = `
 <div class="ocean-story"><p class="ocean-kicker">BETWEEN TIDES</p><h1 class="ocean-wordmark"><img src="${oceanTitle}" alt="YOU SEE / I SEE"></h1><p>光が揺れる、ふたりだけの海。<br>ひとりは泳ぎ、ひとりは道をつくる。<br>まだ知らない景色を、いっしょに。</p><div class="ocean-coordinate"><span>01 — INTO THE BLUE</span><span>ふたりの海底探検</span></div></div><div class="lobby-card">
 <p class="eyebrow">DIVE TOGETHER · 二人で、ひとつの迷路</p><h1>${testRole ? 'ひとりで、<br>本番の流れを試そう。' : '部屋をつくって、<br>相手を招待しよう。'}</h1>
 <div id="net-lobby-mount">${testRole ? `<button type="button" id="test-restart" class="primary wide">${testLabel}をもう一度</button><p><a href="/test/${testRole === 'parent' ? '2' : '1'}">${testRole === 'parent' ? 'エクスプローラー' : 'ナビゲーター'}からテストする ↗</a></p><p><a href="/">二人で遊ぶ ↗</a></p>` : ''}</div>
-<p class="lobby-note">${testRole ? '相手はCPUです。部屋の作成・参加は不要。本番と同じ2ラウンドを体験し、途中で役割を交代します。' : 'つくった人がナビゲーター、参加した人がエクスプローラーではじまります。ラウンドごとに必ず交代します。'}</p>
+<p class="lobby-note">${testRole ? '相手はCPUです。部屋の作成・参加は不要。本番と同じ流れを体験できます。' : 'つくった人がナビゲーター、参加した人がエクスプローラーです。'}</p>
 <p class="lobby-settings"><span id="lobby-summary"></span><button type="button" id="lobby-settings-open" class="text-button">⚙ 迷路の設定</button></p>
+<p class="lobby-foot"><button type="button" class="text-button access-connect" hidden>🎮 Access コントローラーを接続（USB）</button></p>
 <p class="lobby-foot">ひとりで試す：<a href="/test/1">ナビゲーターから ↗</a> · <a href="/test/2">エクスプローラーから ↗</a> · <a href="/test">自由テスト ↗</a></p>
 </div></section>
 <main class="workspace"${testMode ? '' : ' hidden'}>
@@ -48,17 +52,38 @@ ${['parent', 'child'].map(role => `<section class="board-card ${role}"><div clas
 </div>
 <div class="interaction-panel"><div class="touch-controls"><div class="dpad"><button data-dir="3" aria-label="上">↑</button><button data-dir="2" aria-label="左">←</button><button data-dir="1" aria-label="下">↓</button><button data-dir="0" aria-label="右">→</button></div><button id="rotate" class="secondary">↻ <span id="direction">右</span></button><button id="place" class="primary">壁を置く</button></div><p id="control-hint" class="hint"></p></div>
 </main>
-<dialog id="settings-dialog" class="settings-dialog"><div class="dialog-head"><h2>設定</h2><button id="settings-close" class="text-button" aria-label="閉じる">✕</button></div><button type="button" id="settings-help" class="secondary">遊び方</button><div id="net-room-mount"></div><div class="wall-style" role="radiogroup" aria-label="壁のデザイン"><span>壁のデザイン</span><label><input type="radio" name="wall-style" value="ridge">岩の壁</label><label><input type="radio" name="wall-style" value="reef">サンゴと岩</label><small>この画面だけに反映されます</small></div><form id="settings"><div class="fields">${fields.map(([key, label]) => `<label class="field">${label}${input(key, label)}</label>`).join('')}</div><div class="form-actions"><button type="button" id="defaults" class="text-button">初期値</button><button class="primary" type="submit">適用</button></div></form></dialog>
+<dialog id="settings-dialog" class="settings-dialog"><div class="dialog-head"><h2>設定</h2><button id="settings-close" class="text-button" aria-label="閉じる">✕</button></div><button type="button" id="settings-help" class="secondary">遊び方</button><button type="button" class="secondary access-connect" hidden>🎮 Access コントローラーを接続（USB）</button><div id="net-room-mount"></div><div class="wall-style" role="radiogroup" aria-label="壁のデザイン"><span>壁のデザイン</span><label><input type="radio" name="wall-style" value="ridge">岩の壁</label><label><input type="radio" name="wall-style" value="reef">サンゴと岩</label><small>この画面だけに反映されます</small></div><form id="settings"><div class="fields">${fields.map(([key, label]) => `<label class="field">${label}${input(key, label)}</label>`).join('')}</div><div class="form-actions"><button type="button" id="defaults" class="text-button">初期値</button><button class="primary" type="submit">適用</button></div></form></dialog>
 <div id="notice" role="status"></div>
-<dialog id="result">${waterLight}<div class="return-art" aria-hidden="true"><canvas id="result-scene"></canvas></div><p class="eyebrow">BACK TO THE LIGHT</p><h2 id="result-title">探検完了</h2><p class="result-count"><span id="result-count-label">出会った生き物</span><strong id="result-count"></strong></p><div class="zukan result-zukan" id="result-zukan" role="list" aria-label="図鑑"></div><p id="final-stats"></p><p id="result-rounds" class="result-rounds" hidden></p><p id="swap-note" class="swap-note">次のラウンドは役割を交代します。</p><div class="dialog-actions"><button id="close-result" class="secondary">閉じる</button><button id="again" class="primary">もう一度</button></div></dialog>
+<dialog id="result">${waterLight}<div class="return-art" aria-hidden="true"><canvas id="result-scene"></canvas></div><p class="eyebrow">BACK TO THE LIGHT</p><h2 id="result-title">探検完了</h2><p class="result-count"><span id="result-count-label">出会った生き物</span><strong id="result-count"></strong></p><div class="zukan result-zukan" id="result-zukan" role="list" aria-label="図鑑"></div><p id="final-stats"></p><div class="dialog-actions"><button id="close-result" class="primary">終了する</button></div></dialog>
 <dialog id="ready" class="ready-dialog">${waterLight}${bubbles(12)}<p class="eyebrow" id="ready-eyebrow"></p><h2 id="ready-title"></h2><p id="ready-note"></p><div id="ready-tutorial" class="tutorial"></div><button type="button" id="ready-review" class="secondary wide">チュートリアルを確認</button><button type="button" id="ready-start" class="primary wide">準備完了</button><p class="ready-foot"><button type="button" id="ready-settings" class="text-button">⚙ 設定</button></p></dialog>
 <dialog id="countdown" class="countdown-dialog" aria-label="開始カウントダウン">${bubbles(14, 720)}<p class="eyebrow" id="countdown-round"></p><h2>まもなく探検が始まります</h2><div class="countdown-core"><span class="countdown-rings" aria-hidden="true"><i></i><i></i><i></i></span><strong id="countdown-number" aria-live="assertive" aria-atomic="true">3</strong></div><div class="depth-gauge" aria-hidden="true"><span>水面</span><i><b></b></i><span>海の底</span></div><p>ふたりで、海の向こうへ。</p><button id="countdown-pause" class="secondary">待機に戻る</button></dialog>
-<dialog id="ending" class="ending-dialog"><div class="ending-flash" aria-hidden="true"></div>${drops(24)}${sparkles(18)}<p class="eyebrow">THANK YOU FOR DIVING</p><h2>ふたりの旅は、ここまで。</h2><p>同じ海で見つけた景色を、<br>ふたりで話してみよう。</p><button id="ending-finish" class="primary">海から戻る</button></dialog>
+<dialog id="ending" class="ending-dialog"><div class="ending-flash" aria-hidden="true"></div>${drops(24)}${sparkles(18)}<p class="eyebrow">THANK YOU FOR DIVING</p><h2>ふたりの旅は、ここまで。</h2><p>同じ海で見つけた景色を、<br>ふたりで話してみよう。</p><p id="ending-wait" class="ending-wait" hidden>相手が探検を終えるのを待っています…</p><button id="ending-finish" class="primary">はじめに戻る</button></dialog>
 <dialog id="help">${waterLight}<h2>遊び方</h2><p>目標は、ふたりで海の生き物の図鑑を埋めること。迷路の魚のシルエットにエクスプローラーが触れると、正体の生き物が図鑑に登録されます。大きい魚ほどレアな生き物に出会えます。</p><p>ナビゲーターには、魚の危険度が「!」の数（! 低・!! 中・!!! 高）で見えます。触れるとエクスプローラーのHPが危険度に応じて減ります。HPはナビゲーターにしか見えず、0にはなりません。大きい魚ほど危険なことが多いので、壁で道をふさぐかどうかはナビゲーター次第です。道がふさがると、エクスプローラーだけの秘密の通路が開きます。</p><p id="keyboard-help">矢印キー/WASDで操作。ナビゲーターはTabで向き、Spaceで設置。Escで一時停止。Fで全画面。</p><div class="pad-help" hidden><b>PlayStation コントローラー</b>${controllerDiagram()}<p>左スティックで移動、上下左右の方向キーで壁の向き、×で決定・壁の設置。</p><p>ナビゲーター：位置を選んで壁を設置</p><div class="controller-actions">${playGuide('parent')}</div><p>エクスプローラー：移動してアイテムを探す</p><div class="controller-actions">${playGuide('child')}</div><p>共通の操作</p><div class="controller-actions">${padAction('prev', '長押しで一時停止')}</div><p>メニュー：左スティックで項目を選択、×で決定、← 長押しで戻る。設定の数値はスティックの左右で変更。設定と遊び方は一時停止中の画面から開けます。</p><p>チュートリアル：練習はふだんと同じ操作。→ 長押しで次へ・確認、← 長押しで戻る。</p>${sandboxMode ? '<p>テストモード：L1 / R1で役割切替、CREATEでリセット。</p>' : ''}</div><button id="help-close" class="primary">OK</button></dialog>
 <div id="room-code" class="room-code" popover="manual" role="status" aria-label="部屋コード" hidden></div>`;
 
 const $ = id => document.getElementById(id);
 // Open long help content at its heading, including after a network pause reorders dialogs.
+// The Access controller is read over WebHID; the browser asks permission once, from a click or key.
+function accessButtons() { document.querySelectorAll('.access-connect').forEach(button => { button.hidden = !accessSupported() || accessConnected(); }); }
+document.querySelectorAll('.access-connect').forEach(button => button.onclick = async () => {
+  notice(await requestAccess() ? 'Access コントローラーを接続しました。' : 'Access コントローラーに接続できませんでした。USB-Cで接続し、ほかのタブやアプリで開いていないか確認してください。');
+});
+onAccessChange(accessButtons); accessButtons();
+// Connect by default: reuse a granted controller silently; otherwise the first click or key press of
+// the session opens the browser's device chooser (it cannot open without such a gesture).
+reconnectAccess().then(found => {
+  if (found || !accessSupported()) return;
+  let asked = false;
+  try { asked = sessionStorage.getItem('access-asked') === '1'; } catch { /* storage unavailable */ }
+  if (asked) return;
+  const ask = event => {
+    if (event.target.closest?.('.access-connect')) return;   // that button asks by itself
+    window.removeEventListener('pointerdown', ask, true); window.removeEventListener('keydown', ask, true);
+    try { sessionStorage.setItem('access-asked', '1'); } catch { /* storage unavailable */ }
+    if (!accessConnected()) requestAccess().then(ok => { if (ok) notice('Access コントローラーを接続しました。'); });
+  };
+  window.addEventListener('pointerdown', ask, true); window.addEventListener('keydown', ask, true);
+});
 const helpHeading = $('help').querySelector('h2');
 helpHeading.tabIndex = -1;
 helpHeading.autofocus = true;
@@ -66,17 +91,23 @@ document.querySelector('.wall-style').insertAdjacentHTML('beforebegin', '<label 
 document.querySelector('.wall-style').insertAdjacentHTML('beforebegin', '<fieldset class="font-size-control"><legend>文字サイズ</legend><div class="font-size-options" role="group" aria-label="文字サイズ"><button type="button" data-text-scale="1" aria-pressed="true">標準</button><button type="button" data-text-scale="1.5" aria-pressed="false">1.5倍</button><button type="button" data-text-scale="2" aria-pressed="false">2倍</button></div></fieldset>');
 let game = createMaze(), cursor = game.avatar, direction = 0, seed = 260830, keys = new Set(), last = 0, uiClock = 0, resultShown = false, lastPhase = null, endingTimer = null, sentOxygen = -1, diveTimer = 0;
 const resultScene = createResultScene($('result-scene'));
+const ENDING_MS = 5000;
 const controllerUI = createControllerUI();
-let padSeen = false;
+let padSeen = false, shownEditable = null, stateDirty = false;
 // Presentation dialogs rise in once per real opening; fullscreen re-insertion must not replay it.
 function reveal(dialog) { dialog.classList.add('entering'); dialog.showModal(); }
 document.querySelectorAll('dialog').forEach(d => d.addEventListener('animationend', e => { if (e.target === d && e.animationName.startsWith('dialog-')) d.classList.remove('entering'); }));
+// update() runs every 80 ms; writing only what changed keeps it from invalidating layout each time.
+const setText = (el, text) => { if (el.textContent !== text) el.textContent = text; };
+const setHTML = (el, html) => { if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; } };
+const setAttr = (el, name, value) => { value = String(value); if (el.getAttribute(name) !== value) el.setAttribute(name, value); };
 const restart = (el, name) => { el.classList.remove(name); void el.offsetWidth; el.classList.add(name); };
 function countdownTick() { restart($('countdown'), 'tick'); window.dispatchEvent(new CustomEvent('ocean-pulse')); }
 function diveIn() { const boards = document.querySelector('.boards'); restart(boards, 'is-diving'); clearTimeout(diveTimer); diveTimer = setTimeout(() => boards.classList.remove('is-diving'), 1500); }
 const keyDirection = { ArrowRight: 0, d: 0, ArrowDown: 1, s: 1, ArrowLeft: 2, a: 2, ArrowUp: 3, w: 3 };
 const descriptions = { parent: '壁を置いてエクスプローラーCPUを守ろう', child: '魚に触れて図鑑を埋めよう', cpu: 'CPU同士を観察' };
-function oceanPhase() { return !$('lobby').hidden ? 'lobby' : game.phase === 'result' && network.active ? 'summary' : game.phase; }
+// While the ending plays the camera stays above the surface, even if the next game has already arrived.
+function oceanPhase() { return $('ending').open ? 'ending' : !$('lobby').hidden ? 'lobby' : game.phase === 'result' && network.active ? 'summary' : game.phase; }
 function showLobby(on) { if ($('ending').open && !on) return; $('lobby').hidden = !on; document.querySelector('.workspace').hidden = on; if (on) lobbySummary(); window.dispatchEvent(new CustomEvent('ocean-phase', { detail: oceanPhase() })); }
 const network = sandboxMode ? { active: false, connected: false, state: null, send() {} } : (testRole ? connectSoloMaze : connectMaze)({ role: testRole, settings: () => Object.fromEntries(new FormData($('settings'))), notice,
   onLeave: () => { clearTimeout(endingTimer); tutorial.stop(); $('ready').close(); $('help').close(); $('ending').close(); $('countdown').close(); $('settings-dialog').close(); setImmersive(false); document.querySelector('.boards').classList.remove('network-boards'); document.querySelectorAll('.board-card').forEach(b => b.hidden = false); reset(); showLobby(true); },
@@ -89,18 +120,22 @@ const network = sandboxMode ? { active: false, connected: false, state: null, se
     if (game.phase !== 'playing') keys.clear();
     document.querySelector('.boards').classList.add('network-boards');
     document.querySelectorAll('.board-card').forEach(b => b.hidden = !b.classList.contains(packet.role));
-    update(); render();
+    // Packets can arrive several times a frame; the frame loop applies the newest one once (and draws).
+    stateDirty = true;
+    // The partner has ended too, so the ending scene that was waiting moves on to the new game.
+    if (endingWaiting && (game.phase !== 'result' || !packet.partner.connected)) finishEnding();
   }
 });
 function notice(message) { $('notice').textContent = message; $('notice').classList.add('show'); clearTimeout(notice.timer); notice.timer = setTimeout(() => $('notice').classList.remove('show'), 2600); }
 const tutorial = createTutorial($('ready-tutorial'), { onStep: () => update(), onFinish: () => { if (!tutorial.last) return; tutorial.stop(); network.send({ type: 'tutorial' }); update(); }, onClose: () => update() });
 function readyPrompt() {
+  if ($('ending').open) return;   // the next game's briefing waits for the ending scene
   const waiting = ['ready', 'paused'].includes(game.phase) && !$('result').open;
   if (!waiting) { if ($('ready').open) { $('ready').close(); tutorial.stop(); } return; }
   const { partner, ready, match, tutorialComplete } = network.state, paused = game.phase === 'paused';
   const startWasUsable = $('ready').open && !$('ready-start').hidden && !$('ready-start').disabled;
   const partnerLine = testRole ? '相手はCPU · 準備完了' : partner.connected ? partner.ready ? '相手は準備完了' : partner.tutorialComplete ? '相手は準備中' : '相手はチュートリアルを確認中' : '相手を待っています';
-  $('ready-eyebrow').textContent = `${paused ? 'ひと休み中' : `第${match.leg}ラウンド / 全2ラウンド`} · ${partnerLine}`;
+  $('ready-eyebrow').textContent = `${paused ? 'ひと休み中' : '探検の準備'} · ${partnerLine}`;
   $('ready-title').textContent = game.mode === 'parent' ? 'あなたはナビゲーターです。' : 'あなたはエクスプローラーです。';
   $('ready-note').textContent = testRole ? (paused ? '準備完了で3秒後に再開します。' : '相手はCPUです。チュートリアルを確認し、準備完了で3秒後に始まります。') : network.state.reason || 'チュートリアルを確認して準備完了を押してください。二人の準備ができたら3秒後に始まります。';
   // Close the countdown first: its close restores focus, which would undo the focus set below.
@@ -115,7 +150,7 @@ function readyPrompt() {
   // The briefing is the whole prompt until it is closed or finished; its last step confirms.
   const briefing = !paused && !ready && tutorial.running;
   $('ready').classList.toggle('briefing', briefing);
-  tutorial.setKicker(`${match.leg === 2 && !paused ? '役割交代 · ' : ''}${game.mode === 'parent' ? 'ナビゲーター' : 'エクスプローラー'} · ${$('ready-eyebrow').textContent}`);
+  tutorial.setKicker(`${game.mode === 'parent' ? 'ナビゲーター' : 'エクスプローラー'} · ${$('ready-eyebrow').textContent}`);
   $('ready-eyebrow').hidden = $('ready-title').hidden = $('ready-note').hidden = $('ready-start').hidden = briefing;
   $('ready-tutorial').hidden = !briefing;
   // A controller's briefing is the practice board and hold → / hold ←; settings come after it.
@@ -144,20 +179,35 @@ function lobbySummary() { const v = Object.fromEntries(new FormData($('settings'
 function reset(settings = game.settings, nextSeed = seed) { const mode = game.mode; game = createMaze(settings, nextSeed); game.mode = mode; seed = nextSeed; cursor = game.avatar; keys.clear(); resultShown = false; $('result').close(); update(); render(); }
 function setMode(mode) { if (network.active) return; game.mode = mode; keys.clear(); update(); }
 // A finished round is followed by the same maze with the roles exchanged, so both sides play it.
-function swapRoles() { if (game.mode === 'cpu') return; game.mode = game.mode === 'parent' ? 'child' : 'parent'; notice(game.mode === 'parent' ? '交代 · 今度はあなたがナビゲーターです。' : '交代 · 今度はあなたがエクスプローラーです。'); }
-function toggle() { if (network.active) { if (['ready', 'paused'].includes(game.phase) && !network.state.tutorialComplete) return; network.send({ type: ['playing', 'countdown'].includes(game.phase) ? 'pause' : game.phase === 'result' ? 'again' : 'ready' }); return; } if (game.phase === 'result') { reset(); swapRoles(); } if (game.phase === 'playing') { game.phase = 'paused'; keys.clear(); } else start(game); update(); }
+function toggle() { if (network.active) { if (['ready', 'paused'].includes(game.phase) && !network.state.tutorialComplete) return; network.send({ type: ['playing', 'countdown'].includes(game.phase) ? 'pause' : game.phase === 'result' ? 'again' : 'ready' }); return; } if (game.phase === 'result') { endGame(); return; } if (game.phase === 'playing') { game.phase = 'paused'; keys.clear(); } else start(game); update(); }
 function control(dir) { if (game.mode === 'parent') { const n = neighbor(game, cursor, dir); if (n >= 0) cursor = n; } else if (game.mode === 'child') { if (network.active) network.send({ type: 'move', direction: dir }); else move(game, dir); } }
 function wall() { if (game.mode !== 'parent') return; if (network.active) { network.send({ type: 'wall', cell: cursor, direction }); return; } if (!placeWall(game, cursor, direction)) notice(game.phase !== 'playing' ? '探検を始めてから壁を置いてください。' : game.walls.size >= game.settings.wallLimit ? '設置できる壁をすべて使いました。' : 'すでに壁があります。空いている通路を選んでください。'); update(); }
 function rotate() { direction = (direction + 1) % 4; update(); }
-$('start').onclick = toggle; $('reset').onclick = () => { if (!network.active) reset(); }; $('again').onclick = () => { if (network.active) { network.send({ type: 'again' }); return; } reset(); swapRoles(); start(game); update(); }; $('close-result').onclick = () => {
-  $('result').close();
-  if (!network.active) return;
+$('start').onclick = toggle; $('reset').onclick = () => { if (!network.active) reset(); }; $('close-result').onclick = () => endGame();
+// Ending a game: the ending scene plays, then a new game (same room and roles) starts by itself.
+// In a room the new game needs both players to have ended; until then the scene waits.
+let endingWaiting = false;
+function endGame() {
+  $('result').close(); resultScene.stop?.();
+  if (network.active && game.phase === 'result') network.send({ type: 'again' });
   document.querySelector('.workspace').hidden = true;
   window.dispatchEvent(new CustomEvent('ocean-phase', { detail: 'ending' }));
-  reveal($('ending'));
-  clearTimeout(endingTimer); endingTimer = setTimeout(finishEnding, 5000);
-};
-function finishEnding() { clearTimeout(endingTimer); $('ending').close(); network.send({ type: 'leave' }); }
+  endingWaiting = false; $('ending-wait').hidden = true; reveal($('ending'));
+  clearTimeout(endingTimer); endingTimer = setTimeout(finishEnding, ENDING_MS);
+}
+function finishEnding() {
+  clearTimeout(endingTimer);
+  if (network.active && game.phase === 'result') {
+    // A partner who has gone cannot start the next game; return to the lobby instead.
+    if (!network.state.partner.connected) { $('ending').close(); network.send({ type: 'leave' }); return; }
+    endingWaiting = true; $('ending-wait').hidden = false; return;
+  }
+  endingWaiting = false; $('ending').close();
+  document.querySelector('.workspace').hidden = false;
+  if (!network.active) reset();
+  window.dispatchEvent(new CustomEvent('ocean-phase', { detail: oceanPhase() }));
+  update();
+}
 $('ending-finish').onclick = finishEnding;
 $('ending').addEventListener('cancel', event => { event.preventDefault(); finishEnding(); });
 $('result').addEventListener('cancel', event => { if (network.active) { event.preventDefault(); $('close-result').click(); } });
@@ -218,7 +268,7 @@ try { const value = Number(localStorage.getItem(textScaleKey)); if ([1, 1.5, 2].
 function updateTextScale(value) {
   const scale = [1, 1.5, 2].includes(Number(value)) ? Number(value) : 1;
   document.documentElement.classList.toggle('large-text', scale > 1);
-  document.documentElement.style.setProperty('--text-scale', scale);
+  document.documentElement.style.setProperty('--text-scale', scale); setTextScale(scale);
   document.querySelectorAll('[data-text-scale]').forEach(button => button.setAttribute('aria-pressed', Number(button.dataset.textScale) === scale));
   return scale;
 }
@@ -263,66 +313,57 @@ function update() {
   lastPhase = game.phase;
   document.querySelector('.mode-group').hidden = network.active; $('reset').hidden = network.active;
   const editable = !network.active || network.state?.host && game.phase === 'ready' && network.state.match.leg === 1;
-  document.querySelectorAll('#settings input, #settings button').forEach(b => b.disabled = !editable);
+  if (editable !== shownEditable) { shownEditable = editable; document.querySelectorAll('#settings input, #settings button').forEach(b => b.disabled = !editable); }
   $('defaults').hidden = network.active;
   $('room-chip').hidden = !network.active;
   roomCode();
   if (network.active) {
     // The room code itself lives in the top-right corner; the chip only names a test run.
-    $('room-chip-code').textContent = testRole ? testLabel : '';
-    $('room-chip-partner').textContent = testRole ? '相手はCPU' : network.state.partner.connected ? network.state.partner.ready ? '相手は準備完了' : '相手が接続中' : '相手を待っています';
+    setText($('room-chip-code'), testRole ? testLabel : '');
+    setText($('room-chip-partner'), testRole ? '相手はCPU' : network.state.partner.connected ? network.state.partner.ready ? '相手は準備完了' : '相手が接続中' : '相手を待っています');
   }
-  $('phase').textContent = { ready: '開始前', countdown: 'まもなく開始', playing: '探検中', paused: 'ひと休み中', result: '探検完了' }[game.phase];
+  setText($('phase'), { ready: '開始前', countdown: 'まもなく開始', playing: '探検中', paused: 'ひと休み中', result: '探検完了' }[game.phase]);
   $('phase-dot').classList.toggle('live', game.phase === 'playing');
-  const remaining = Math.ceil(game.settings.duration - game.time); $('timer').textContent = `${String(Math.floor(remaining / 60)).padStart(2, '0')}:${String(remaining % 60).padStart(2, '0')}`;
+  const remaining = Math.ceil(game.settings.duration - game.time); setText($('timer'), `${String(Math.floor(remaining / 60)).padStart(2, '0')}:${String(remaining % 60).padStart(2, '0')}`);
   $('timer').classList.toggle('urgent', remaining <= 5 && game.phase === 'playing');
   const oxygen = Math.max(0, Math.min(100, (game.settings.duration - game.time) / game.settings.duration * 100));
   if (Math.round(oxygen) !== sentOxygen) { sentOxygen = Math.round(oxygen); window.dispatchEvent(new CustomEvent('ocean-oxygen', { detail: oxygen / 100 })); }
-  $('oxygen-fill').style.width = `${oxygen}%`; $('oxygen').setAttribute('aria-valuenow', Math.round(oxygen)); $('oxygen').classList.toggle('low', oxygen <= 25); $('oxygen').classList.toggle('critical', oxygen <= 10); $('oxygen').classList.toggle('flowing', game.phase === 'playing');
-  $('start').textContent = { ready: 'スタート', countdown: '待機に戻る', playing: '一時停止', paused: '再開', result: 'もう一度' }[game.phase];
-  $('mode-description').textContent = descriptions[game.mode];
+  const fill = `${oxygen}%`; if ($('oxygen-fill').style.width !== fill) $('oxygen-fill').style.width = fill; setAttr($('oxygen'), 'aria-valuenow', Math.round(oxygen)); $('oxygen').classList.toggle('low', oxygen <= 25); $('oxygen').classList.toggle('critical', oxygen <= 10); $('oxygen').classList.toggle('flowing', game.phase === 'playing');
+  let startText = { ready: 'スタート', countdown: '待機に戻る', playing: '一時停止', paused: '再開', result: 'もう一度' }[game.phase], modeText = descriptions[game.mode];
   $('start').disabled = network.active && ((['ready', 'paused'].includes(game.phase) && !network.state.tutorialComplete) || !network.connected || (!['playing', 'countdown'].includes(game.phase) && (network.state?.ready && game.phase !== 'result' || network.state?.again && game.phase === 'result')));
   if (network.active) {
-    $('mode-description').textContent = network.state.reason || '対戦中';
-    if (['ready', 'paused'].includes(game.phase)) $('start').textContent = network.state.ready ? '相手を待機中' : '準備完了';
-    const nextLabel = network.state.match.done ? 'もう一度あそぶ' : '交代して第2ラウンドへ';
-    if (game.phase === 'result') $('start').textContent = network.state.again ? '相手を待機中' : nextLabel;
-    $('again').disabled = network.state.again || !network.connected || !network.state.partner.connected; $('again').textContent = network.state.again ? '相手を待機中' : nextLabel;
+    modeText = network.state.reason || '対戦中';
+    if (['ready', 'paused'].includes(game.phase)) startText = network.state.ready ? '相手を待機中' : '準備完了';
+    if (game.phase === 'result') startText = '終了する';
     readyPrompt();
     if (game.phase === 'countdown') {
-      $('countdown-round').textContent = `第${network.state.match.leg}ラウンド / 全2ラウンド`;
+      setText($('countdown-round'), 'まもなく出発');
       const number = String(network.state.countdown);
       const changed = $('countdown-number').textContent !== number;
       if (changed) $('countdown-number').textContent = number;
       if (!$('countdown').open) { $('settings-dialog').close(); reveal($('countdown')); countdownTick(); }
       else if (changed) countdownTick();
     } else if ($('countdown').open) $('countdown').close();
-  } else { if ($('ready').open) { $('ready').close(); tutorial.stop(); } $('again').disabled = false; $('again').textContent = game.mode === 'cpu' ? 'もう一度' : '交代してもう一度'; if (game.phase === 'result' && game.mode !== 'cpu') $('start').textContent = '交代してもう一度'; }
-  for (const role of ['parent', 'child']) $('badge-' + role).textContent = game.mode === role ? 'あなた' : 'CPU';
+  } else { if ($('ready').open) { $('ready').close(); tutorial.stop(); } if (game.phase === 'result') startText = '終了する'; }
+  setText($('start'), startText); setText($('mode-description'), modeText);
+  for (const role of ['parent', 'child']) setText($('badge-' + role), game.mode === role ? 'あなた' : 'CPU');
   sidePanels();
-  $('detail-parent').textContent = `${game.walls.size} / ${game.settings.wallLimit}`; $('detail-child').textContent = `${game.collected} / ${game.items.length}`;
-  document.querySelectorAll('[data-mode]').forEach(b => { b.classList.toggle('selected', b.dataset.mode === game.mode); b.setAttribute('aria-pressed', b.dataset.mode === game.mode); });
+  setText($('detail-parent'), `${game.walls.size} / ${game.settings.wallLimit}`); setText($('detail-child'), `${game.collected} / ${game.items.length}`);
+  document.querySelectorAll('[data-mode]').forEach(b => { b.classList.toggle('selected', b.dataset.mode === game.mode); setAttr(b, 'aria-pressed', b.dataset.mode === game.mode); });
   $('rotate').hidden = $('place').hidden = game.mode !== 'parent';
   document.querySelector('.dpad').hidden = game.mode === 'cpu';
-  $('direction').textContent = ['右', '下', '左', '上'][direction];
-  $('control-hint').innerHTML = padSeen ? playGuide(game.mode) : game.mode === 'parent' ? 'マスの端をクリック、またはSpaceで壁を設置' : game.mode === 'child' ? '矢印/WASDで移動 · 点線は秘密の通路' : '';
+  setText($('direction'), ['右', '下', '左', '上'][direction]);
+  setHTML($('control-hint'), padSeen ? playGuide(game.mode) : game.mode === 'parent' ? 'マスの端をクリック、またはSpaceで壁を設置' : game.mode === 'child' ? '矢印/WASDで移動 · 点線は秘密の通路' : '');
   if (game.phase === 'result' && !resultShown) {
     resultShown = true; keys.clear();
-    // A match is one round as the parent and one as the child; the second result closes it out.
-    const match = network.active ? network.state.match : null, done = !!match?.done;
-    $('result-title').textContent = done ? 'ふたりの探検が終わりました' : network.active ? `第${match.leg}ラウンド終了` : '探検完了';
+    // A game is one round; its result offers only the way out, to the ending and the next game.
+    $('result-title').textContent = network.active ? 'ふたりの探検が終わりました' : '探検完了';
     // Both players see this round's whole encyclopedia, with risk revealed so they can talk it over.
     const found = collection();
-    $('result-count-label').textContent = network.active ? `第${match.leg}ラウンドで出会った生き物` : 'この海で出会った生き物';
+    $('result-count-label').textContent = 'この海で出会った生き物';
     $('result-count').textContent = `${found.size} / ${CREATURES.length} 種`;
     $('result-zukan').innerHTML = zukan(found, '', { risk: true });
     $('final-stats').textContent = `${game.moves}マスの旅 · 出会い ${game.collected} · 壁 ${game.walls.size} · 秘密の通路 ${game.secrets.size}`;
-    $('result-rounds').hidden = !done;
-    if (done) $('result-rounds').textContent = match.results.map((leg, i) => `第${i + 1}ラウンド ${leg.caught.length}匹`).join('　/　');
-    $('swap-note').hidden = done || game.mode === 'cpu';
-    $('close-result').className = done ? 'primary' : 'secondary'; $('again').className = done ? 'secondary' : 'primary';
-    // After round one the only way on is the swap; leaving is offered once the match is over.
-    $('close-result').hidden = network.active && !done; $('close-result').textContent = network.active ? '終了する' : '閉じる';
     reveal($('result')); resultScene.play();
   }
 }
@@ -353,11 +394,15 @@ function sidePanels() {
     $('zukan').innerHTML = zukan(found, fresh?.creature); $('zukan-count').textContent = `${found.size} / ${CREATURES.length}`;
   }
 }
-function render() { for (const role of ['parent', 'child']) if (!network.active || game.mode === role) drawMaze($('board-' + role), game, role, cursor, direction); }
+// Boards are not drawn while the game screen is hidden (lobby, ending); they resume on return.
+const workspace = document.querySelector('.workspace');
+function render() { if (workspace.hidden) return; for (const role of ['parent', 'child']) if (!network.active || game.mode === role) drawMaze($('board-' + role), game, role, cursor, direction); }
 let networkClock = 0;
 // Game time advances from wall-clock deltas; rAF only paces drawing. A watchdog keeps the round
 // moving when the browser stops painting the tab without firing blur/visibilitychange.
 function step(now) {
+  // Apply the newest state before reading input, so a press always meets the screen it was made on.
+  if (stateDirty) { stateDirty = false; update(); uiClock = 0; }
   const dt = last ? Math.max(0, Math.min((now - last) / 1000, 1)) : 0; last = now; const padDir = pollPad(now), key = [...keys].at(-1), held = key !== undefined ? keyDirection[key] : padDir >= 0 ? padDir : undefined;
   if (!network.active) { for (let left = dt; left > 0; left -= .1) tick(game, Math.min(left, .1), held === undefined ? -1 : held); }
   else { network.advance?.(dt); networkClock += dt; if (networkClock >= .06) { networkClock = 0; if (held !== undefined && game.mode === 'child' && game.phase === 'playing') network.send({ type: 'move', direction: held }); } }
@@ -371,7 +416,7 @@ function controllerHints() {
   if (controllerUI.editing) { scope = $('controller-keyboard'); hint = padAction('left', '文字を選択') + padAction('cross', '入力') + padAction('prev', '長押しで戻る'); }
   else if ($('help').open) { scope = $('help'); hint = padAction('left', 'スクロール') + padAction('prev', '長押しで閉じる'); }
   else if ($('settings-dialog').open) { scope = $('settings-dialog'); hint = menu + padAction('left', '数値は左右で変更'); }
-  else if ($('ending').open) { scope = $('ending'); hint = padAction('cross', '海から戻る'); }
+  else if ($('ending').open) { scope = $('ending'); hint = padAction('cross', 'はじめに戻る'); }
   else if ($('countdown').open) { scope = $('countdown'); hint = padAction('prev', '長押しで待機に戻る'); }
   else if ($('result').open) { scope = $('result'); hint = padAction('left', '項目を選択') + padAction('cross', '決定') + padAction('prev', network.active ? '長押しで終了' : '長押しで閉じる'); }
   else if ($('ready').open) {

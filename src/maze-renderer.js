@@ -85,6 +85,9 @@ function paintSeabed(cols, rows, variant, res) {
 export const WALL_STYLES = ['ridge', 'reef'];
 let wallStyle = 'ridge';
 export function setWallStyle(style) { if (WALL_STYLES.includes(style)) wallStyle = style; }
+// The page's text scale, pushed in when it changes so drawing never has to query computed style.
+let textScale = 1;
+export function setTextScale(scale) { textScale = Number(scale) || 1; }
 
 // Lumpy boulder lit from the upper left, with a contact shadow down-right.
 function drawRock(c, x, y, r, seed, [dark, mid, light]) {
@@ -224,12 +227,18 @@ function drawFishIcon(c, x, y, size, light = 1, alpha = 1) {
   disc(c, 3.6, -1, .75, `rgba(225,248,255,${.8 * light})`);
   c.restore();
 }
-function drawRiskMarks(c, x, y, size, risk, light) {
-  const scale = FISH_SCALE[size] || 1, marks = '!'.repeat(risk), px = Math.round(9 + 3.2 * scale);
-  c.save(); c.font = `900 ${px}px sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
-  c.lineJoin = 'round'; c.globalAlpha = .35 * light; c.lineWidth = 7; c.strokeStyle = RISK_COLORS[risk]; c.strokeText(marks, x + .5 * scale, y + .5);
-  c.globalAlpha = 1; c.lineWidth = 3; c.strokeStyle = 'rgba(10,24,48,.85)'; c.strokeText(marks, x + .5 * scale, y + .5);
-  c.fillStyle = RISK_COLORS[risk]; c.fillText(marks, x + .5 * scale, y + .5);
+// Marks are drawn together, grouped by fish size, because assigning ctx.font (a string the canvas
+// has to parse) is the costliest step; fish sit in separate cells, so the order is not visible.
+function drawRiskMarks(c, marks, markScale = 1) {
+  c.save(); c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineJoin = 'round';
+  let font = '';
+  for (const { x, y, size, risk, light } of marks.sort((a, b) => (FISH_SCALE[a.size] || 1) - (FISH_SCALE[b.size] || 1))) {
+    const scale = FISH_SCALE[size] || 1, text = '!'.repeat(risk), next = `900 ${Math.round((9 + 3.2 * scale) * markScale)}px sans-serif`;
+    if (next !== font) { c.font = font = next; }
+    c.globalAlpha = .35 * light; c.lineWidth = 7 * markScale; c.strokeStyle = RISK_COLORS[risk]; c.strokeText(text, x + .5 * scale, y + .5);
+    c.globalAlpha = 1; c.lineWidth = 3 * markScale; c.strokeStyle = 'rgba(10,24,48,.85)'; c.strokeText(text, x + .5 * scale, y + .5);
+    c.fillStyle = RISK_COLORS[risk]; c.fillText(text, x + .5 * scale, y + .5);
+  }
   c.restore();
 }
 
@@ -402,6 +411,7 @@ export function drawMaze(canvas, s, role, cursor, direction, options = {}) {
   }
   drawKelp(c, cols, rows, amb, variant);
   drawAnchor(c, ...center((rows - 1) * cols));
+  const hpLabels = [];
   for (const item of s.items) {
     const [x, y] = center(item.cell);
     if (item.taken && !v.taken.has(item.cell)) {
@@ -411,12 +421,16 @@ export function drawMaze(canvas, s, role, cursor, direction, options = {}) {
     // A met fish leaves a faint outline; the navigator also sees what it did to the explorer's HP.
     if (item.taken) {
       drawFishIcon(c, x, y, item.size, .2, .35);
-      if (role === 'parent' && Number.isFinite(item.damage)) {
-        const text = item.damage > 0 ? `♥−${item.damage}` : item.damage < 0 ? `♥+${-item.damage}` : '♥±0';
-        c.save(); c.font = `800 ${11 * (Number(getComputedStyle(document.documentElement).getPropertyValue('--text-scale')) || 1)}px sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
-        c.lineWidth = 3; c.strokeStyle = 'rgba(10,24,48,.85)'; c.strokeText(text, x, y); c.fillStyle = item.damage > 0 ? '#ff9d8a' : '#9ff0c8'; c.fillText(text, x, y); c.restore();
-      }
+      if (role === 'parent' && Number.isFinite(item.damage)) hpLabels.push([x, y, item.damage]);
     }
+  }
+  if (hpLabels.length) {
+    c.save(); c.font = `800 ${11 * textScale}px sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineWidth = 3;
+    for (const [x, y, damage] of hpLabels) {
+      const text = damage > 0 ? `♥−${damage}` : damage < 0 ? `♥+${-damage}` : '♥±0';
+      c.strokeStyle = 'rgba(10,24,48,.85)'; c.strokeText(text, x, y); c.fillStyle = damage > 0 ? '#ff9d8a' : '#9ff0c8'; c.fillText(text, x, y);
+    }
+    c.restore();
   }
   c.drawImage(v.wallsLayer.canvas, -pad, -pad, width, height);
   for (const e of s.walls) {
@@ -488,13 +502,16 @@ export function drawMaze(canvas, s, role, cursor, direction, options = {}) {
   c.save(); c.translate(pad, pad);
   // Fish sit above the fog so neither player loses track of them. Their light rises and falls
   // slowly (faster for「!!!」), so a risk mark is hard to overlook.
+  const marks = [];
   for (const item of s.items) {
     if (item.taken) continue;
     const [x, y] = center(item.cell), risk = role === 'parent' ? item.risk : 0;
     const light = .6 + .4 * (.5 + .5 * Math.sin(amb * (risk === 3 ? 3.4 : 1.6) + item.cell * 1.3));
     drawFishIcon(c, x, y, item.size, light);
-    if (risk) drawRiskMarks(c, x, y, item.size, risk, light);
+    if (risk) marks.push({ x, y, size: item.size, risk, light });
   }
+  // Callers that show the board enlarged (the tutorial) can shrink the「!」marks to match.
+  if (marks.length) drawRiskMarks(c, marks, options.markScale || 1);
   if (role === 'parent') {
     // The exit is a column of daylight from an opening in the surface.
     const [x, y] = center(s.goal), sway = Math.sin(amb * 1.3) * .06;

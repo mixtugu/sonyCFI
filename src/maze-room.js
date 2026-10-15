@@ -9,24 +9,23 @@ export class MazeRooms {
   send(socket, packet) { if (socket?.readyState === 1 && (socket.bufferedAmount || 0) < 1_000_000) socket.send(JSON.stringify(packet)); }
   error(socket, message, code = 'invalid') { this.send(socket, { type: 'error', message, code }); }
   add(room, role, socket) {
-    // `seat` is the role this member opens a match with; `role` alternates between the two legs.
+    // `seat` is the role this member keeps; `role` is what this game's view uses.
     const member = { role, seat: role, socket, token: randomHex(24), ready: false, tutorialComplete: false, again: false };
     room.members.push(member); this.bindings.set(socket, { room, member }); this.session(room, member); this.broadcast(room);
   }
   session(room, member) { this.send(member.socket, { type: 'session', code: room.code, token: member.token }); }
-  // A match is two legs: everyone plays parent once and child once, then it is over.
-  reset(room, settings = room.game?.settings, next = false) {
+  // A game is a single round; players keep their seats from game to game.
+  reset(room, settings = room.game?.settings) {
     room.game = createMaze(settings, randomSeed()); room.game.mode = 'duo'; room.round++;
-    if (next) { room.leg = 2; room.members.forEach(m => { m.role = m.role === 'parent' ? 'child' : 'parent'; }); }
-    else { room.leg = 1; room.results = []; room.members.forEach(m => { m.role = m.seat; }); }
+    room.leg = 1; room.results = []; room.members.forEach(m => { m.role = m.seat; });
     room.members.forEach(m => { m.ready = false; m.tutorialComplete = false; m.again = false; });
     room.countdown = 0;
-    room.reason = next ? '役割を交代しました。新しい役割のチュートリアルを確認し、二人とも準備完了を押すと3秒後に始まります。' : 'チュートリアルを確認し、二人とも準備完了を押すと3秒後に始まります。';
+    room.reason = 'チュートリアルを確認し、二人とも準備完了を押すと3秒後に始まります。';
   }
   finish(room) {
     if (room.game.phase !== 'result') return;
-    // Each round has its own encyclopedia. Both players review it on the result screen and both
-    // ask to go on before the roles swap (see 'again').
+    // The round's encyclopedia is the result. Each player ends it ('again'); once both have, a new
+    // game starts in the same room.
     room.results[room.leg - 1] = { caught: room.game.items.filter(i => i.taken).map(i => i.creature) };
   }
   advance(room, elapsed) {
@@ -72,7 +71,7 @@ export class MazeRooms {
     const { room, member } = binding, g = room.game; room.touched = Date.now();
     if (data.type === 'leave') {
       this.bindings.delete(socket);
-      if (g.phase === 'result' && room.leg === 2) {
+      if (g.phase === 'result') {
         // Keep the match's encyclopedia readable for the partner who is still reviewing the match.
         member.socket = null; member.token = null; member.ready = false; member.again = false;
       } else { room.members = room.members.filter(m => m !== member); this.reset(room); }
@@ -91,9 +90,9 @@ export class MazeRooms {
     } else if (data.type === 'pause' && ['playing', 'countdown'].includes(g.phase)) {
       this.pause(room, 'ひと休み中です。二人とも準備ができたら再開します。');
     } else if (data.type === 'again' && g.phase === 'result') {
-      // A completed match restarts only after both players ask to play again.
-      member.again = true; if (room.members.length === 2 && room.members.every(m => m.again && m.socket?.readyState === 1)) this.reset(room, undefined, room.leg === 1);
-    } else if (data.type === 'settings' && g.phase === 'ready' && room.leg === 1 && member === room.members[0]) {
+      // A finished game restarts only after both players have ended it.
+      member.again = true; if (room.members.length === 2 && room.members.every(m => m.again && m.socket?.readyState === 1)) this.reset(room);
+    } else if (data.type === 'settings' && g.phase === 'ready' && member === room.members[0]) {
       this.reset(room, data.settings);
     } else if (data.type === 'move' && g.phase === 'playing') {
       if (member.role !== 'child') return this.error(socket, 'エクスプローラーだけが移動できます。', 'role');
@@ -116,7 +115,7 @@ export class MazeRooms {
     const g = room.game, review = g.phase === 'result', parent = member.role === 'parent';
     // Only send public state plus this role's information; never send the seed or hidden item values.
     return { type: 'state', code: room.code, round: room.round, role: member.role, host: member === room.members[0], ready: member.ready, tutorialComplete: !!member.tutorialComplete, countdown: Math.ceil(room.countdown || 0), again: member.again,
-      match: { leg: room.leg, done: review && room.leg === 2, results: room.results },
+      match: { leg: room.leg, done: review, results: room.results },
       partner: { connected: room.members.some(m => m !== member && m.socket?.readyState === 1), ready: room.members.some(m => m !== member && m.ready), tutorialComplete: room.members.some(m => m !== member && m.tutorialComplete), again: room.members.some(m => m !== member && m.again) }, reason: room.reason,
       game: { settings: g.settings, phase: g.phase, time: g.time, avatar: g.avatar, goal: parent || review ? g.goal : null,
         base: [...g.base], walls: [...g.walls], secrets: !parent || review ? [...g.secrets] : [],

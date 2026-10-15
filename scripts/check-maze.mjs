@@ -30,7 +30,9 @@ try {
   await page.locator('#start').click(); await expect(page.locator('#result')).toBeVisible({ timeout: 8000 });
   await expect(page.locator('#final-stats')).toContainText('マスの旅');
   await page.screenshot({ path: 'artifacts/maze-result.png', fullPage: true });
-  await page.locator('#close-result').click(); await page.locator('#fullscreen').click(); await page.locator('#reset').click();
+  await page.locator('#close-result').click(); await expect(page.locator('#ending')).toBeVisible(); await page.locator('#ending-finish').click();
+  await expect(page.locator('#phase')).toHaveText('開始前');   // the ending opens a new game
+  await page.locator('#fullscreen').click(); await page.locator('#reset').click();
   await page.locator('[data-mode=parent]').click(); await page.locator('#start').click();
   // Find an open edge through the same public module, then exercise actual pointer placement.
   const target = (() => { const s = createMaze({ duration: 5 }, 260831); const { cols, rows } = s.settings; for (let a = 0; a < cols * rows; a++) { const b = neighbor(s, a, 0); if (b >= 0 && !s.base.has(edge(a, b))) return { x: (a % cols + 1) * 36 + 13, y: (Math.floor(a / cols) + .5) * 36 + 14, w: cols * 36 + 28, h: rows * 36 + 28 }; } })();
@@ -38,11 +40,10 @@ try {
   await page.mouse.click(box.x + target.x / target.w * box.width, box.y + target.y / target.h * box.height);
   await expect(page.locator('#detail-parent')).toHaveText('1 / 12');
   await expect(page.locator('#hp-hearts .heart')).toHaveCount(16);   // walls cost no HP
-  // The round ends with an exchange: the next one puts this player on the other side.
-  await expect(page.locator('#result')).toBeVisible({ timeout: 9000 });
-  await expect(page.locator('#again')).toHaveText('交代してもう一度');
-  await page.locator('#again').click();
-  await expect(page.locator('#badge-child')).toHaveText('あなた'); await expect(page.locator('#badge-parent')).toHaveText('CPU');
+  // The round ends with only 終了する; the new game keeps this player's role.
+  await expect(page.locator('#result')).toBeVisible({ timeout: 9000 }); await expect(page.locator('#result .dialog-actions button')).toHaveCount(1);
+  await page.locator('#close-result').click(); await page.locator('#ending-finish').click();
+  await expect(page.locator('#badge-parent')).toHaveText('あなた'); await expect(page.locator('#phase')).toHaveText('開始前');
   await page.locator('#fullscreen').click(); await page.locator('#reset').click();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: 'artifacts/maze-mobile.png', fullPage: true });
@@ -61,6 +62,6 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator('#help-open').click(); await expect(page.locator('#help')).toBeVisible(); await page.locator('#help-close').click();
   assert.deepEqual(errors, []);
-  console.log('Room lobby, /test mode, desktop/mobile, CPU, pause, result + swap, wall pointer, help and fullscreen passed.');
+  console.log('Room lobby, /test mode, desktop/mobile, CPU, pause, result + new game, wall pointer, help and fullscreen passed.');
 } finally { await browser?.close(); await app.close(); }
 

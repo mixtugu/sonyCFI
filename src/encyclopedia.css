@@ -53,3 +53,7 @@
 .result-zukan .zukan-cells{grid-template-columns:repeat(auto-fill,minmax(96px,1fr))}.result-zukan .zukan-name{font-size:calc(12px * var(--text-scale,1))}
 #result[open] .result-zukan{animation:rise-in .7s .6s both}
 @media(prefers-reduced-motion:reduce){.zukan-cell.is-new,.hp-panel.is-hit,.contact-hit{animation:none}}
+
+/* Ending: waits for the partner before the next game starts. */
+.ending-dialog .ending-wait{margin-top:14px;font-size:calc(15px * var(--text-scale,1));opacity:.85;animation:ending-wait 1.6s ease-in-out infinite alternate}
+@keyframes ending-wait{to{opacity:.45}}

@@ -6,10 +6,16 @@ input[type=number]{width:calc(60px + 4px * var(--text-scale, 1))}.field span inp
 
 /* Shared water-light layers (the caustic tile is generated at startup as --caustics). */
 .fx-caustics,.fx-rays,.fx-bubbles,.fx-sparkles{position:absolute;inset:0;pointer-events:none;border-radius:inherit;overflow:hidden}
-.fx-caustics{background-image:var(--caustics);background-size:300px;mix-blend-mode:screen;opacity:.06;filter:blur(1.2px);animation:caustic-a 26s linear infinite}
-.fx-caustics::after{content:'';position:absolute;inset:0;background-image:var(--caustics);background-size:440px;opacity:.7;animation:caustic-b 37s linear infinite}
-@keyframes caustic-a{to{background-position:300px 600px}}
-@keyframes caustic-b{to{background-position:-880px 440px}}
+/* Caustic sheets slide by whole tiles. Each sheet is a pseudo-element one travel distance larger
+   than its frame and moves with transform, so the compositor animates it without restyling or
+   repainting the page every frame; the visible pattern matches a background-position slide. */
+.fx-caustics{mix-blend-mode:screen;opacity:.06;filter:blur(1.2px)}
+.fx-caustics::before,.fx-caustics::after,.ocean-world .board-heading::before{content:'';position:absolute;background-image:var(--caustics);pointer-events:none;will-change:transform}
+.fx-caustics::before{inset:-600px 0 0 -300px;background-size:300px;animation:caustic-a 26s linear infinite}
+.fx-caustics::after{inset:-440px -880px 0 0;background-size:440px;opacity:.7;animation:caustic-b 37s linear infinite}
+@keyframes caustic-a{to{transform:translate(300px,600px)}}
+@keyframes caustic-b{to{transform:translate(-880px,440px)}}
+@media(prefers-reduced-motion:reduce){.fx-caustics::before{animation:none}}
 .fx-rays::before{content:'';position:absolute;inset:-30% -25% 15%;background:repeating-linear-gradient(104deg,transparent 0 48px,#c6fff00e 48px 86px,transparent 86px 150px,#c6fff008 150px 172px,transparent 172px 240px);-webkit-mask-image:linear-gradient(#000 5%,transparent 85%);mask-image:linear-gradient(#000 5%,transparent 85%);transform-origin:50% 0;animation:rays 11s ease-in-out infinite alternate}
 @keyframes rays{from{transform:skewX(-7deg) translateX(-4%)}to{transform:skewX(7deg) translateX(4%)}}
 .fx-bubbles i{position:absolute;bottom:-18px;left:var(--x);width:var(--s);height:var(--s);border-radius:50%;border:1px solid #dcfff5a6;background:radial-gradient(circle at 32% 30%,#fff 0 14%,#c9fff21f 32%,transparent 70%);box-shadow:inset 0 0 4px #bff7ee44;opacity:0;animation:bubble var(--d) var(--delay) linear infinite}
@@ -69,7 +75,7 @@ input[type=number]{width:calc(60px + 4px * var(--text-scale, 1))}.field span inp
 .ocean-world .toolbar{background:linear-gradient(180deg,#102d62e0,#081b43e8);border-color:#9bbaff35;backdrop-filter:blur(14px) saturate(1.3);box-shadow:0 14px 40px #0009,inset 0 1px 0 #d8e4ff1a}
 .ocean-world .board-card{position:relative;background:linear-gradient(170deg,#143774d1,#061a3dde 45%,#03132de6);border-color:#9bbaff38;box-shadow:0 34px 80px #000c1a8c,inset 0 1px 0 #d8e4ff1f;backdrop-filter:blur(10px)}
 .ocean-world .board-heading{position:relative;overflow:hidden;border-bottom-color:#9fe8d824}
-.ocean-world .board-heading::before{content:'';position:absolute;inset:0;background-image:var(--caustics);background-size:300px;mix-blend-mode:screen;opacity:.07;filter:blur(1px);animation:caustic-a 30s linear infinite;pointer-events:none}
+.ocean-world .board-heading::before{inset:-600px 0 0 -300px;background-size:300px;mix-blend-mode:screen;opacity:.07;filter:blur(1px);animation:caustic-a 30s linear infinite}
 .ocean-world .board-heading h2{letter-spacing:.14em;color:#e0eaff}
 .ocean-world .board-surface,.ocean-world.immersive .board-surface{background:transparent;padding:12px}
 .ocean-world.immersive .board-surface{grid-template:minmax(0,1fr)/minmax(0,1fr)}

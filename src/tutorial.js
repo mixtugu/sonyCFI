@@ -108,7 +108,8 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
     resetPresentation();
     update();
   }
-  function setKicker(text) { find('.briefing-kicker').textContent = text; }
+  // The briefing shows no role / status line above the steps.
+  function setKicker() { find('.briefing-kicker').textContent = ''; }
 
   function update() {
     if (!running) return;
@@ -179,7 +180,7 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
         { cell: 3, size: 'medium', creature: 'octopus', risk: 2, damage: 2, taken: taken.has(3) },
         { cell: 13, size: 'small', creature: 'clownfish', risk: 1, damage: 0, taken: taken.has(13) },
       ],
-    }, role, practice.cursor.y * COLS + practice.cursor.x, (practice.direction + 3) % 4, { cursor: cursorStep(), resolution });
+    }, role, practice.cursor.y * COLS + practice.cursor.x, (practice.direction + 3) % 4, { cursor: cursorStep(), resolution, markScale: .65 });
   }
   function drawBoard() {
     const interactive = cursorStep() || moveStep();

@@ -23,6 +23,25 @@ export function createOceanPresentation() {
   lifeCanvas.className = 'ocean-life'; lifeCanvas.setAttribute('aria-hidden', 'true');
   depthCanvas.after(lifeCanvas);
   const life = lifeCanvas.getContext('2d');
+  // Board rectangles the fish swim behind. Reading them forces layout, so they are re-read only after
+  // something that can move a board: a resize of the page or of the board area, a scroll, or boards
+  // being shown or hidden. A one-second refresh covers anything the observers miss.
+  let boardRects = null, rectsAt = 0;
+  const staleRects = () => { boardRects = null; };
+  const resizes = typeof ResizeObserver === 'function' ? new ResizeObserver(staleRects) : null;
+  const watched = new Set();
+  window.addEventListener('resize', staleRects, { passive: true });
+  window.addEventListener('scroll', staleRects, { passive: true, capture: true });
+  const mutations = new MutationObserver(staleRects);
+  mutations.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['hidden'] });
+  mutations.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+  function readBoardRects(now) {
+    if (boardRects && now - rectsAt < 1000) return boardRects;
+    if (resizes) for (const element of document.querySelectorAll('.workspace, .toolbar, .boards, .board-card')) if (!watched.has(element)) { watched.add(element); resizes.observe(element); }
+    boardRects = [...document.querySelectorAll('.board-card:not([hidden])')].map(board => board.getBoundingClientRect()).filter(rect => rect.width && rect.height);
+    rectsAt = now;
+    return boardRects;
+  }
   let depths = null;
   try { depths = createDepths(depthCanvas); } catch { depths = null; }
   if (!depths) depthCanvas.remove();
@@ -133,10 +152,7 @@ export function createOceanPresentation() {
     const time = motionPreference.matches ? 0 : (phase === 'paused' ? phaseAt : now) / 1000;
     drawFish(life, width, height, time); drawJelly(life, width, height, time);
     life.globalCompositeOperation = 'destination-out';
-    for (const board of document.querySelectorAll('.board-card:not([hidden])')) {
-      const rect = board.getBoundingClientRect();
-      if (rect.width && rect.height) life.fillRect(rect.left - 8, rect.top - 8, rect.width + 16, rect.height + 16);
-    }
+    for (const rect of readBoardRects(now)) life.fillRect(rect.left - 8, rect.top - 8, rect.width + 16, rect.height + 16);
     life.globalCompositeOperation = 'source-over';
   }
 
@@ -172,6 +188,6 @@ export function createOceanPresentation() {
     },
     pulse() { if (phase !== 'paused') sim.pulseAt = sim.clock; },
     setOxygen(value) { oxygen = Math.max(0, Math.min(1, +value || 0)); },
-    destroy() { cancelAnimationFrame(raf); close(); canvas.remove(); depthCanvas.remove(); lifeCanvas.remove(); window.removeEventListener('pointermove', onPointer); window.removeEventListener('pointerdown', onDown); window.removeEventListener('keydown', onKey); }
+    destroy() { cancelAnimationFrame(raf); resizes?.disconnect(); mutations.disconnect(); window.removeEventListener('resize', staleRects); window.removeEventListener('scroll', staleRects, { capture: true }); close(); canvas.remove(); depthCanvas.remove(); lifeCanvas.remove(); window.removeEventListener('pointermove', onPointer); window.removeEventListener('pointerdown', onDown); window.removeEventListener('keydown', onKey); }
   };
 }

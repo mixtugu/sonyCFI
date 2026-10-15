@@ -21,6 +21,22 @@ Help is also reachable through Settings → 遊び方, including controllers tha
 
 An unplug during play or countdown pauses the round and restores keyboard guidance. Reconnecting restores PlayStation guidance without discarding tutorial progress. The round requires an explicit resume. Browsers may expose a newly connected controller only after its first button press. Standard Gamepad API button/axis mapping is assumed; generic controllers use the same positional mapping and PlayStation labels.
 
+## PlayStation Access controller (WebHID)
+
+On a PC the browser's Gamepad API only sees the Access controller's *mapped* actions, which do not reliably follow a profile set up on a PS5. The game therefore reads the controller's **physical** buttons over WebHID (`src/access-controller.js`, layout from [ps-access](https://github.com/johnhenry/ps-access) PROTOCOL.md, MIT) and applies a fixed layout, whatever profile is active:
+
+| Physical input | Game |
+| --- | --- |
+| Centre button | × |
+| Perimeter buttons 7 / 3 / 1 / 5 (top / bottom / left / right with the stick in its default place) | ↑ / ↓ / ← → (tap aims the wall; hold ← / → goes back / on) |
+| Stick | left stick |
+
+Requirements: Chrome or Edge, controller on **USB-C**. Press **🎮 Access コントローラーを接続（USB）** once (lobby card or ⚙ settings) and allow the device; afterwards it reconnects on every visit and after replugging. Close other tabs or apps that hold the controller (for example the ps-access web tool) first. While connected over WebHID, the Gamepad API's view of the same controller is ignored. Verified with a simulated device: `node scripts/check-access-hid.mjs`.
+
+## Troubleshooting
+
+Open the game with `?pad` appended to the address (for example `/test?pad`) to show a live readout of every connected controller: its id, whether the browser applies the standard layout, the pressed button numbers, the axis values and the game buttons they become. Controllers the browser has no layout for (`mapping` empty) report the D-pad as a single hat-switch axis; the game reads that axis as ↑ → ↓ ←. Several connected controllers are read together.
+
 ## Implementation
 
 - `src/gamepad.js`: direction dead zone, repeat timing and button edges.

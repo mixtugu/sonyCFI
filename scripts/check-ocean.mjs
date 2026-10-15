@@ -77,6 +77,8 @@ try {
   assert.ok(tutorialMoves, 'on-demand tutorial moves immediately');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto(url); await expect(page.locator('.ocean-intro')).toHaveCount(0);
+  // Compare only after the backdrop's first paint has sized it to the viewport.
+  await expect.poll(() => page.locator('.ocean-backdrop').evaluate(c => c.width >= innerWidth)).toBe(true);
   const reducedWater = await backdrop(); await page.waitForTimeout(300); assert.equal(await backdrop(), reducedWater, 'reduced-motion water is static');
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.locator('#maze-create button')).toBeVisible();

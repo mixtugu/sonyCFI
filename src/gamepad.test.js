@@ -57,3 +57,28 @@ test('D-pad aims walls; directional holds stay separate from × and ○', () => 
   read(pad([BUTTONS.down]), 80 + HOLD_MS * 2);
   assert.equal(read(pad([BUTTONS.down]), 80 + HOLD_MS * 3).long.size, 0);   // ↑ / ↓ have no hold
 });
+test('a controller without a standard layout steers with its hat-switch D-pad', () => {
+  const raw = (hat, pressed = []) => ({ id: 'Access', mapping: '', axes: [0, 0, 0, -1, -1, 0, 0, 0, 0, hat], buttons: Array.from({ length: 14 }, (_, i) => ({ pressed: pressed.includes(i) })) });
+  const read = createPadReader();
+  assert.equal(read(raw(1.2857), []).aim, -1);                 // at rest; also teaches which axis is the hat
+  assert.equal(read(raw(-1), []).aim, 3);                      // up
+  read(raw(1.2857), []); assert.equal(read(raw(-3 / 7), []).aim, 0);   // right
+  read(raw(1.2857), []); assert.equal(read(raw(1 / 7), []).aim, 1);    // down
+  read(raw(1.2857), []); assert.equal(read(raw(5 / 7), []).aim, 2);    // left
+  assert.equal(padAim(raw(1.2857)), -1);                       // its axes 2–3 are not a right stick
+  // Holding the hat's left is a hold of ←, like the D-pad buttons of a standard layout.
+  const hold = createPadReader(); hold(raw(5 / 7), 0);
+  assert.equal(hold(raw(5 / 7), HOLD_MS).long.has('left'), true);
+});
+test('several connected controllers are read as one', async () => {
+  const { firstPad } = await import('./gamepad.js');
+  const standard = { id: 'DualSense', connected: true, mapping: 'standard', axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false })) };
+  const access = { id: 'Access', connected: true, mapping: '', axes: [.9, 0, 0, -1, -1, 0, 0, 0, 0, -3 / 7], buttons: Array.from({ length: 14 }, () => ({ pressed: false })) };
+  globalThis.navigator ??= {};
+  const saved = navigator.getGamepads; navigator.getGamepads = () => [standard, null, access];
+  try {
+    const pad = firstPad(), read = createPadReader(), input = read(pad, 0);
+    assert.equal(input.dir, 0);                                // the tilted stick wins
+    assert.equal(input.aim, 0);                                // the other pad's hat still counts
+  } finally { navigator.getGamepads = saved; }
+});
