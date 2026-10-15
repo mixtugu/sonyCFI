@@ -64,8 +64,8 @@ test('playing keeps private views and role restrictions with no CPU actions', ()
   assert.deepEqual(parentView.secrets, []); assert.equal(childView.goal, null);
   // HP and risk are the navigator's alone; neither role learns a creature before it is met.
   assert.equal(parentView.hp, 16); assert.equal(childView.hp, null);
-  assert.ok(parentView.items.filter(i => !i.taken).every(i => ['small', 'medium', 'large'].includes(i.size) && [1, 2, 3].includes(i.risk) && !('creature' in i) && !('damage' in i)));
-  assert.ok(childView.items.every(i => ['small', 'medium', 'large'].includes(i.size) && !('risk' in i) && !('damage' in i)));
+  assert.ok(parentView.items.filter(i => !i.taken).every(i => ['small', 'medium', 'large'].includes(i.size) && [1, 2, 3].includes(i.maxRisk) && !('risk' in i) && !('creature' in i) && !('damage' in i)));
+  assert.ok(childView.items.every(i => ['small', 'medium', 'large'].includes(i.size) && !('risk' in i) && !('maxRisk' in i) && !('damage' in i)));
   assert.equal('seed' in childView, false);
 });
 test('a creature stays hidden until met and is then shared; only the navigator sees the damage', () => {

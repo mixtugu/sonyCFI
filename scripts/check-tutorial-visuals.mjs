@@ -20,13 +20,14 @@ try {
       return stroke.apply(this, args);
     };
   });
+  // The navigator's wall practice is step 02 (danger → walls → time).
+  await page.locator('.briefing-next').click(); await expect(page.locator('.briefing-count')).toHaveText('02 / 03'); await page.locator('.briefing-art').focus();
   await page.keyboard.press('Space');
   await expect(page.locator('.practice-feedback')).toContainText('壁を設置');
   await expect.poll(() => page.evaluate(() => window.effectStrokes.includes('#ffb797'))).toBe(true);
   await page.screenshot({ path: 'artifacts/tutorial-shared-wall-effects.png' });
   await page.locator('.briefing-next').click();
-  await expect(page.locator('.briefing-count')).toHaveText('02 / 03');
-  await page.locator('.briefing-next').click();
+  await expect(page.locator('.briefing-count')).toHaveText('03 / 03');
   await expect(page.locator('.briefing-oxygen')).toBeVisible();
 
   await page.goto(`http://127.0.0.1:${app.port}/test/2`);

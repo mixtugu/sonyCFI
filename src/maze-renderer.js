@@ -1,4 +1,5 @@
 import { neighbor, edge } from './maze.js';
+import { creatureBitmap } from './creature-art.js';
 import { drawDiverHD, drawRipple, disc, motionPreference, causticTile } from './ocean-art.js';
 
 // Presentation-only: reads the role's state, never mutates it. Each canvas keeps its own visual
@@ -208,6 +209,8 @@ function paintReef(s, role, cols, rows, segment, res) {
 
 // One glowing fish silhouette in three sizes; the size hints at how rare the creature may be.
 const FISH_SCALE = { small: 1.15, medium: 1.6, large: 2.15 };
+// Width of a met creature's picture on its cell, by the fish's size (a cell is 36 units).
+const CREATURE_WIDTH = { small: 28, medium: 33, large: 38 };
 const fishPath = (() => {
   const p = new Path2D();
   p.moveTo(7, 0); p.bezierCurveTo(5, -5.4, -3, -5.4, -5, 0); p.bezierCurveTo(-3, 5.4, 5, 5.4, 7, 0);
@@ -337,7 +340,7 @@ export function drawMaze(canvas, s, role, cursor, direction, options = {}) {
   // Server snapshots replace the state object: reset by maze identity and round progress.
   if (!v || v.cols !== cols || v.rows !== rows || v.res !== res || (!onDemand && (s.time < v.gameTime || s.moves < v.moves || (s.phase === 'ready' && v.phase !== 'ready')))) {
     const [x, y] = center(s.avatar);
-    v = { cols, rows, res, x, y, fromX: x, fromY: y, avatar: s.avatar, angle: -.6, movedAt: 0, last: now, time: 0, ambient: 0, beat: -1,
+    v = { cols, rows, res, x, y, fromX: x, fromY: y, avatar: s.avatar, angle: -.6, movedAt: -Infinity, kickPhase: 0, kickSpeed: 3.5, last: now, time: 0, ambient: 0, beat: -1,
       bubbles: [], events: [], sparks: [], puffs: [], births: new Map(), walls: new Set(s.walls), taken: new Set(s.items.filter(i => i.taken).map(i => i.cell)),
       explored: layer(width * res, height * res), fog: layer(width * res, height * res), stamped: 0, stampedAvatar: -1, fogLevel: null, phase: s.phase };
     scenes.set(canvas, v);
@@ -418,10 +421,13 @@ export function drawMaze(canvas, s, role, cursor, direction, options = {}) {
       v.taken.add(item.cell);
       if (animate) { v.events.push({ x, y, at: t, color: '#ffe4a7', radius: 32 }); v.sparks.push({ x, y, at: t }); }
     }
-    // A met fish leaves a faint outline; the navigator also sees what it did to the explorer's HP.
+    // A met fish turns into the creature it was, left on its cell (a faint outline until the picture
+    // is ready); the navigator also sees what it did to the explorer's HP, just below it.
     if (item.taken) {
-      drawFishIcon(c, x, y, item.size, .2, .35);
-      if (role === 'parent' && Number.isFinite(item.damage)) hpLabels.push([x, y, item.damage]);
+      const picture = item.creature && creatureBitmap(item.creature);
+      if (picture) { const box = CREATURE_WIDTH[item.size] || 30, fit = Math.min(box / picture.naturalWidth, box * .8 / picture.naturalHeight), w = picture.naturalWidth * fit, h = picture.naturalHeight * fit; c.drawImage(picture, x - w / 2, y - h / 2 - 2, w, h); }
+      else drawFishIcon(c, x, y, item.size, .2, .35);
+      if (role === 'parent' && Number.isFinite(item.damage)) hpLabels.push([x, picture ? y + 11 : y, item.damage]);
     }
   }
   if (hpLabels.length) {
@@ -505,7 +511,7 @@ export function drawMaze(canvas, s, role, cursor, direction, options = {}) {
   const marks = [];
   for (const item of s.items) {
     if (item.taken) continue;
-    const [x, y] = center(item.cell), risk = role === 'parent' ? item.risk : 0;
+    const [x, y] = center(item.cell), risk = role === 'parent' ? item.maxRisk ?? item.risk : 0;
     const light = .6 + .4 * (.5 + .5 * Math.sin(amb * (risk === 3 ? 3.4 : 1.6) + item.cell * 1.3));
     drawFishIcon(c, x, y, item.size, light);
     if (risk) marks.push({ x, y, size: item.size, risk, light });
@@ -581,7 +587,14 @@ export function drawMaze(canvas, s, role, cursor, direction, options = {}) {
   c.fillStyle = torch; c.beginPath(); c.moveTo(10, -2.5); c.lineTo(cell * 2.9, -cell * .9); c.quadraticCurveTo(cell * 3.1, 0, cell * 2.9, cell * .9); c.lineTo(10, 2.5); c.closePath(); c.fill(); c.restore();
   const halo = c.createRadialGradient(v.x, v.y, 1, v.x, v.y, 30); halo.addColorStop(0, 'rgba(185,255,225,.16)'); halo.addColorStop(1, 'rgba(185,255,225,0)'); disc(c, v.x, v.y, 30, halo);
   c.restore();
-  drawDiverHD(c, v.x, v.y, v.angle, amb + t, travel < 1 ? 1 : 0, .7);
+  // The fins kick faster while the explorer is on the move and ease back to a slow idle beat.
+  const swimming = animate && s.phase === 'playing' && t - v.movedAt < .95;
+  if (animate && s.phase === 'playing') {
+    const targetSpeed = swimming ? 7 : 3.5, decay = Math.exp(-dt / .3);
+    v.kickPhase += targetSpeed * dt + (v.kickSpeed - targetSpeed) * .3 * (1 - decay);
+    v.kickSpeed = targetSpeed + (v.kickSpeed - targetSpeed) * decay;
+  }
+  drawDiverHD(c, v.x, v.y, v.angle, amb + t, swimming ? 1 : 0, .7, 1, v.kickPhase);
 
   if (role === 'parent' && s.mode === 'parent' && s.phase !== 'result' && options.cursor !== false) {
     const [x, y] = center(cursor), pulse = .5 + .5 * Math.sin(amb * 4);

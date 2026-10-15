@@ -24,7 +24,7 @@ try {
   // before a partner joins or any other click happens to re-open/promote a dialog.
   await expect(parent.locator('body')).toHaveClass(/immersive/);
   await expect.poll(() => parent.evaluate(() => !!document.fullscreenElement)).toBe(true);
-  await expect(parent.locator('.briefing-title')).toHaveText('壁を立ててエクスプローラーを守る');
+  await expect(parent.locator('.briefing-title')).toHaveText('「!」の数が危険のサイン');
   await expect.poll(() => parent.evaluate(() => {
     const dialog = document.getElementById('ready'), title = dialog.querySelector('.briefing-title');
     const rect = title.getBoundingClientRect();
@@ -44,9 +44,11 @@ try {
   await expect(parent.locator('#ready')).toBeVisible(); await expect(parent.locator('#ready-title')).toHaveText('あなたはナビゲーターです。');
   await expect(child.locator('#ready-title')).toHaveText('あなたはエクスプローラーです。');
   // Each round opens with a three-step briefing; the first steps carry a small practice board.
-  await expect(parent.locator('.briefing-title')).toHaveText('壁を立ててエクスプローラーを守る');
-  await expect(child.locator('.briefing-title')).toHaveText('魚に触れて、図鑑に登録');
+  await expect(parent.locator('.briefing-title')).toHaveText('「!」の数が危険のサイン');
+  await expect(child.locator('.briefing-title')).toHaveText('大きな魚をつかまえよう');
   await expect(parent.locator('#ready-start')).toBeHidden();
+  // The navigator's wall practice is step 02 (danger → walls → time).
+  await parent.locator('.briefing-next').click(); await expect(parent.locator('.briefing-count')).toHaveText('02 / 03'); await parent.locator('.briefing-art').focus();
   const practiceImage = await parent.locator('.briefing-canvas').evaluate(canvas => canvas.toDataURL());
   await parent.keyboard.press('Space');
   await expect(parent.locator('.practice-feedback')).toHaveText('東側に壁を設置しました');
@@ -59,7 +61,7 @@ try {
   for (const key of ['ArrowRight', 'ArrowUp', 'ArrowUp', 'ArrowRight']) await child.keyboard.press(key);
   await expect(child.locator('.practice-feedback')).toContainText('秘密の通路を通り抜けました');
   await parent.screenshot({ path: 'artifacts/tuto-1-parent.png' }); await child.screenshot({ path: 'artifacts/tuto-2-child.png' });
-  await parent.locator('.briefing-next').click(); await parent.locator('.briefing-next').click();
+  await parent.locator('.briefing-next').click();   // already on 02, the wall practice
   await expect(parent.locator('.briefing-count')).toHaveText('03 / 03');
   await expect(parent.locator('.briefing-board')).toBeHidden(); await expect(parent.locator('.briefing-next')).toBeHidden();
   // Tutorial confirmation and ready are separate steps; closing early cannot skip confirmation.
@@ -102,10 +104,10 @@ try {
   await child.locator('#close-result').click(); await expect(child.locator('#ending')).toBeVisible();
   await expect.poll(() => room.round).toBe(round + 1); assert.deepEqual(room.results, []);
   await expect(parent.locator('#ending')).toBeHidden(); await expect(parent.locator('#ready')).toBeVisible();
-  await expect(parent.locator('.briefing-title')).toHaveText('壁を立ててエクスプローラーを守る');   // no swap
+  await expect(parent.locator('.briefing-title')).toHaveText('「!」の数が危険のサイン');   // no swap
   await expect(child.locator('#ready')).toBeHidden();   // the partner's ending is still playing
   await expect(child.locator('#ending')).toBeHidden({ timeout: 7000 }); await expect(child.locator('#ready')).toBeVisible();
-  await expect(child.locator('.briefing-title')).toHaveText('魚に触れて、図鑑に登録'); await expect(child.locator('#zukan-count')).toHaveText('0 / 12');
+  await expect(child.locator('.briefing-title')).toHaveText('大きな魚をつかまえよう'); await expect(child.locator('#zukan-count')).toHaveText('0 / 12');
   await child.evaluate(() => document.exitFullscreen?.().catch(() => {})); await expect.poll(() => child.evaluate(() => !!document.fullscreenElement)).toBe(false);
   await child.setViewportSize({ width: 390, height: 844 });
   assert.equal(await child.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);

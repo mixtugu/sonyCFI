@@ -14,7 +14,7 @@ import { accessConnected, accessSupported, onAccessChange, reconnectAccess, requ
 import { createTutorial } from './tutorial.js';
 import { createResultScene } from './result-scene.js';
 import { CREATURES } from './creatures.js';
-import { contactCard, explorerPanel, hearts, navigatorPanel, zukan } from './encyclopedia-ui.js';
+import { contactCard, explorerPanel, hearts, navigatorPanel, wallStock, zukan } from './encyclopedia-ui.js';
 
 const fields = [['cols', '横のマス数'], ['rows', '縦のマス数'], ['duration', '制限時間（秒）'], ['wallLimit', '壁の枚数'], ['moveMs', '移動間隔（ms）']];
 const input = (key, label) => `<input type="number" name="${key}" aria-label="${label}" min="${LIMITS[key][0]}" max="${LIMITS[key][1]}" step="${key === 'moveMs' ? 50 : 1}" value="${DEFAULTS[key]}" required>`;
@@ -58,7 +58,7 @@ ${['parent', 'child'].map(role => `<section class="board-card ${role}"><div clas
 <dialog id="ready" class="ready-dialog">${waterLight}${bubbles(12)}<p class="eyebrow" id="ready-eyebrow"></p><h2 id="ready-title"></h2><p id="ready-note"></p><div id="ready-tutorial" class="tutorial"></div><button type="button" id="ready-review" class="secondary wide">チュートリアルを確認</button><button type="button" id="ready-start" class="primary wide">準備完了</button><p class="ready-foot"><button type="button" id="ready-settings" class="text-button">⚙ 設定</button></p></dialog>
 <dialog id="countdown" class="countdown-dialog" aria-label="開始カウントダウン">${bubbles(14, 720)}<p class="eyebrow" id="countdown-round"></p><h2>まもなく探検が始まります</h2><div class="countdown-core"><span class="countdown-rings" aria-hidden="true"><i></i><i></i><i></i></span><strong id="countdown-number" aria-live="assertive" aria-atomic="true">3</strong></div><div class="depth-gauge" aria-hidden="true"><span>水面</span><i><b></b></i><span>海の底</span></div><p>ふたりで、海の向こうへ。</p><button id="countdown-pause" class="secondary">待機に戻る</button></dialog>
 <dialog id="ending" class="ending-dialog"><div class="ending-flash" aria-hidden="true"></div>${drops(24)}${sparkles(18)}<p class="eyebrow">THANK YOU FOR DIVING</p><h2>ふたりの旅は、ここまで。</h2><p>同じ海で見つけた景色を、<br>ふたりで話してみよう。</p><p id="ending-wait" class="ending-wait" hidden>相手が探検を終えるのを待っています…</p><button id="ending-finish" class="primary">はじめに戻る</button></dialog>
-<dialog id="help">${waterLight}<h2>遊び方</h2><p>目標は、ふたりで海の生き物の図鑑を埋めること。迷路の魚のシルエットにエクスプローラーが触れると、正体の生き物が図鑑に登録されます。大きい魚ほどレアな生き物に出会えます。</p><p>ナビゲーターには、魚の危険度が「!」の数（! 低・!! 中・!!! 高）で見えます。触れるとエクスプローラーのHPが危険度に応じて減ります。HPはナビゲーターにしか見えず、0にはなりません。大きい魚ほど危険なことが多いので、壁で道をふさぐかどうかはナビゲーター次第です。道がふさがると、エクスプローラーだけの秘密の通路が開きます。</p><p id="keyboard-help">矢印キー/WASDで操作。ナビゲーターはTabで向き、Spaceで設置。Escで一時停止。Fで全画面。</p><div class="pad-help" hidden><b>PlayStation コントローラー</b>${controllerDiagram()}<p>左スティックで移動、上下左右の方向キーで壁の向き、×で決定・壁の設置。</p><p>ナビゲーター：位置を選んで壁を設置</p><div class="controller-actions">${playGuide('parent')}</div><p>エクスプローラー：移動してアイテムを探す</p><div class="controller-actions">${playGuide('child')}</div><p>共通の操作</p><div class="controller-actions">${padAction('prev', '長押しで一時停止')}</div><p>メニュー：左スティックで項目を選択、×で決定、← 長押しで戻る。設定の数値はスティックの左右で変更。設定と遊び方は一時停止中の画面から開けます。</p><p>チュートリアル：練習はふだんと同じ操作。→ 長押しで次へ・確認、← 長押しで戻る。</p>${sandboxMode ? '<p>テストモード：L1 / R1で役割切替、CREATEでリセット。</p>' : ''}</div><button id="help-close" class="primary">OK</button></dialog>
+<dialog id="help">${waterLight}<h2>遊び方</h2><p>目標は、ふたりで海の生き物の図鑑を埋めること。迷路の魚のシルエットにエクスプローラーが触れると、正体の生き物が図鑑に登録されます。大きい魚ほどレアな生き物に出会えます。</p><p>ナビゲーターには、魚から現れる生き物の最大の危険度が「!」の数（! 低・!! 中・!!! 高）で見えます。実際の生き物はそれ以下の危険度で、触れるとエクスプローラーのHPがその危険度に応じて減ります。HPはナビゲーターにしか見えず、0にはなりません。大きい魚ほど危険なことが多いので、壁で道をふさぐかどうかはナビゲーター次第です。道がふさがると、エクスプローラーだけの秘密の通路が開きます。</p><p id="keyboard-help">矢印キー/WASDで操作。ナビゲーターはTabで向き、Spaceで設置。Escで一時停止。Fで全画面。</p><div class="pad-help" hidden><b>PlayStation コントローラー</b>${controllerDiagram()}<p>左スティックで移動、上下左右の方向キーで壁の向き、×で決定・壁の設置。</p><p>ナビゲーター：位置を選んで壁を設置</p><div class="controller-actions">${playGuide('parent')}</div><p>エクスプローラー：移動してアイテムを探す</p><div class="controller-actions">${playGuide('child')}</div><p>共通の操作</p><div class="controller-actions">${padAction('prev', '長押しで一時停止')}</div><p>メニュー：左スティックで項目を選択、×で決定、← 長押しで戻る。設定の数値はスティックの左右で変更。設定と遊び方は一時停止中の画面から開けます。</p><p>チュートリアル：練習はふだんと同じ操作。→ 長押しで次へ・確認、← 長押しで戻る。</p>${sandboxMode ? '<p>テストモード：L1 / R1で役割切替、CREATEでリセット。</p>' : ''}</div><button id="help-close" class="primary">OK</button></dialog>
 <div id="room-code" class="room-code" popover="manual" role="status" aria-label="部屋コード" hidden></div>`;
 
 const $ = id => document.getElementById(id);
@@ -372,8 +372,10 @@ function collection() {
   return new Set(game.items.filter(item => item.taken && item.creature).map(item => item.creature));
 }
 // Side panels change only when something happens, so they are rebuilt on change, not per frame.
-let shownHp = null, shownMet = null, shownFound = null;
+let shownHp = null, shownMet = null, shownFound = null, shownWalls = '';
 function sidePanels() {
+  const left = Math.max(0, game.settings.wallLimit - game.walls.size), wallKey = `${left}/${game.settings.wallLimit}`;
+  if (wallKey !== shownWalls) { shownWalls = wallKey; $('wall-stock-icons').innerHTML = wallStock(left, game.settings.wallLimit); $('wall-stock-count').textContent = `${left} / ${game.settings.wallLimit} 枚`; }
   if (Number.isFinite(game.hp) && game.hp !== shownHp) {
     const hit = shownHp !== null && game.hp < shownHp && game.phase === 'playing';
     shownHp = game.hp; $('hp-hearts').innerHTML = hearts(game.hp); $('hp-hearts').setAttribute('aria-valuenow', game.hp);

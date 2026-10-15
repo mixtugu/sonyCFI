@@ -45,7 +45,10 @@ try {
   await hold(parent, [14]); await expect(parent.locator('#settings-dialog')).toBeVisible();   // hold ← closes help
   await activate(parent, '#settings button[type=submit]'); await expect(parent.locator('#settings-dialog')).toBeHidden();
   await activate(parent, '#maze-create button'); await expect(parent.locator('#ready')).toBeVisible();
-  // Left stick moves, D-pad taps aim walls, and → / ← holds move between tutorial steps.
+  // Step 01 explains the danger; the wall practice is step 02. Left stick moves, D-pad taps aim
+  // walls, and → / ← holds move between tutorial steps.
+  await expect(parent.locator('.briefing-count')).toHaveText('01 / 03');
+  await hold(parent, [15]); await expect(parent.locator('.briefing-count')).toHaveText('02 / 03');
   await expect(parent.locator('.briefing-description')).toContainText('スティック');
   await expect(parent.locator('.briefing-close')).toBeHidden();
   await expect(parent.locator('.briefing-next')).toContainText('長押しで次へ');
@@ -54,14 +57,14 @@ try {
   for (const [button, name] of [[12, '北'], [13, '南'], [14, '西'], [15, '東']]) {
     await press(parent, [button]);
     await expect(parent.locator('.practice-feedback')).toHaveText(`設置方向: ${name}`);
-    await expect(parent.locator('.briefing-count')).toHaveText('01 / 03');
+    await expect(parent.locator('.briefing-count')).toHaveText('02 / 03');
   }
-  await hold(parent, [0]); await expect(parent.locator('.briefing-count')).toHaveText('01 / 03');
-  await hold(parent, [1]); await expect(parent.locator('.briefing-count')).toHaveText('01 / 03');
+  await hold(parent, [0]); await expect(parent.locator('.briefing-count')).toHaveText('02 / 03');
+  await hold(parent, [1]); await expect(parent.locator('.briefing-count')).toHaveText('02 / 03');
   await press(parent, [0]); await expect(parent.locator('.practice-feedback')).toHaveText('東側に壁を設置しました');
-  await expect(parent.locator('.briefing-count')).toHaveText('01 / 03');   // taps never change the step
-  await hold(parent, [15]); await expect(parent.locator('.briefing-count')).toHaveText('02 / 03');   // hold → advances
-  await hold(parent, [14]); await expect(parent.locator('.briefing-count')).toHaveText('01 / 03');   // hold ← goes back
+  await expect(parent.locator('.briefing-count')).toHaveText('02 / 03');   // taps never change the step
+  await hold(parent, [15]); await expect(parent.locator('.briefing-count')).toHaveText('03 / 03');   // hold → advances
+  await hold(parent, [14]); await expect(parent.locator('.briefing-count')).toHaveText('02 / 03');   // hold ← goes back
   await expect(parent.locator('.practice-feedback')).toHaveText('東側に壁を設置しました'); // navigation holds never aim
   await press(parent, [], [-1, 0, 0, 0]); await expect(parent.locator('.practice-feedback')).toHaveText('選択: B-02');
   await press(parent, [], [1, 0, 0, 0]); await expect(parent.locator('.practice-feedback')).toHaveText('選択: C-02');
@@ -122,7 +125,7 @@ try {
   // One round: × on the only button ends the game, × again skips the ending, and a new game opens in the same seats.
   for (const page of [parent, child]) { await expect(page.locator('#result')).toBeVisible(); await expect(page.locator('#close-result')).toBeFocused(); await press(page, [0]); await expect(page.locator('#ending')).toBeVisible(); }
   for (const page of [parent, child]) { await press(page, [0]); await expect(page.locator('#ready')).toBeVisible(); }
-  await expect(parent.locator('.briefing-title')).toHaveText('壁を立ててエクスプローラーを守る'); await expect(child.locator('.briefing-title')).toContainText('魚に触れて');
+  await expect(parent.locator('.briefing-title')).toHaveText('「!」の数が危険のサイン'); await expect(child.locator('.briefing-title')).toContainText('大きな魚を');
   // Leaving from nested settings must also dismiss the underlying ready dialog.
   await hold(parent, [15]); await hold(parent, [15]); await hold(parent, [15]); await activate(parent, '#ready-settings'); await activate(parent, '#maze-leave');
   await expect(parent.locator('#lobby')).toBeVisible(); await expect(parent.locator('#ready')).toBeHidden();

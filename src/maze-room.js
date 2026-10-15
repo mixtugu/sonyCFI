@@ -119,8 +119,9 @@ export class MazeRooms {
       partner: { connected: room.members.some(m => m !== member && m.socket?.readyState === 1), ready: room.members.some(m => m !== member && m.ready), tutorialComplete: room.members.some(m => m !== member && m.tutorialComplete), again: room.members.some(m => m !== member && m.again) }, reason: room.reason,
       game: { settings: g.settings, phase: g.phase, time: g.time, avatar: g.avatar, goal: parent || review ? g.goal : null,
         base: [...g.base], walls: [...g.walls], secrets: !parent || review ? [...g.secrets] : [],
-        // Both see a fish's size and, once met, the creature. Only the navigator sees risk and HP.
-        items: g.items.map(i => ({ cell: i.cell, taken: i.taken, size: i.size, ...(i.taken ? { creature: i.creature } : {}), ...(parent || review ? { risk: i.risk } : {}), ...(i.taken && parent ? { damage: i.damage } : {}) })),
+        // Both see a fish's size and, once met, the creature. Only the navigator sees the maximum
+        // risk and HP; a creature's own risk is shown only after it is met (or in the report).
+        items: g.items.map(i => ({ cell: i.cell, taken: i.taken, size: i.size, ...(i.taken ? { creature: i.creature } : {}), ...(parent || review ? { maxRisk: i.maxRisk } : {}), ...((i.taken && parent) || review ? { risk: i.risk } : {}), ...(i.taken && parent ? { damage: i.damage } : {}) })),
         hp: parent ? g.hp : null,
         collected: g.collected, moves: g.moves, trail: g.trail, logs: review ? g.logs : g.logs.filter(l => l.text.startsWith('壁を設置')).map(l => ({ time: l.time, text: 'ナビゲーターが壁を置きました。' })) } };
   }

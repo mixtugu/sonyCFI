@@ -57,3 +57,14 @@
 /* Ending: waits for the partner before the next game starts. */
 .ending-dialog .ending-wait{margin-top:14px;font-size:calc(15px * var(--text-scale,1));opacity:.85;animation:ending-wait 1.6s ease-in-out infinite alternate}
 @keyframes ending-wait{to{opacity:.45}}
+
+/* Walls left to place, as stones (from the wall-stock design); used ones fade out. */
+.wall-stock{padding:10px 12px}
+.wall-stock-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}.wall-stock-head b{font-size:calc(15px * var(--text-scale,1));color:#e8f0ff}.wall-stock-head span{font-variant-numeric:tabular-nums;color:#ffe2a8;font-weight:700}
+.wall-stock-icons{display:grid;grid-template-columns:repeat(auto-fill,minmax(22px,1fr));gap:3px}
+.wall-stock-icon{width:100%;aspect-ratio:1;display:block;transition:opacity .25s,filter .25s}.wall-stock-icon.is-used{opacity:.18;filter:grayscale(1)}
+.zukan-cell:not(.is-found) .stars{opacity:.55}
+
+/* Creature illustrations (transparent PNGs) keep their shape inside a steady 4:3 frame. */
+img.creature-art{display:block;aspect-ratio:4/3;object-fit:contain;-webkit-user-drag:none;user-select:none}
+.contact-hit img.creature-art{margin:0 auto;padding:8px;box-sizing:border-box}

@@ -2,29 +2,29 @@ import { drawMaze, resetMazeScene } from './maze-renderer.js';
 import { edge, DEFAULTS } from './maze.js';
 import { controllerDiagram, padIcon } from './controller-guide.js';
 
-// The pre-round briefing: three short steps per role, each a title, one line of description and one
+// The pre-round briefing: three short steps per role (the navigator's run danger → walls → time), each a title, one line of description and one
 // line of controls. The first steps carry a 5×4 practice board to try the controls on.
 const GUIDES = {
   parent: [
+    { title: '「!」の数が危険のサイン', symbol: '!', tag: 'RISK',
+      description: () => '「!」の数は、その魚から現れる生き物の最大の危険度です。実際の生き物はそれ以下の危険度で、触れるとその危険度に応じてエクスプローラーのHPが減ります。HPが見えるのはナビゲーターだけです。',
+      controls: () => '最大 <b class="risk-1">!</b> 低 · <b class="risk-2">!!</b> 中 · <b class="risk-3">!!!</b> 高' },
     { title: '壁を立ててエクスプローラーを守る', symbol: 'ナ', tag: 'NAVIGATOR',
       description: () => '矢印キーで壁の位置を選択。Tabで向きを選び、Spaceで壁を設置して、エクスプローラーが危ない魚へ進む道をふさぎます。',
       controls: () => '<kbd data-practice-key="Arrow">矢印キー</kbd>で位置を選択 · <kbd data-practice-key="Tab" role="button" tabindex="0">Tab</kbd> で向き · <kbd data-practice-key="Space" role="button" tabindex="0">Space</kbd> で設置' },
-    { title: '「!」の数が危険のサイン', symbol: '!', tag: 'RISK',
-      description: () => '魚の危険度は「!」の数で見えます。エクスプローラーが魚に触れると、危険度に応じてエクスプローラーのHPが減ります。HPが見えるのはナビゲーターだけです。',
-      controls: () => '<b class="risk-1">!</b> 低リスク · <b class="risk-2">!!</b> 中リスク · <b class="risk-3">!!!</b> 高リスク' },
     { title: '制限時間内にエクスプローラーを守る', symbol: 'O₂', tag: 'TIME LIMIT',
       description: s => `酸素ボンベの残量が制限時間（${s.duration}秒）です。危ない魚へ向かう道を壁でふさぎ、エクスプローラーのHPを守りましょう。`,
       controls: () => '残り時間は上の酸素ボンベで確認' },
   ],
   child: [
-    { title: '魚に触れて、図鑑に登録', symbol: 'エ', tag: 'EXPLORER',
-      description: () => '矢印キーでエクスプローラーが隣のマスへ1歩移動します。魚のシルエットに触れると正体の生き物が図鑑に登録されます。大きい魚ほどレアな生き物かも。',
+    { title: '大きな魚をつかまえよう', symbol: 'エ', tag: 'EXPLORER',
+      description: () => '矢印キーでエクスプローラーが隣のマスへ1歩移動します。魚に触れるとつかまえられます。大きい魚ほど、めずらしい生き物かも。',
       controls: () => '<kbd data-practice-key="Arrow">矢印キー</kbd>でエクスプローラーを操縦 · マスをタップしても移動' },
-    { title: '壁を避け、秘密の通路を通り抜ける', symbol: '↗', tag: 'SECRET PASSAGE',
-      description: () => 'ふつうの壁の先へは進めません。点線の「秘密の通路」はエクスプローラーだけが通り抜けできます。',
+    { title: '通り抜けられる壁（秘密の通路）を探そう', symbol: '↗', tag: 'SECRET PASSAGE',
+      description: () => 'ふつうの壁の先へは進めません。点線の壁は「秘密の通路」で、エクスプローラーだけが通り抜けられます。見つけて通ってみましょう。',
       controls: () => '<kbd data-practice-key="Arrow">矢印キー</kbd>でエクスプローラーを操縦 · マスをタップしても移動' },
-    { title: '酸素が尽きる前に探す', symbol: 'O₂', tag: 'TIME LIMIT',
-      description: s => `酸素ボンベが空になると探検終了です（${s.duration}秒）。残量を見ながら、制限時間内にできるだけ多くの生き物と出会い、図鑑を埋めましょう。`,
+    { title: '制限時間内にたくさんつかまえよう', symbol: 'O₂', tag: 'TIME LIMIT',
+      description: s => `酸素ボンベが空になると探検終了です（${s.duration}秒）。残量を見ながら、時間内にできるだけたくさんの魚をつかまえましょう。`,
       controls: () => '残り時間は上の酸素ボンベで確認' },
   ],
 };
@@ -74,7 +74,7 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
   const parent = () => role === 'parent';
   const steps = () => GUIDES[parent() ? 'parent' : 'child'];
   const last = () => step === steps().length - 1;
-  const cursorStep = () => parent() && step === 0;
+  const cursorStep = () => parent() && step === 1;
   const moveStep = () => !parent() && step < 2;
   const passageOpen = () => !parent() && step === 1;
   const fixed = () => new Set(passageOpen() ? PASSAGE_WALLS : FIXED_WALLS);
@@ -120,7 +120,7 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
     // Left stick moves; directional taps aim walls and horizontal holds navigate the briefing.
     if (controller && (cursorStep() || moveStep())) {
       if (cursorStep()) find('.briefing-description').textContent = '左スティックで位置を選び、上下左右の方向キーで壁の向きを決め、×で壁を設置して危ない魚への道をふさぎます。→ 長押しで次へ、← 長押しで戻ります。';
-      else if (step === 0) find('.briefing-description').textContent = '左スティックでエクスプローラーを隣のマスへ動かします。魚に触れると生き物が図鑑に登録されます。→ 長押しで次へ、← 長押しで戻ります。';
+      else if (step === 0) find('.briefing-description').textContent = '左スティックでエクスプローラーを隣のマスへ動かします。魚に触れるとつかまえられます。→ 長押しで次へ、← 長押しで戻ります。';
       controls.innerHTML = `<kbd data-practice-key="Arrow">${padIcon('left')} ${parent() ? '位置' : '移動'}</kbd>` + (parent() ? `<kbd data-practice-key="Tab">${padIcon('dpad')} 向き</kbd><kbd data-practice-key="Space">${padIcon('cross')} 設置</kbd>` : '点線は秘密の通路');
     }
     // The controller drawing lights up the buttons this step uses.
@@ -154,7 +154,7 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
   }
   // Share the round renderer, including its role-specific symbols and colors.
   function paint() {
-    const riskExample = parent() && step === 1;
+    const riskExample = parent() && step === 0;
     const avatar = practice.child.y * COLS + practice.child.x;
     const convertEdges = edges => new Set([...edges].map(value => {
       const [a, b] = value.split('|').map(point => {
@@ -176,15 +176,15 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
       base: convertEdges(fixed()), walls,
       secrets: passageOpen() ? convertEdges(practice.passages) : new Set(),
       items: [
-        { cell: 7, size: 'large', creature: 'shark', risk: 3, damage: 4, taken: riskExample || taken.has(7) },
-        { cell: 3, size: 'medium', creature: 'octopus', risk: 2, damage: 2, taken: taken.has(3) },
-        { cell: 13, size: 'small', creature: 'clownfish', risk: 1, damage: 0, taken: taken.has(13) },
+        { cell: 7, size: 'large', creature: 'shark', maxRisk: 3, risk: 3, damage: 4, taken: riskExample || taken.has(7) },
+        { cell: 3, size: 'medium', creature: 'octopus', maxRisk: 3, risk: 2, damage: 2, taken: taken.has(3) },
+        { cell: 13, size: 'small', creature: 'clownfish', maxRisk: 1, risk: 1, damage: 0, taken: taken.has(13) },
       ],
     }, role, practice.cursor.y * COLS + practice.cursor.x, (practice.direction + 3) % 4, { cursor: cursorStep(), resolution, markScale: .65 });
   }
   function drawBoard() {
     const interactive = cursorStep() || moveStep();
-    const riskExample = parent() && step === 1;
+    const riskExample = parent() && step === 0;
     paint();
     board.classList.toggle('is-visible', interactive);
     find('.briefing-example').textContent = interactive ? '練習' : '表示例';

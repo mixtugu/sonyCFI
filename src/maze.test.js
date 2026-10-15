@@ -12,6 +12,8 @@ test('seeded mazes are connected at every supported board size', () => {
     assert.deepEqual(s.items.map(i => i.size).sort(), [...SIZE_MIX].sort());
     // Each fish hides a creature of its own size, and its risk is that creature's.
     assert.ok(s.items.every(i => creature(i.creature).size === i.size && creature(i.creature).risk === i.risk));
+    // 「!」is the maximum risk: the creature is at that risk or below, and large fish are always「!!!」.
+    assert.ok(s.items.every(i => i.risk <= i.maxRisk && i.maxRisk <= 3 && (i.size !== 'large' || i.maxRisk === 3)));
     assert.ok(s.items.every(i => i.cell !== s.avatar && i.cell !== s.goal));
   }
 });
@@ -55,4 +57,11 @@ test('movement respects the configured interval and configuration is bounded', (
   const s = createMaze({ cols: 100, rows: -1, duration: NaN });
   assert.equal(s.settings.cols, 28); assert.equal(s.settings.rows, 8); assert.equal(s.settings.duration, DEFAULTS.duration);
   start(s); assert.ok(move(s, autoDirection(s))); assert.equal(move(s, autoDirection(s)), false);
+});
+test('a maximum risk only ever hides creatures at or below it', () => {
+  const random = rng(11);
+  for (let i = 0; i < 2000; i++) for (const size of ['small', 'medium']) {
+    const maxRisk = 1 + (i % 3), found = pickCreature(size, random, maxRisk);
+    assert.ok(found.size === size && found.risk <= maxRisk);
+  }
 });

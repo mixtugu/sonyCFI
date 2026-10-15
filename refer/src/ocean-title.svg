@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 270" fill="none">
+  <title>YOU SEE / I SEE</title>
+  <g fill="#fff" font-family="Noto Sans JP, sans-serif" font-size="78" font-weight="300" letter-spacing="1">
+    <text x="4" y="92">YOU SEE</text>
+    <text x="118" y="244">I SEE</text>
+  </g>
+  <path d="M18 190 C25 146 56 128 110 130 C224 135 300 153 404 105 C426 95 442 83 458 76" stroke="#fff" stroke-dasharray="10 13" stroke-linecap="round" stroke-width="4"/>
+  <circle cx="18" cy="190" r="9" stroke="#fff" stroke-width="3"/>
+  <circle cx="18" cy="190" r="3" fill="#fff"/>
+  <circle cx="458" cy="76" r="9" stroke="#fff" stroke-width="3"/>
+  <circle cx="458" cy="76" r="3" fill="#fff"/>
+</svg>

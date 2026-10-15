@@ -23,8 +23,14 @@ export const RISK_LABELS = { 1: '低リスク', 2: '中リスク', 3: '高リス
 export const SIZE_MIX = ['large', 'large', 'large', 'medium', 'medium', 'medium', 'medium', 'small', 'small', 'small', 'small', 'small'];
 // Rarer creatures turn up less often within their size.
 const WEIGHT = { 1: 6, 2: 4, 3: 3, 4: 2, 5: 1 };
-export function pickCreature(size, random) {
-  const pool = CREATURES.filter(c => c.size === size), total = pool.reduce((sum, c) => sum + WEIGHT[c.stars], 0);
+// The navigator's「!」is a fish's *maximum* risk: the creature behind it is drawn from its size's
+// pool at that risk or below. Large creatures are all high risk, so a large fish is always「!!!」.
+export function maxRiskFor(size, random) {
+  const lowest = Math.min(...CREATURES.filter(c => c.size === size).map(c => c.risk));
+  return lowest + Math.floor(random() * (4 - lowest));
+}
+export function pickCreature(size, random, maxRisk = 3) {
+  const pool = CREATURES.filter(c => c.size === size && c.risk <= maxRisk), total = pool.reduce((sum, c) => sum + WEIGHT[c.stars], 0);
   let roll = random() * total;
   for (const c of pool) if ((roll -= WEIGHT[c.stars]) < 0) return c;
   return pool.at(-1);

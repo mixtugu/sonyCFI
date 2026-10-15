@@ -1,4 +1,15 @@
+import explorerBodyUrl from './assets/explorer/body.png';
+import explorerFarFinUrl from './assets/explorer/fin-far.png';
+import explorerNearFinUrl from './assets/explorer/fin-near.png';
+
 // Shared, procedural ocean artwork. All coordinates are presentation-only.
+// The explorer illustration: a body and two fins drawn as separate layers so the fins can kick.
+const explorerParts = typeof Image === 'function' ? [explorerBodyUrl, explorerFarFinUrl, explorerNearFinUrl].map(url => {
+  const image = new Image();
+  image.addEventListener('error', () => console.error(`Explorer illustration failed to load: ${url}`));
+  image.src = url;
+  return image;
+}) : [];
 const TAU = Math.PI * 2;
 export const motionPreference = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
 export function disc(c, x, y, r, fill) {
@@ -132,55 +143,47 @@ export function causticTile(size = 192) {
   return caustics = canvas;
 }
 
-// Top-down scuba diver with contact shadow; `lift` scales the shadow offset (0 hides it).
-export function drawDiverHD(c, x, y, angle, time, speed = 0, scale = 1, lift = 1) {
+// Separate fins retain the swimming cadence without deforming the illustrated helmet.
+export function drawDiverHD(c, x, y, angle, time, speed = 0, scale = 1, lift = 1, kickPhase) {
   const t = motionPreference.matches ? 0 : time, swim = speed > .1;
-  const kick = Math.sin(t * (swim ? 11 : 2.2)), hover = Math.sin(t * 1.4), reach = Math.sin(t * (swim ? 6 : 1.3));
+  const kick = Math.sin(motionPreference.matches ? 0 : kickPhase ?? t * (swim ? 7 : 3.5)), hover = Math.sin(t * 1.4);
   if (lift) {
     c.save(); c.translate(x + 5 * scale * lift, y + 7 * scale * lift); c.rotate(angle); c.scale(scale, scale);
     const shade = c.createRadialGradient(-6, 0, 2, -6, 0, 24);
     shade.addColorStop(0, `rgba(14,48,63,${.24 - hover * .03})`); shade.addColorStop(1, 'rgba(14,48,63,0)');
     c.fillStyle = shade; c.beginPath(); c.ellipse(-6, 0, 26, 11, 0, 0, TAU); c.fill(); c.restore();
   }
-  c.save(); c.translate(x, y); c.rotate(angle); const s = scale * (1 + hover * .025); c.scale(s, s); c.globalAlpha = .84;
-  c.lineCap = 'round'; c.lineJoin = 'round';
-  const suit = c.createLinearGradient(0, -7.5, 0, 7.5); suit.addColorStop(0, '#fff2cd'); suit.addColorStop(.44, '#f0d3a1'); suit.addColorStop(1, '#c9946c');
-  c.fillStyle = suit; c.beginPath(); c.ellipse(1, 0, 9.7, 7.3, 0, 0, TAU); c.fill();
-  c.strokeStyle = 'rgba(35,81,105,.42)'; c.lineWidth = .7; c.stroke();
-  c.fillStyle = '#d6a271'; for (const side of [-1, 1]) { c.beginPath(); c.ellipse(4.6, side * 4.5, 3.6, 2.4, side * .25, 0, TAU); c.fill(); }
-  for (const side of [-1, 1]) {
-    const r = side * reach * 1.4, arm = new Path2D();
-    arm.moveTo(4.6, side * 5); arm.quadraticCurveTo(9, side * (8 + r), 13.6, side * (4.8 + r * .5));
-    c.strokeStyle = 'rgba(35,81,105,.42)'; c.lineWidth = 3.8; c.stroke(arm); c.strokeStyle = 'rgba(241,207,148,.78)'; c.lineWidth = 2.6; c.stroke(arm);
-    disc(c, 13.6, side * (4.8 + r * .5), 1.9, '#536a73');
+  if (!explorerParts.every(image => image.complete && image.naturalWidth > 0)) return;
+  c.save(); c.translate(x, y); c.rotate(angle);
+  if (swim && !motionPreference.matches) {
+    c.save(); c.scale(scale, scale); c.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 6; i++) {
+      const phase = (t * 2.2 + i / 6) % 1, side = i % 2 ? 1 : -1;
+      const bx = -17 - phase * 22, by = side * (5 + phase * 7);
+      c.strokeStyle = `rgba(170,239,255,${(1 - phase) * .5})`; c.lineWidth = .8;
+      c.beginPath(); c.ellipse(bx, by, 1 + phase * 2, .8 + phase, 0, 0, TAU); c.stroke();
+    }
+    for (const side of [-1, 1]) {
+      const phase = (t * 2.2 + (side + 1) / 4) % 1;
+      c.strokeStyle = `rgba(194,249,255,${Math.sin(phase * Math.PI) * .45})`; c.lineWidth = 1;
+      c.beginPath(); c.moveTo(-12 - phase * 12, side * 6);
+      c.quadraticCurveTo(-23 - phase * 12, side * 12, -34 - phase * 12, side * 9); c.stroke();
+    }
+    c.restore();
   }
-  c.fillStyle = '#486271'; c.beginPath(); c.roundRect(12.6, 3.3 + reach * .7, 5.2, 2.5, 1); c.fill(); disc(c, 17.9, 4.55 + reach * .7, 1.4, '#fff2c6');
-  const tank = c.createLinearGradient(-13, 0, -2, 0); tank.addColorStop(0, '#344f63'); tank.addColorStop(.22, '#7898a4'); tank.addColorStop(.46, '#d1dfd9'); tank.addColorStop(.7, '#91afb0'); tank.addColorStop(1, '#426576');
-  c.fillStyle = tank; c.beginPath(); c.roundRect(-12.5, -3.8, 9.5, 7.6, 3.8); c.fill(); c.strokeStyle = 'rgba(35,81,105,.4)'; c.lineWidth = .7; c.stroke();
-  c.fillStyle = '#ddc286'; c.fillRect(-10.2, -3.2, 1.35, 6.4); c.fillRect(-5.7, -3.2, 1.2, 6.4);
-  c.fillStyle = '#486775'; c.beginPath(); c.roundRect(-13.2, -2, 2, 4, 1); c.fill();
-  c.fillStyle = '#b9ccca'; c.beginPath(); c.roundRect(-3.6, -2.1, 2.6, 4.2, 1); c.fill(); c.strokeStyle = 'rgba(35,81,105,.5)'; c.lineWidth = .5; c.stroke();
-  c.strokeStyle = 'rgba(35,81,105,.44)'; c.lineWidth = 1.25; c.beginPath(); c.moveTo(-2.8, -2.5); c.quadraticCurveTo(1, -7, 6, -5); c.lineTo(8, -3.5); c.stroke();
-  for (const side of [-1, 1]) {
-    const k = kick * side * (swim ? 1 : .35);
-    c.save(); c.translate(-9, side * 3.8); c.rotate(side * .04 + k * .1);
-    c.strokeStyle = 'rgba(218,176,111,.78)'; c.lineWidth = 3; c.beginPath(); c.moveTo(4, -side * 1.1); c.lineTo(0, 0); c.stroke();
-    c.fillStyle = '#4a6572'; c.beginPath(); c.roundRect(-1.8, -1.7, 4.4, 3.4, 1.5); c.fill();
-    const fin = c.createLinearGradient(-8, 0, -1, 0); fin.addColorStop(0, '#294456'); fin.addColorStop(.7, '#496b7b'); fin.addColorStop(1, '#829fa7');
-    c.fillStyle = fin; c.beginPath(); c.moveTo(-1, -1.4); c.quadraticCurveTo(-4, -2.8, -6.2, -2.1); c.quadraticCurveTo(-8.5, 0, -6.2, 2.1); c.quadraticCurveTo(-4, 2.8, -1, 1.4); c.closePath(); c.fill();
-    c.strokeStyle = 'rgba(35,81,105,.36)'; c.lineWidth = .45; c.stroke();
-    c.strokeStyle = 'rgba(188,219,220,.5)'; c.lineWidth = .35; c.beginPath(); c.moveTo(-2.2, -.5); c.lineTo(-6.8, -.85); c.moveTo(-2.2, .5); c.lineTo(-6.8, .85); c.stroke(); c.restore();
-  }
-  const helmet = c.createRadialGradient(7, -6, 1, 10, 0, 10); helmet.addColorStop(0, '#fff5d7'); helmet.addColorStop(.45, '#f2dc9e'); helmet.addColorStop(1, '#c99358');
-  c.fillStyle = helmet; c.beginPath(); c.arc(10, 0, 7.3, 0, TAU); c.fill(); c.strokeStyle = 'rgba(123,91,55,.42)'; c.lineWidth = .75; c.stroke();
-  c.strokeStyle = 'rgba(239,216,166,.6)'; c.lineWidth = .6; c.beginPath(); c.arc(10, 0, 6.2, -.88, .88); c.stroke();
-  const visor = c.createLinearGradient(11, -4, 16, 4); visor.addColorStop(0, '#78b6b9'); visor.addColorStop(.46, '#456f7c'); visor.addColorStop(1, '#25495e');
-  c.fillStyle = visor; c.beginPath(); c.ellipse(13.1, 0, 3.25, 4.8, 0, -Math.PI / 2, Math.PI / 2); c.lineTo(13.1, -4.8); c.closePath(); c.fill();
-  c.strokeStyle = 'rgba(108,201,207,.62)'; c.lineWidth = .6; c.stroke();
-  c.fillStyle = 'rgba(233,255,251,.72)'; c.beginPath(); c.ellipse(13.1, -2, .75, 1.35, -.35, 0, TAU); c.fill();
-  c.fillStyle = '#fff0a0'; c.beginPath(); c.arc(17, 0, 1.5, 0, TAU); c.fill();
-  c.globalCompositeOperation = 'lighter'; c.strokeStyle = 'rgba(160,255,235,.2)'; c.lineWidth = 1;
-  c.beginPath(); c.ellipse(1, 0, 9, 6.7, 0, Math.PI * 1.1, Math.PI * 1.9); c.stroke();
+  const s = scale * (1 + hover * .025) * .37;
+  c.scale(s, s); c.rotate(Math.PI / 2);
+  c.translate(-39, -67);
+  const fin = (image, px, py, direction) => {
+    const stroke = kick * direction;
+    c.save(); c.translate(px, py + stroke * 7);
+    c.rotate(stroke * .32);
+    c.scale(1, 1 + stroke * .3);
+    c.drawImage(image, -px, -py); c.restore();
+  };
+  fin(explorerParts[1], 25, 103, -1);
+  c.drawImage(explorerParts[0], 0, 0);
+  fin(explorerParts[2], 46, 107, 1);
   c.restore();
 }
 

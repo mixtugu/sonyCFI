@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <defs>
+    <linearGradient id="stone" x2=".3" y2="1">
+      <stop stop-color="#b1ccce"/><stop offset=".4" stop-color="#668d9c"/><stop offset="1" stop-color="#29485f"/>
+    </linearGradient>
+    <linearGradient id="side" x2="1" y2="1">
+      <stop stop-color="#456a7c"/><stop offset="1" stop-color="#152f46"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="25" cy="43" rx="21" ry="4" fill="#031b2b" opacity=".5"/>
+  <path d="M4 13 13 6 45 6 36 13Z" fill="#b5d0d2"/>
+  <path d="M36 13 45 6 45 35 36 43Z" fill="url(#side)" stroke="#203e53"/>
+  <path d="M4 13H36V43H4Z" fill="url(#stone)" stroke="#284c61" stroke-width="1.5"/>
+  <path d="M5 23H36M5 33H36M20 13V23M12 23V33M28 23V33M20 33V42" fill="none" stroke="#244457" stroke-width="2"/>
+  <path d="M6 15H34M6 25H34M6 35H34" fill="none" stroke="#c7e5de" stroke-opacity=".5" stroke-width="1"/>
+  <path d="M7 17H16M23 17H30M15 27H23M7 37H14" stroke="#daeee2" stroke-opacity=".25" stroke-linecap="round"/>
+  <path d="M5 13 13 7H43" fill="none" stroke="#e2eee3" stroke-opacity=".65"/>
+</svg>

@@ -1,6 +1,6 @@
 export const DEFAULTS = Object.freeze({ cols: 14, rows: 10, duration: 30, wallLimit: 12, moveMs: 500 });
 export const LIMITS = { cols: [10, 28], rows: [8, 18], duration: [5, 120], wallLimit: [0, 30], moveMs: [100, 1200] };
-import { HP_MAX, SIZE_MIX, applyDamage, pickCreature, rollDamage } from './creatures.js';
+import { HP_MAX, SIZE_MIX, applyDamage, maxRiskFor, pickCreature, rollDamage } from './creatures.js';
 
 export const DIRS = [[1, 0], [0, 1], [-1, 0], [0, -1]];
 export const edge = (a, b) => a < b ? `${a}:${b}` : `${b}:${a}`;
@@ -46,9 +46,9 @@ export function createMaze(settings = {}, seed = 260830) {
     for (let y = Math.floor(zy * config.rows / 3); y < Math.floor((zy + 1) * config.rows / 3); y++)
       for (let x = Math.floor(zx * config.cols / 4); x < Math.floor((zx + 1) * config.cols / 4); x++) { const n = y * config.cols + x; if (n !== s.goal && x + (config.rows - 1 - y) > 2) cells.push(n); }
     const cell = cells[Math.floor(random() * cells.length)];
-    // The creature is drawn when the maze is made, so the navigator's「!」shows its real risk.
-    const found = pickCreature(sizes[i], random);
-    s.items.push({ cell, size: sizes[i], creature: found.id, risk: found.risk, taken: false });
+    // The navigator sees maxRisk; the creature (and its own risk, which sets the damage) stays hidden.
+    const maxRisk = maxRiskFor(sizes[i], random), found = pickCreature(sizes[i], random, maxRisk);
+    s.items.push({ cell, size: sizes[i], maxRisk, creature: found.id, risk: found.risk, taken: false });
   }
   s.trail.push(s.avatar);
   return s;

@@ -58,7 +58,7 @@ try {
   assert.equal(await child.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   for (const page of [parent, child]) { await page.locator('#close-result').click(); await expect(page.locator('#ending')).toBeVisible(); }
   for (const page of [parent, child]) { await page.locator('#ending-finish').click(); await expect(page.locator('#ready')).toBeVisible({ timeout: 8000 }); }
-  await expect(parent.locator('.briefing-title')).toHaveText('壁を立ててエクスプローラーを守る'); await expect(child.locator('.briefing-title')).toHaveText('魚に触れて、図鑑に登録');
+  await expect(parent.locator('.briefing-title')).toHaveText('「!」の数が危険のサイン'); await expect(child.locator('.briefing-title')).toHaveText('大きな魚をつかまえよう');
   assert.equal(await parent.evaluate(() => window.packet.tutorialComplete), false);
   await parent.locator('#ready-settings').click();
   await parent.locator('#maze-leave').click();
