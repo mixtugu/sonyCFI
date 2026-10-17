@@ -1,5 +1,6 @@
-export const DEFAULTS = Object.freeze({ cols: 14, rows: 10, duration: 30, wallLimit: 12, moveMs: 500 });
+export const DEFAULTS = Object.freeze({ cols: 14, rows: 10, duration: 30, wallLimit: 8, moveMs: 500 });
 export const LIMITS = { cols: [10, 28], rows: [8, 18], duration: [5, 120], wallLimit: [0, 30], moveMs: [100, 1200] };
+export const WALL_DAMAGE = 2;
 import { HP_MAX, SIZE_MIX, applyDamage, maxRiskFor, pickCreature, rollDamage } from './creatures.js';
 
 export const DIRS = [[1, 0], [0, 1], [-1, 0], [0, -1]];
@@ -29,16 +30,24 @@ export function createMaze(settings = {}, seed = 260830) {
   for (let a = 0; a < count; a++) for (const b of neighbors(s, a)) s.base.add(edge(a, b));
   const seen = new Set([s.avatar]), stack = [s.avatar];
   while (stack.length) {
-    const a = stack.at(-1), options = neighbors(s, a).filter(n => !seen.has(n));
+    const a = stack.at(-1), options = neighbors(s, a).filter(n => n !== s.goal && !seen.has(n));
     if (!options.length) { stack.pop(); continue; }
     const b = options[Math.floor(random() * options.length)];
     s.base.delete(edge(a, b)); seen.add(b); stack.push(b);
   }
+  // Attach the top-right cell only after the other cells are connected, so fish never require it.
+  const goalNeighbors = neighbors(s, s.goal);
+  s.base.delete(edge(s.goal, goalNeighbors[Math.floor(random() * goalNeighbors.length)]));
   // A few loops offer choices without losing the character of a carved maze.
   const closed = [...s.base];
   for (let i = 0; i < Math.floor(count / 32); i++) s.base.delete(closed.splice(Math.floor(random() * closed.length), 1)[0]);
   const sizes = [...SIZE_MIX];
   for (let i = sizes.length - 1; i > 0; i--) { const j = Math.floor(random() * (i + 1)); [sizes[i], sizes[j]] = [sizes[j], sizes[i]]; }
+  if (sizes[3] !== 'large') {
+    const largeZones = sizes.map((size, i) => size === 'large' ? i : -1).filter(i => i >= 0);
+    const zone = largeZones[Math.floor(random() * largeZones.length)];
+    [sizes[3], sizes[zone]] = [sizes[zone], sizes[3]];
+  }
   // One fish per zone of a 4×3 grid keeps them spread evenly, so no item is far from the next;
   // none sits within two steps of the start, where the child would grab it instantly.
   for (let i = 0; i < 12; i++) {
@@ -70,7 +79,8 @@ export function placeWall(s, cell, dir) {
     s.secrets.add(options[Math.floor(s.random() * options.length)]);
     area = reachable(s);
   }
-  log(s, '壁を設置');
+  s.hp = applyDamage(s.hp, WALL_DAMAGE);
+  log(s, `壁を設置 · HP −${WALL_DAMAGE}`);
   return true;
 }
 export function move(s, dir) {

@@ -208,40 +208,37 @@ function paintReef(s, role, cols, rows, segment, res) {
 }
 
 // One glowing fish silhouette in three sizes; the size hints at how rare the creature may be.
-const FISH_SCALE = { small: 1.15, medium: 1.6, large: 2.15 };
+const FISH_SCALE = { small: 1, medium: 1.4, large: 1.8 };
 // Width of a met creature's picture on its cell, by the fish's size (a cell is 36 units).
 const CREATURE_WIDTH = { small: 28, medium: 33, large: 38 };
+const RISK_MARK_COLORS = { 1: '#7cff9b', 2: '#ffe45c', 3: '#ff5b55' };
 const fishPath = (() => {
   const p = new Path2D();
-  p.moveTo(7, 0); p.bezierCurveTo(5, -5.4, -3, -5.4, -5, 0); p.bezierCurveTo(-3, 5.4, 5, 5.4, 7, 0);
-  p.moveTo(-4.2, 0); p.lineTo(-8.6, -3.6); p.quadraticCurveTo(-7.2, 0, -8.6, 3.6); p.closePath();
+  p.moveTo(-4.5, -1.2);
+  p.bezierCurveTo(-1, -5, 3.3, -3.4, 5, 0);
+  p.bezierCurveTo(3.3, 3.4, -1, 5, -4.5, 1.2);
+  p.quadraticCurveTo(-8.6, 4.5, -6.8, 0);
+  p.quadraticCurveTo(-8.6, -4.5, -4.5, -1.2);
+  p.closePath();
   return p;
 })();
-// Navigator risk marks: one to three「!」, yellow → orange → red.
-const RISK_COLORS = { 1: '#ffd84a', 2: '#ffa23a', 3: '#ff5b3f' };
-function drawFishIcon(c, x, y, size, light = 1, alpha = 1) {
+export function drawFishIcon(c, x, y, size, light = 1, alpha = 1, risk = 0, markScale = 1) {
   const scale = FISH_SCALE[size] || 1;
-  c.save(); c.translate(x, y); c.scale(scale, scale); c.globalAlpha = alpha;
-  // Glow from wide translucent strokes rather than shadowBlur, which does not repaint identically.
-  c.lineJoin = 'round';
-  for (const [width, a] of [[4.2, .1], [2.6, .18]]) { c.strokeStyle = `rgba(110,200,255,${a * light})`; c.lineWidth = width; c.stroke(fishPath); }
-  c.fillStyle = `rgba(120,200,255,${.28 + .14 * light})`; c.fill(fishPath);
-  c.strokeStyle = `rgba(205,240,255,${.75 + .25 * light})`; c.lineWidth = 1.15 / scale + .35; c.lineJoin = 'round'; c.stroke(fishPath);
-  disc(c, 3.6, -1, .75, `rgba(225,248,255,${.8 * light})`);
-  c.restore();
-}
-// Marks are drawn together, grouped by fish size, because assigning ctx.font (a string the canvas
-// has to parse) is the costliest step; fish sit in separate cells, so the order is not visible.
-function drawRiskMarks(c, marks, markScale = 1) {
-  c.save(); c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineJoin = 'round';
-  let font = '';
-  for (const { x, y, size, risk, light } of marks.sort((a, b) => (FISH_SCALE[a.size] || 1) - (FISH_SCALE[b.size] || 1))) {
-    const scale = FISH_SCALE[size] || 1, text = '!'.repeat(risk), next = `900 ${Math.round((9 + 3.2 * scale) * markScale)}px sans-serif`;
-    if (next !== font) { c.font = font = next; }
-    c.globalAlpha = .35 * light; c.lineWidth = 7 * markScale; c.strokeStyle = RISK_COLORS[risk]; c.strokeText(text, x + .5 * scale, y + .5);
-    c.globalAlpha = 1; c.lineWidth = 3 * markScale; c.strokeStyle = 'rgba(10,24,48,.85)'; c.strokeText(text, x + .5 * scale, y + .5);
-    c.fillStyle = RISK_COLORS[risk]; c.fillText(text, x + .5 * scale, y + .5);
+  c.save(); c.translate(x, y); c.scale(scale * 1.15, scale * 1.1); c.globalAlpha = alpha;
+  if (risk) {
+    const markScaleY = scale * 1.1;
+    const glow = risk - 1;
+    c.save();
+    c.globalAlpha *= Math.min(1, (.05 + .75 * light) * (1 + .25 * glow));
+    c.font = `900 ${(12 + 2 * glow) / markScaleY * markScale}px sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillStyle = RISK_MARK_COLORS[risk]; c.shadowColor = RISK_MARK_COLORS[risk]; c.shadowBlur = (4 + 2.5 * glow) * markScale;
+    c.save(); c.translate(-.3, .2); c.scale(1, 1.5); c.fillText('!'.repeat(risk), 0, 0); c.restore();
+    c.restore();
   }
+  c.fillStyle = 'rgba(67,177,235,.12)'; c.fill(fishPath);
+  c.lineJoin = 'round'; c.strokeStyle = '#62d8ff'; c.shadowColor = '#39bfff'; c.shadowBlur = 7 * scale;
+  c.lineWidth = 1.4; c.stroke(fishPath);
+  c.shadowBlur = 0; c.strokeStyle = '#d4f8ff'; c.lineWidth = .55; c.stroke(fishPath);
   c.restore();
 }
 
@@ -412,6 +409,48 @@ export function drawMaze(canvas, s, role, cursor, direction, options = {}) {
     c.setLineDash([1, 7]); c.lineDashOffset = -amb * 6; c.strokeStyle = 'rgba(220,255,245,.45)'; c.lineWidth = 1.2; c.stroke(trail);
     c.restore();
   }
+  if (options.guideRoute?.length > 1) {
+    c.save(); c.strokeStyle = '#ffe45c'; c.lineWidth = 7; c.lineJoin = c.lineCap = 'round';
+    const route = new Path2D();
+    let length = 0;
+    options.guideRoute.forEach((cell, i) => {
+      const [x, y] = center(cell);
+      if (i === 0) route.moveTo(x, y);
+      else {
+        const [px, py] = center(options.guideRoute[i - 1]);
+        length += Math.hypot(x - px, y - py); route.lineTo(x, y);
+      }
+    });
+    c.stroke(route);
+    const glowLength = 180, peak = (now % 8) / 8 * (length + glowLength) - glowLength / 2;
+    if (animate) {
+      c.save(); c.shadowColor = '#fff16a'; c.shadowBlur = 14; c.lineWidth = 8;
+      let distance = 0;
+      for (let i = 1; i < options.guideRoute.length; i++) {
+        const [ax, ay] = center(options.guideRoute[i - 1]), [bx, by] = center(options.guideRoute[i]);
+        const segmentLength = Math.hypot(bx - ax, by - ay), gradient = c.createLinearGradient(ax, ay, bx, by);
+        for (let stop = 0; stop <= 12; stop++) {
+          const fraction = stop / 12, offset = Math.abs(distance + segmentLength * fraction - peak) / (glowLength / 2);
+          const alpha = offset < 1 ? (1 + Math.cos(offset * Math.PI)) / 2 : 0;
+          gradient.addColorStop(fraction, `rgba(255,255,235,${alpha})`);
+        }
+        c.strokeStyle = gradient; c.beginPath(); c.moveTo(ax, ay); c.lineTo(bx, by); c.stroke();
+        distance += segmentLength;
+      }
+      c.restore();
+    }
+    const [x, y] = center(options.guideRoute.at(-1)), [px, py] = center(options.guideRoute.at(-2));
+    c.translate(x, y); c.rotate(Math.atan2(y - py, x - px));
+    c.fillStyle = '#ffe45c'; c.beginPath(); c.moveTo(8, 0); c.lineTo(-7, -10); c.lineTo(-7, 10); c.closePath(); c.fill();
+    if (animate) {
+      const offset = Math.abs(length - peak) / (glowLength / 2);
+      if (offset < 1) {
+        c.fillStyle = `rgba(255,255,235,${(1 + Math.cos(offset * Math.PI)) / 2})`;
+        c.shadowColor = '#fff16a'; c.shadowBlur = 14; c.fill();
+      }
+    }
+    c.restore();
+  }
   drawKelp(c, cols, rows, amb, variant);
   drawAnchor(c, ...center((rows - 1) * cols));
   const hpLabels = [];
@@ -430,17 +469,10 @@ export function drawMaze(canvas, s, role, cursor, direction, options = {}) {
       if (role === 'parent' && Number.isFinite(item.damage)) hpLabels.push([x, picture ? y + 11 : y, item.damage]);
     }
   }
-  if (hpLabels.length) {
-    c.save(); c.font = `800 ${11 * textScale}px sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineWidth = 3;
-    for (const [x, y, damage] of hpLabels) {
-      const text = damage > 0 ? `♥−${damage}` : damage < 0 ? `♥+${-damage}` : '♥±0';
-      c.strokeStyle = 'rgba(10,24,48,.85)'; c.strokeText(text, x, y); c.fillStyle = damage > 0 ? '#ff9d8a' : '#9ff0c8'; c.fillText(text, x, y);
-    }
-    c.restore();
-  }
   c.drawImage(v.wallsLayer.canvas, -pad, -pad, width, height);
   for (const e of s.walls) {
     const [a, b] = e.split(':').map(Number), coords = segment(a, b);
+    if (role === 'parent' && Number.isFinite(options.wallDamage)) hpLabels.push([(coords[0] + coords[2]) / 2, (coords[1] + coords[3]) / 2 + 11, options.wallDamage]);
     if (!v.walls.has(e)) {
       v.walls.add(e);
       if (animate) { v.births.set(e, t); v.events.push({ x: (coords[0] + coords[2]) / 2, y: (coords[1] + coords[3]) / 2, at: t, color: '#ffb797', radius: 26 }); v.puffs.push({ x: (coords[0] + coords[2]) / 2, y: (coords[1] + coords[3]) / 2, at: t, n: 12, spread: 20, line: coords }); }
@@ -506,18 +538,13 @@ export function drawMaze(canvas, s, role, cursor, direction, options = {}) {
   c.restore();
 
   c.save(); c.translate(pad, pad);
-  // Fish sit above the fog so neither player loses track of them. Their light rises and falls
-  // slowly (faster for「!!!」), so a risk mark is hard to overlook.
-  const marks = [];
+  // Fish sit above the fog so neither player loses track of them.
   for (const item of s.items) {
     if (item.taken) continue;
     const [x, y] = center(item.cell), risk = role === 'parent' ? item.maxRisk ?? item.risk : 0;
-    const light = .6 + .4 * (.5 + .5 * Math.sin(amb * (risk === 3 ? 3.4 : 1.6) + item.cell * 1.3));
-    drawFishIcon(c, x, y, item.size, light);
-    if (risk) marks.push({ x, y, size: item.size, risk, light });
+    const light = .4 + .6 * (.5 + .5 * Math.sin(amb * (risk === 3 ? 3.4 : 1.6) + item.cell * 1.3));
+    drawFishIcon(c, x, y, item.size, light, 1, risk, options.markScale || 1);
   }
-  // Callers that show the board enlarged (the tutorial) can shrink the「!」marks to match.
-  if (marks.length) drawRiskMarks(c, marks, options.markScale || 1);
   if (role === 'parent') {
     // The exit is a column of daylight from an opening in the surface.
     const [x, y] = center(s.goal), sway = Math.sin(amb * 1.3) * .06;
@@ -616,6 +643,20 @@ export function drawMaze(canvas, s, role, cursor, direction, options = {}) {
 
   const vignette = c.createRadialGradient(width / 2, height / 2, Math.min(width, height) * .35, width / 2, height / 2, Math.max(width, height) * .72);
   vignette.addColorStop(0, 'rgba(0,6,14,0)'); vignette.addColorStop(1, 'rgba(0,6,14,.45)'); c.fillStyle = vignette; c.fillRect(0, 0, width, height);
+  if (hpLabels.length) {
+    c.save(); c.translate(pad, pad); c.font = `800 ${11 * textScale}px sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineJoin = 'round';
+    for (const [x, y, damage] of hpLabels) {
+      const text = damage > 0 ? `♥−${damage}` : damage < 0 ? `♥+${-damage}` : '♥±0';
+      const hurt = damage > 0, top = hurt ? '#ffd0a0' : '#d7ffed', bottom = hurt ? '#ff806f' : '#75d9ac';
+      c.save(); c.shadowColor = hurt ? 'rgba(255,100,85,.65)' : 'rgba(90,235,175,.65)'; c.shadowBlur = 7;
+      c.strokeStyle = hurt ? '#762b37' : '#155044'; c.lineWidth = 4;
+      for (const offset of [3, 2, 1]) c.strokeText(text, x + offset * .45, y + offset * .6);
+      const fill = c.createLinearGradient(0, y - 7, 0, y + 7);
+      fill.addColorStop(0, top); fill.addColorStop(.48, hurt ? '#ffac86' : '#aaffd2'); fill.addColorStop(1, bottom);
+      c.fillStyle = fill; c.fillText(text, x, y); c.restore();
+    }
+    c.restore();
+  }
 }
 export function pointerCell(canvas, s, event) {
   const rect = canvas.getBoundingClientRect();

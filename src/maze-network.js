@@ -3,7 +3,7 @@ export function connectMaze({ settings, onState, onLeave, notice }) {
   // which stays reachable while the game fills the screen.
   // Roles are fixed at the start: the host is the parent, the guest the child. They swap every round.
   const lobbyMarkup = `<p id="net-status" role="status">接続中…</p><div id="net-lobby"><form id="maze-create"><button class="primary wide" disabled>部屋をつくる（ナビゲーターではじめる）</button></form><form id="maze-join"><input name="code" aria-label="迷路の部屋コード" value="A" maxlength="1" minlength="1" pattern="A" readonly required><button class="secondary" disabled>参加</button></form></div>`;
-  const roomMarkup = `<div id="net-room" hidden><p><strong id="maze-code"></strong> <b id="maze-role"></b> <span id="maze-partner"></span></p><div class="invite-row"><button id="maze-leave" class="text-button">退出</button></div></div>`;
+  const roomMarkup = `<div id="net-room" hidden><p><strong id="maze-code"></strong> <b id="maze-role"></b> <span id="maze-partner"></span></p><div class="invite-row"><button type="button" id="maze-leave" class="secondary home-icon-button" aria-label="退出" title="退出"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M10 4H4v16h6M14 8l4 4-4 4M8 12h12"/></svg><span>退出</span></button></div></div>`;
   const lobbyMount = document.getElementById('net-lobby-mount'), roomMount = document.getElementById('net-room-mount');
   if (lobbyMount && roomMount) { lobbyMount.innerHTML = lobbyMarkup; roomMount.innerHTML = roomMarkup; }
   else document.querySelector('.toolbar').insertAdjacentHTML('beforebegin', `<section class="multiplayer">${lobbyMarkup}${roomMarkup}</section>`);
@@ -16,7 +16,7 @@ export function connectMaze({ settings, onState, onLeave, notice }) {
   if (ticket && ticket.code !== 'A') { ticket = null; try { sessionStorage.removeItem('maze-session'); } catch {} }
   if (ticket && invited && ticket.code !== invited.toUpperCase()) ticket = null;
   function persist() { try { if (ticket) sessionStorage.setItem('maze-session', JSON.stringify(ticket)); else sessionStorage.removeItem('maze-session'); } catch {} }
-  function connection() { $('net-status').textContent = client.connected ? client.active ? '接続済み' : '二人で遊ぶ' : stopped ? '別の画面で接続されました。再読み込みしてください。' : '接続中…'; document.querySelectorAll('#net-lobby button').forEach(b => b.disabled = !client.connected); }
+  function connection() { $('net-status').textContent = client.connected ? client.active ? '接続済み' : '' : stopped ? '別の画面で接続されました。再読み込みしてください。' : '接続中…'; $('net-status').hidden = client.connected && !client.active; document.querySelectorAll('#net-lobby button').forEach(b => b.disabled = !client.connected); }
   function connect() {
     clearTimeout(retry);
     const previous = socket;

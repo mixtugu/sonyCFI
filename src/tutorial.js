@@ -1,31 +1,34 @@
 import { drawMaze, resetMazeScene } from './maze-renderer.js';
-import { edge, DEFAULTS } from './maze.js';
+import { edge, DEFAULTS, WALL_DAMAGE } from './maze.js';
+import { HP_MAX, applyDamage, creature } from './creatures.js';
+import { hearts, zukan } from './encyclopedia-ui.js';
 import { controllerDiagram, padIcon } from './controller-guide.js';
+import oceanTitle from './assets/you-see-i-see.png';
 
 // The pre-round briefing: three short steps per role (the navigator's run danger → walls → time), each a title, one line of description and one
 // line of controls. The first steps carry a 5×4 practice board to try the controls on.
 const GUIDES = {
   parent: [
-    { title: '「!」の数が危険のサイン', symbol: '!', tag: 'RISK',
-      description: () => '「!」の数は、その魚から現れる生き物の最大の危険度です。実際の生き物はそれ以下の危険度で、触れるとその危険度に応じてエクスプローラーのHPが減ります。HPが見えるのはナビゲーターだけです。',
-      controls: () => '最大 <b class="risk-1">!</b> 低 · <b class="risk-2">!!</b> 中 · <b class="risk-3">!!!</b> 高' },
-    { title: '壁を立ててエクスプローラーを守る', symbol: 'ナ', tag: 'NAVIGATOR',
-      description: () => '矢印キーで壁の位置を選択。Tabで向きを選び、Spaceで壁を設置して、エクスプローラーが危ない魚へ進む道をふさぎます。',
+    { title: '海の中には危険がたくさん', symbol: '!', tag: 'RISK',
+      description: () => 'エクスプローラーが自由に海を探索しているよ。\n魚に会うと💛が減っちゃうんだって。\n！が多いほど💛が多く減る可能性が高いみたい…',
+      controls: () => '' },
+    { title: 'エクスプローラーを守ろう', symbol: 'ナ', tag: 'NAVIGATOR',
+      description: () => `ナビゲーターは壁を立てられるよ。\n壁でエクスプローラーを危険な魚から守ってあげよう。\nでも、壁を立てると💛が${WALL_DAMAGE}つ減っちゃうみたい…`,
       controls: () => '<kbd data-practice-key="Arrow">矢印キー</kbd>で位置を選択 · <kbd data-practice-key="Tab" role="button" tabindex="0">Tab</kbd> で向き · <kbd data-practice-key="Space" role="button" tabindex="0">Space</kbd> で設置' },
-    { title: '制限時間内にエクスプローラーを守る', symbol: 'O₂', tag: 'TIME LIMIT',
-      description: s => `酸素ボンベの残量が制限時間（${s.duration}秒）です。危ない魚へ向かう道を壁でふさぎ、エクスプローラーのHPを守りましょう。`,
-      controls: () => '残り時間は上の酸素ボンベで確認' },
+    { title: '時間内にゴールを目指そう', symbol: 'O₂', tag: 'TIME LIMIT',
+      description: () => '制限時間は30秒だよ。\n💛がゼロにならないように壁を立てて守りながら、\nエクスプローラーを画面右上のゴールに導こう。',
+      controls: () => '' },
   ],
   child: [
-    { title: '大きな魚をつかまえよう', symbol: 'エ', tag: 'EXPLORER',
-      description: () => '矢印キーでエクスプローラーが隣のマスへ1歩移動します。魚に触れるとつかまえられます。大きい魚ほど、めずらしい生き物かも。',
+    { title: '魚探しに出かけよう', symbol: 'エ', tag: 'EXPLORER',
+      description: () => 'ジョイスティックの向きに合わせて\nエクスプローラーを動かせるよ。\n大きい魚ほど、レアな生き物に出会えるかも…！',
       controls: () => '<kbd data-practice-key="Arrow">矢印キー</kbd>でエクスプローラーを操縦 · マスをタップしても移動' },
-    { title: '通り抜けられる壁（秘密の通路）を探そう', symbol: '↗', tag: 'SECRET PASSAGE',
-      description: () => 'ふつうの壁の先へは進めません。点線の壁は「秘密の通路」で、エクスプローラーだけが通り抜けられます。見つけて通ってみましょう。',
+    { title: '新しい道を冒険しよう', symbol: '↗', tag: 'SECRET PASSAGE',
+      description: () => '途中で壁が現れて進むのをじゃましてくるよ。\nでも、大丈夫。代わりに新しい道が出来るみたい！',
       controls: () => '<kbd data-practice-key="Arrow">矢印キー</kbd>でエクスプローラーを操縦 · マスをタップしても移動' },
-    { title: '制限時間内にたくさんつかまえよう', symbol: 'O₂', tag: 'TIME LIMIT',
-      description: s => `酸素ボンベが空になると探検終了です（${s.duration}秒）。残量を見ながら、時間内にできるだけたくさんの魚をつかまえましょう。`,
-      controls: () => '残り時間は上の酸素ボンベで確認' },
+    { title: '時間内に魚をたくさん集めよう', symbol: 'O₂', tag: 'TIME LIMIT',
+      description: () => '制限時間は30秒だよ。\n出会った魚は図鑑に登録されるよ。\nできるだけレアな魚を集めよう！',
+      controls: () => '' },
   ],
 };
 // Compass order, as on the practice board: north, east, south, west.
@@ -38,36 +41,71 @@ const COLS = 5, ROWS = 4;
 const edgeKey = (ax, ay, bx, by) => { const a = `${ax},${ay}`, b = `${bx},${by}`; return a < b ? `${a}|${b}` : `${b}|${a}`; };
 const inBounds = (x, y) => x >= 0 && y >= 0 && x < COLS && y < ROWS;
 const coordinate = (x, y) => `${String.fromCharCode(65 + x)}-${String(ROWS - y).padStart(2, '0')}`;
-const FIXED_WALLS = [edgeKey(1, 1, 2, 1), edgeKey(3, 1, 3, 2)];
-// The secret-passage step splits the board with a wall whose only gap is the passage, so every
-// fish lies beyond it and the explorer has to go through.
-const PASSAGE_WALLS = [0, 1, 2, 3].map(y => edgeKey(1, y, 2, y)).concat(edgeKey(3, 1, 3, 2));
-const PASSAGES = [edgeKey(1, 1, 2, 1)];
 const BOARD_WIDTH = COLS * 36 + 28;
+const DEMO_ROUTE = [15, 10, 5, 0, 1, 6, 7, 2, 3, 8, 13, 14, 9, 4];
+const EXPLORER_ROUTE = DEMO_ROUTE.slice(0, DEMO_ROUTE.indexOf(14) + 1);
+const EXPLORER_DETOUR = [...DEMO_ROUTE.slice(0, DEMO_ROUTE.indexOf(2) + 1), 7, 12, 17, 18];
+const DEMO_FISH = [
+  { cell: 7, size: 'small', creature: 'clownfish', maxRisk: 1, risk: 1, damage: 1 },
+  { cell: 3, size: 'medium', creature: 'octopus', maxRisk: 2, risk: 2, damage: 2 },
+  { cell: 13, size: 'large', creature: 'shark', maxRisk: 3, risk: 3, damage: 4 },
+  { cell: 17, size: 'medium', creature: 'octopus', maxRisk: 2, risk: 2, damage: 2 },
+];
+const DEMO_STEPS = [];
+let arrival = 1;
+for (const cell of DEMO_ROUTE) {
+  DEMO_STEPS.push({ cell, at: arrival });
+  arrival += .7 + (DEMO_FISH.some(fish => fish.cell === cell) ? 1.6 : 0);
+}
+const DEMO_DURATION = DEMO_STEPS.at(-1).at + 3;
+const DEMO_WALLS = new Set();
+for (let cell = 0; cell < COLS * ROWS; cell++) for (const next of [cell % COLS < COLS - 1 ? cell + 1 : -1, cell + COLS < COLS * ROWS ? cell + COLS : -1]) {
+  if (next >= 0 && !DEMO_ROUTE.some((point, i) => i > 0 && edge(DEMO_ROUTE[i - 1], point) === edge(cell, next))) DEMO_WALLS.add(edge(cell, next));
+}
+// Branches connect the remaining cells without creating a shortcut past the fish.
+for (const [a, b] of [[10, 11], [11, 12], [12, 17], [17, 16], [17, 18], [18, 19]]) DEMO_WALLS.delete(edge(a, b));
+DEMO_WALLS.delete(edge(14, 19));
 
 export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
   container.innerHTML = `
-<div class="briefing-top"><span class="briefing-kicker"></span><button type="button" class="secondary briefing-close">閉じる <kbd>Esc</kbd></button></div>
+<div class="briefing-top"><span class="briefing-kicker"></span><span class="briefing-practice-notice" hidden>実際に操作してみてね</span><img class="briefing-logo" src="${oceanTitle}" alt="YOU SEE / I SEE"></div>
 <div class="briefing-progress" aria-label="チュートリアル進行状況"><span></span><span></span><span></span></div>
 <div class="briefing-layout">
 <div class="briefing-art" tabindex="-1">
 <div class="briefing-art-heading"><span class="briefing-art-tag"></span><span class="briefing-example">練習</span></div>
-<div class="briefing-maze"><canvas class="briefing-canvas" aria-hidden="true"></canvas><div class="briefing-board" role="grid" aria-label="練習用の迷路"></div></div>
+<div class="briefing-maze"><canvas class="briefing-canvas" aria-hidden="true"></canvas><div class="briefing-board" role="grid" aria-label="練習用の迷路"></div><div class="briefing-wall-bubble" hidden>壁が現れた！</div></div>
+<div class="briefing-hp hp-panel" hidden><span class="hp-label">HP</span><div class="hp-hearts" role="meter" aria-label="エクスプローラーのHP" aria-valuemin="1" aria-valuemax="${HP_MAX}"></div><strong class="briefing-hp-value"></strong></div>
 <div class="briefing-oxygen oxygen" hidden><span class="oxygen-valve" aria-hidden="true"><i class="oxygen-knob"></i><i class="oxygen-neck"></i></span><span class="oxygen-body"><span class="oxygen-track"><span class="oxygen-fill"></span><span class="oxygen-ticks"></span></span><span class="oxygen-band"></span><span class="oxygen-band"></span><strong></strong><span class="oxygen-label">O₂</span></span></div>
 <div class="practice-feedback" role="status" aria-live="polite"></div></div>
-<div class="briefing-copy"><div class="briefing-count"></div><h3 class="briefing-title"></h3><p class="briefing-description"></p><div class="briefing-controls"></div><div class="briefing-pad" hidden></div></div>
+<div class="briefing-copy"><div class="briefing-count"></div><h3 class="briefing-title"></h3><p class="briefing-description"></p><div class="briefing-controls"></div><div class="briefing-pad" hidden></div><div class="briefing-zukan zukan" role="list" aria-label="小サイズの図鑑" hidden></div></div>
 </div>
 <div class="briefing-footer"><button type="button" class="secondary briefing-previous">戻る</button><div class="briefing-nav"><button type="button" class="secondary briefing-next">次へ</button><button type="button" class="primary briefing-launch" hidden>確認して待機へ</button></div></div>`;
   const find = selector => container.querySelector(selector);
   const art = find('.briefing-art'), board = find('.briefing-board'), feedback = find('.practice-feedback'), controls = find('.briefing-controls'), layout = find('.briefing-layout');
   let running = false, controller = false, role = 'parent', settings = {}, step = 0, keyTimer = 0, shownStep = -1, loop = 0, painted = 0;
-  const practice = { cursor: { x: 2, y: 2 }, direction: 1, child: { x: 0, y: 3 }, placed: new Set(), passages: new Set(PASSAGES), feedback: '' };
+  const practice = { cursor: { x: 2, y: 2 }, direction: 1, child: { x: 0, y: 3 }, placed: new Set(), feedback: '' };
   let startedAt = 0;
   let trail = [15];
   const taken = new Set();
+  let demoCycle = -1, demoHp = null;
+  let cursorMovedAt = 0;
+  let detourSteps = [];
+  let wrongWallUntil = 0;
+  let explorerWrong = false;
+  let explorerCompletedAt = null;
+  let wallNoticeUntil = 0;
+  let registeredSmall = null;
 
   function resetPresentation() {
     startedAt = performance.now();
+    cursorMovedAt = startedAt;
+    detourSteps = [];
+    wrongWallUntil = 0;
+    explorerWrong = false;
+    explorerCompletedAt = null;
+    wallNoticeUntil = 0;
+    registeredSmall = null;
+    demoCycle = -1; demoHp = null;
     resetMazeScene(find('.briefing-canvas'));
   }
 
@@ -75,13 +113,27 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
   const steps = () => GUIDES[parent() ? 'parent' : 'child'];
   const last = () => step === steps().length - 1;
   const cursorStep = () => parent() && step === 1;
+  const timedDemo = () => parent() && step === 2;
+  const collectionDemo = () => !parent() && step === 2;
+  const wallDemo = () => cursorStep() || timedDemo();
   const moveStep = () => !parent() && step < 2;
-  const passageOpen = () => !parent() && step === 1;
-  const fixed = () => new Set(passageOpen() ? PASSAGE_WALLS : FIXED_WALLS);
+  const explorerStep = () => moveStep();
+  const explorerRoute = () => step === 1 ? EXPLORER_DETOUR : EXPLORER_ROUTE;
+  const explorerWallAppeared = () => !parent() && step === 1 && trail.includes(2);
+  function guideRoute() {
+    if (!explorerStep()) return [];
+    if (step === 0) return explorerRoute();
+    const turn = DEMO_ROUTE.indexOf(2);
+    return explorerWallAppeared() ? explorerRoute().slice(turn) : explorerRoute().slice(0, turn + 1);
+  }
+  const fixed = () => new Set([...DEMO_WALLS].filter(value => !explorerWallAppeared() || value !== edge(7, 12)).map(value => {
+    const [a, b] = value.split(':').map(Number);
+    return edgeKey(a % COLS, Math.floor(a / COLS), b % COLS, Math.floor(b / COLS));
+  }));
 
   function start(nextRole, nextSettings) {
     role = nextRole === 'parent' ? 'parent' : 'child'; settings = { ...DEFAULTS, ...nextSettings }; step = 0; running = true;
-    practice.cursor = { x: 2, y: 2 }; practice.direction = 1; practice.child = { x: 0, y: 3 }; practice.placed.clear();
+    practice.cursor = { x: 0, y: ROWS - 1 }; practice.direction = 1; practice.child = { x: 0, y: 3 }; practice.placed.clear();
     practice.feedback = '';
     trail = [15]; taken.clear(); resetPresentation();
     shownStep = -1;
@@ -104,7 +156,8 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
     const target = Math.max(0, Math.min(steps().length - 1, next));
     if (target === step) return;
     step = target;
-    if (moveStep()) { practice.child = { x: 0, y: 3 }; trail = [15]; taken.clear(); practice.feedback = step === 1 ? '点線の通路の向こうへ進んでみましょう' : ''; }
+    if (wallDemo()) { practice.cursor = { x: 0, y: ROWS - 1 }; practice.direction = 1; practice.placed.clear(); practice.feedback = ''; }
+    if (moveStep()) { practice.child = { x: 0, y: 3 }; trail = [15]; taken.clear(); practice.feedback = ''; }
     resetPresentation();
     update();
   }
@@ -114,19 +167,34 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
   function update() {
     if (!running) return;
     const guide = steps()[step];
+    const interactive = cursorStep() || explorerStep();
+    const practiceNotice = find('.briefing-practice-notice');
+    practiceNotice.hidden = false;
+    practiceNotice.textContent = interactive ? '実際に操作してみてね' : '説明動画だよ';
+    practiceNotice.classList.toggle('is-interactive', interactive);
     find('.briefing-title').textContent = guide.title;
     find('.briefing-description').textContent = guide.description(settings);
     controls.innerHTML = guide.controls(settings);
     // Left stick moves; directional taps aim walls and horizontal holds navigate the briefing.
     if (controller && (cursorStep() || moveStep())) {
-      if (cursorStep()) find('.briefing-description').textContent = '左スティックで位置を選び、上下左右の方向キーで壁の向きを決め、×で壁を設置して危ない魚への道をふさぎます。→ 長押しで次へ、← 長押しで戻ります。';
-      else if (step === 0) find('.briefing-description').textContent = '左スティックでエクスプローラーを隣のマスへ動かします。魚に触れるとつかまえられます。→ 長押しで次へ、← 長押しで戻ります。';
       controls.innerHTML = `<kbd data-practice-key="Arrow">${padIcon('left')} ${parent() ? '位置' : '移動'}</kbd>` + (parent() ? `<kbd data-practice-key="Tab">${padIcon('dpad')} 向き</kbd><kbd data-practice-key="Space">${padIcon('cross')} 設置</kbd>` : '点線は秘密の通路');
     }
+    if (cursorStep() || explorerStep()) find('.briefing-footer').insertBefore(controls, find('.briefing-nav'));
+    else find('.briefing-copy').insertBefore(controls, find('.briefing-pad'));
+    controls.hidden = !controls.innerHTML || ((cursorStep() || explorerStep()) && controller);
     // The controller drawing lights up the buttons this step uses.
-    find('.briefing-pad').hidden = !controller;
-    if (controller) find('.briefing-pad').innerHTML = controllerDiagram(cursorStep() ? ['left', 'dpad', 'cross'] : moveStep() ? ['left', 'dpad'] : ['dpad']);
-    find('.briefing-close').hidden = controller;
+    const explorerGuide = explorerStep();
+    const showController = !collectionDemo() && (controller || cursorStep() || explorerGuide);
+    find('.briefing-zukan').hidden = !collectionDemo();
+    find('.briefing-pad').classList.toggle('is-wall-guide', cursorStep() || explorerGuide);
+    find('.briefing-pad').classList.toggle('is-explorer-guide', explorerGuide);
+    find('.briefing-pad').hidden = !showController;
+    if (showController) {
+      const diagram = controllerDiagram(cursorStep() ? ['left', 'dpad', 'cross'] : moveStep() ? ['left', 'dpad'] : ['dpad']);
+      find('.briefing-pad').innerHTML = cursorStep()
+        ? `<span class="wall-guide-note">ジョイスティックで<br>カーソル位置を移動</span>${diagram}<span class="wall-guide-note">ボタンの向きに<br>壁を置く</span><span class="wall-guide-hint" hidden></span>`
+        : explorerGuide ? `<span class="wall-guide-note explorer-comment-space">ジョイスティックで<br>ナビゲーターを移動</span>${diagram}<span class="wall-guide-note explorer-comment-space" aria-hidden="true"></span><span class="wall-guide-hint" hidden></span>` : diagram;
+    }
     find('.briefing-previous').innerHTML = controller ? `${padIcon('prev')} 長押しで戻る` : '戻る';
     find('.briefing-next').innerHTML = controller ? `${padIcon('next')} 長押しで次へ` : '次へ';
     find('.briefing-launch').innerHTML = controller ? `${padIcon('next')} 長押しで確認` : '確認して待機へ';
@@ -139,6 +207,11 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
     find('.briefing-next').hidden = last();
     find('.briefing-launch').hidden = !last();
     if (shownStep !== step) {
+      if (interactive) {
+        practiceNotice.classList.remove('is-interactive');
+        void practiceNotice.offsetWidth;
+        practiceNotice.classList.add('is-interactive');
+      }
       layout.dataset.dir = step < shownStep ? 'prev' : 'next';
       layout.classList.remove('is-entering'); void layout.offsetWidth; layout.classList.add('is-entering');
       shownStep = step;
@@ -149,12 +222,133 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
 
   function blocked(x, y, nx, ny) {
     const e = edgeKey(x, y, nx, ny);
-    if (passageOpen() && practice.passages.has(e)) return false;
-    return fixed().has(e) || practice.placed.has(e);
+    return fixed().has(e) || practice.placed.has(e) || (explorerWallAppeared() && e === edgeKey(2, 0, 3, 0));
   }
   // Share the round renderer, including its role-specific symbols and colors.
+  function updateCursorGuide() {
+    const wallNotice = explorerWallAppeared() && performance.now() < wallNoticeUntil;
+    find('.briefing-wall-bubble').hidden = !wallNotice;
+    feedback.classList.toggle('is-wrong-direction', explorerStep() && explorerWrong);
+    if (explorerStep()) {
+      const pad = find('.briefing-pad'), hint = find('.wall-guide-hint');
+      const next = explorerRoute()[trail.length];
+      feedback.textContent = next === undefined ? '最後まで探検できたね！' : '線に沿ってジョイスティックを動かそう';
+      if (wallNotice) feedback.textContent = '壁が現れた！';
+      const show = next !== undefined && (explorerWrong || performance.now() - cursorMovedAt >= 2000);
+      pad.classList.toggle('is-cursor-guide', next !== undefined);
+      pad.classList.toggle('is-cursor-hint', show);
+      hint.hidden = !show;
+      if (next !== undefined) {
+        const dx = next % COLS - practice.child.x, dy = Math.floor(next / COLS) - practice.child.y;
+        const angle = dy < 0 ? 0 : dx > 0 ? 90 : dy > 0 ? 180 : 270;
+        const directionName = dy < 0 ? '上' : dx > 0 ? '右' : dy > 0 ? '下' : '左';
+        hint.textContent = `${directionName}に倒してみよう`;
+        if (explorerWrong) feedback.textContent = `そっちじゃないよ${directionName}だよ`;
+        pad.querySelector('.joystick-direction-arrow path').setAttribute('transform', `rotate(${angle} 16 16)`);
+        pad.style.setProperty('--stick-x', `${dx * 12}px`);
+        pad.style.setProperty('--stick-y', `${dy * 12}px`);
+      }
+      return;
+    }
+    if (!cursorStep()) return;
+    if (performance.now() < wrongWallUntil) {
+      feedback.textContent = 'そこじゃないよ！';
+      return;
+    }
+    const { x, y } = practice.cursor;
+    const reached = x === 2 && y === 0;
+    if (practice.feedback.startsWith('ゴールへの道がふさがっています')) {
+      feedback.textContent = practice.feedback;
+      return;
+    }
+    if (detourSteps.length) {
+      feedback.textContent = (performance.now() - startedAt) / 1000 >= detourSteps.at(-1).at + .4 ? 'ゴールに到着！守ってあげられたね。' : '壁をよけて、下の道からゴールへ向かうよ';
+      const pad = find('.briefing-pad');
+      find('.wall-guide-hint').hidden = true;
+      pad.classList.remove('is-cursor-hint');
+      pad.classList.remove('is-cursor-guide');
+      pad.querySelector('.is-press-target')?.classList.remove('is-press-target');
+      return;
+    }
+    const instruction = reached ? '右に壁を立てよう' : '■のマスへカーソルを動かそう';
+    if (feedback.textContent !== instruction) {
+      if (reached) feedback.textContent = instruction;
+      else feedback.innerHTML = '<span class="cursor-target-symbol">■</span>のマスへカーソルを動かそう';
+    }
+    const direction = y > 0 ? { text: '上に倒してみよう', angle: 0, x: 0, y: -12 }
+      : x < 2 ? { text: '右に倒してみよう', angle: 90, x: 12, y: 0 }
+      : { text: '左に倒してみよう', angle: 270, x: -12, y: 0 };
+    const pad = find('.briefing-pad'), hint = find('.wall-guide-hint');
+    pad.classList.toggle('is-cursor-guide', !reached);
+    pad.querySelector('.ps-petal[data-angle="90"]')?.classList.toggle('is-press-target', reached);
+    const show = !reached && performance.now() - cursorMovedAt >= 2000;
+    hint.hidden = !(show || reached);
+    if (reached) {
+      if (hint.textContent !== '▶ボタンを押してみよう') hint.textContent = '▶ボタンを押してみよう';
+    } else if (hint.textContent !== direction.text) hint.textContent = direction.text;
+    pad.querySelector('.joystick-direction-arrow path').setAttribute('transform', `rotate(${direction.angle} 16 16)`);
+    pad.classList.toggle('is-cursor-hint', show);
+    pad.style.setProperty('--stick-x', `${direction.x}px`);
+    pad.style.setProperty('--stick-y', `${direction.y}px`);
+  }
   function paint() {
+    if (collectionDemo() && (performance.now() - startedAt) / 1000 >= DEMO_STEPS.find(point => point.cell === 2).at + 3) {
+      resetPresentation();
+    }
+    if (explorerStep() && explorerCompletedAt !== null && performance.now() - explorerCompletedAt >= 3000) {
+      practice.child = { x: 0, y: ROWS - 1 }; practice.feedback = '';
+      trail = [15]; taken.clear(); resetPresentation();
+    }
+    if (wallDemo() && detourSteps.length && (performance.now() - startedAt) / 1000 >= detourSteps.at(-1).at + 1.4) {
+      practice.cursor = { x: 0, y: ROWS - 1 }; practice.direction = 1;
+      practice.child = { x: 0, y: ROWS - 1 }; practice.placed.clear(); practice.feedback = '';
+      trail = [15]; taken.clear(); resetPresentation();
+    }
+    updateCursorGuide();
     const riskExample = parent() && step === 0;
+    const navigatorDemo = riskExample || wallDemo();
+    const autoDemo = navigatorDemo || collectionDemo();
+    const elapsed = (performance.now() - startedAt) / 1000;
+    const stopAt = DEMO_STEPS.find(point => point.cell === 2).at;
+    if (timedDemo()) {
+      const moves = Math.max(0, Math.min(5, Math.floor((elapsed - 2) / .7)));
+      practice.cursor = { x: Math.max(0, moves - 3), y: Math.max(0, ROWS - 1 - moves) };
+      if (!detourSteps.length && elapsed >= stopAt + 1) placeWall();
+      const remaining = Math.max(0, 30 - elapsed), oxygen = find('.briefing-oxygen');
+      oxygen.querySelector('strong').textContent = `00:${String(Math.ceil(remaining)).padStart(2, '0')}`;
+      oxygen.querySelector('.oxygen-fill').style.width = `${remaining / 30 * 100}%`;
+      feedback.textContent = detourSteps.length ? elapsed >= detourSteps.at(-1).at + .4 ? 'ゴールに到着！守ってあげられたね。' : '壁をよけて、下の道からゴールへ向かうよ' : '時間内にゴールを目指そう';
+    }
+    const demoTime = collectionDemo() ? Math.min(elapsed, stopAt) : wallDemo() ? detourSteps.length ? elapsed : Math.min(elapsed, stopAt) : elapsed % DEMO_DURATION;
+    const steps = wallDemo() || collectionDemo() ? [...DEMO_STEPS.filter(point => point.at <= stopAt), ...detourSteps] : DEMO_STEPS;
+    const demoTrail = steps.filter(point => point.at <= demoTime).map(point => point.cell);
+    if (!demoTrail.length) demoTrail.push(DEMO_ROUTE[0]);
+    const demoItems = DEMO_FISH.map(fish => ({ ...fish, taken: steps.some(point => point.cell === fish.cell && demoTime >= point.at + .35) }));
+    if (collectionDemo()) {
+      const found = demoItems.some(fish => fish.size === 'small' && fish.taken);
+      if (registeredSmall !== found) {
+        const book = find('.briefing-zukan');
+        book.innerHTML = zukan(new Set(found ? ['clownfish'] : []), found ? 'clownfish' : '');
+        book.querySelectorAll('.zukan-row:not(.small)').forEach(row => row.remove());
+        book.querySelector('.zukan-size-icon').remove();
+        registeredSmall = found;
+      }
+    }
+    if (navigatorDemo) {
+      const cycle = riskExample ? Math.floor(elapsed / DEMO_DURATION) : 0;
+      if (cycle !== demoCycle) { resetMazeScene(find('.briefing-canvas')); demoCycle = cycle; }
+      const met = demoItems.filter(fish => fish.taken), hp = applyDamage(met.reduce((value, fish) => applyDamage(value, fish.damage), HP_MAX), wallDemo() ? practice.placed.size * WALL_DAMAGE : 0);
+      if (hp !== demoHp) {
+        const meter = find('.briefing-hp .hp-hearts'), panel = find('.briefing-hp');
+        meter.innerHTML = hearts(hp); meter.setAttribute('aria-valuenow', hp);
+        find('.briefing-hp-value').textContent = `${hp} / ${HP_MAX}`;
+        panel.classList.remove('is-hit');
+        if (demoHp !== null && hp < demoHp) { void panel.offsetWidth; panel.classList.add('is-hit'); }
+        demoHp = hp;
+        const latest = met.at(-1);
+        if (riskExample) feedback.textContent = latest ? `${creature(latest.creature).name}に遭遇 · 💛 −${latest.damage}` : '魚に会うと💛はどうなる？';
+      }
+    }
     const avatar = practice.child.y * COLS + practice.child.x;
     const convertEdges = edges => new Set([...edges].map(value => {
       const [a, b] = value.split('|').map(point => {
@@ -164,65 +358,86 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
       return edge(a, b);
     }));
     const walls = convertEdges(practice.placed);
-    if (riskExample) walls.add(edge(12, 13));
+    if (explorerWallAppeared()) walls.add(edge(2, 3));
     // Draw at the size the board is shown (in device pixels), in half steps so resizing seldom repaints layers.
     const canvas = find('.briefing-canvas'), shown = (canvas.clientWidth || BOARD_WIDTH) * (devicePixelRatio || 1);
     const resolution = Math.min(6, Math.max(2, Math.ceil(shown / BOARD_WIDTH * 2) / 2));
     drawMaze(canvas, {
       settings: { ...settings, cols: COLS, rows: ROWS, wallLimit: 20 },
-      mode: role, phase: 'playing', time: (performance.now() - startedAt) / 1000, moves: trail.length - 1,
-      avatar: riskExample ? 6 : avatar, goal: COLS - 1,
-      trail: riskExample ? [15, 10, 5, 6] : trail,
-      base: convertEdges(fixed()), walls,
-      secrets: passageOpen() ? convertEdges(practice.passages) : new Set(),
-      items: [
-        { cell: 7, size: 'large', creature: 'shark', maxRisk: 3, risk: 3, damage: 4, taken: riskExample || taken.has(7) },
-        { cell: 3, size: 'medium', creature: 'octopus', maxRisk: 3, risk: 2, damage: 2, taken: taken.has(3) },
-        { cell: 13, size: 'small', creature: 'clownfish', maxRisk: 1, risk: 1, damage: 0, taken: taken.has(13) },
-      ],
-    }, role, practice.cursor.y * COLS + practice.cursor.x, (practice.direction + 3) % 4, { cursor: cursorStep(), resolution, markScale: .65 });
+      mode: role, phase: 'playing', time: autoDemo ? demoTime : elapsed, moves: (autoDemo ? demoTrail : trail).length - 1,
+      avatar: autoDemo ? demoTrail.at(-1) : avatar, goal: COLS - 1,
+      trail: autoDemo ? demoTrail : trail,
+      base: autoDemo ? DEMO_WALLS : convertEdges(fixed()), walls: riskExample ? new Set() : walls,
+      secrets: new Set(),
+      items: autoDemo ? demoItems : DEMO_FISH.map(fish => ({ ...fish, taken: taken.has(fish.cell) })),
+    }, role, practice.cursor.y * COLS + practice.cursor.x, (practice.direction + 3) % 4, { cursor: wallDemo(), resolution, markScale: .65, wallDamage: wallDemo() ? WALL_DAMAGE : undefined, guideRoute: guideRoute() });
   }
   function drawBoard() {
     const interactive = cursorStep() || moveStep();
     const riskExample = parent() && step === 0;
-    paint();
-    board.classList.toggle('is-visible', interactive);
-    find('.briefing-example').textContent = interactive ? '練習' : '表示例';
+    feedback.hidden = timedDemo() || collectionDemo();
+    find('.briefing-art-heading').hidden = true;
+    art.dataset.role = role;
     const oxygen = find('.briefing-oxygen');
+    art.insertBefore(oxygen, step === 2 ? find('.briefing-maze') : feedback);
     oxygen.hidden = step !== 2;
     oxygen.querySelector('strong').textContent = String(Math.floor(settings.duration / 60)).padStart(2, '0') + ':' + String(settings.duration % 60).padStart(2, '0');
+    oxygen.querySelector('.oxygen-fill').style.width = '100%';
+    paint();
+    board.classList.toggle('is-visible', interactive);
+    find('.briefing-example').textContent = interactive ? '練習' : riskExample ? '自動デモ' : '表示例';
+    find('.briefing-hp').hidden = !parent();
     const practiceHint = `${controller ? '左スティック' : '矢印キー'}で${parent() ? 'カーソル' : 'エクスプローラー'}を動かしてみましょう`;
-    feedback.textContent = interactive ? practice.feedback || practiceHint : riskExample ? 'サメ（!!!）に接触 · HP −4' : '残り時間 · O₂';
+    if (!riskExample && !timedDemo()) feedback.textContent = interactive ? practice.feedback || practiceHint : '残り時間 · O₂';
+    updateCursorGuide();
     board.replaceChildren();
     if (!interactive) return;
     for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
       const cell = document.createElement('div');
       cell.className = 'practice-cell';
+      if (cursorStep() && x === 2 && y === 0) cell.classList.add('is-cursor-target');
       cell.setAttribute('role', 'gridcell');
-      cell.setAttribute('aria-label', coordinate(x, y));
+      cell.setAttribute('aria-label', coordinate(x, y) + (cursorStep() && x === 2 && y === 0 ? '（黄色く光る目標のマス）' : ''));
       cell.dataset.x = x; cell.dataset.y = y;
       board.append(cell);
     }
   }
 
   function moveCursor(direction) {
+    cursorMovedAt = performance.now();
     practice.cursor.x = Math.max(0, Math.min(COLS - 1, practice.cursor.x + direction.dx));
     practice.cursor.y = Math.max(0, Math.min(ROWS - 1, practice.cursor.y + direction.dy));
-    practice.feedback = `選択: ${coordinate(practice.cursor.x, practice.cursor.y)}`;
+    practice.feedback = '';
     drawBoard();
   }
   function moveChild(direction) {
     const { x, y } = practice.child, nx = x + direction.dx, ny = y + direction.dy;
+    if (explorerStep()) {
+      const next = explorerRoute()[trail.length];
+      if (next === undefined) return;
+      if (nx !== next % COLS || ny !== Math.floor(next / COLS)) {
+        explorerWrong = true;
+        drawBoard();
+        return;
+      }
+      explorerWrong = false;
+      cursorMovedAt = performance.now();
+    }
     if (!inBounds(nx, ny)) practice.feedback = '迷路の端です。別の方向へ進んでください';
     else if (blocked(x, y, nx, ny)) practice.feedback = '壁で停止。別の方向へ進んでください';
     else {
       practice.child = { x: nx, y: ny };
       const cell = ny * COLS + nx;
       trail.push(cell);
-      const pickup = [7, 3, 13].includes(cell) && !taken.has(cell);
+      if (explorerStep() && step === 1 && cell === 2) wallNoticeUntil = performance.now() + 3000;
+      const pickup = DEMO_FISH.some(fish => fish.cell === cell) && !taken.has(cell);
       if (pickup) taken.add(cell);
-      practice.feedback = passageOpen() && practice.passages.has(edgeKey(x, y, nx, ny)) ? '秘密の通路を通り抜けました' : `エクスプローラーが ${coordinate(nx, ny)} へ移動`;
+      practice.feedback = `エクスプローラーが ${coordinate(nx, ny)} へ移動`;
       if (pickup) practice.feedback += ' · 生き物を発見';
+      if (explorerStep() && trail.length === explorerRoute().length) {
+        practice.feedback = '最後まで探検できたね！';
+        explorerCompletedAt = performance.now();
+      }
     }
     drawBoard();
   }
@@ -233,12 +448,42 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
   }
   function placeWall() {
     const direction = DIRECTIONS[practice.direction], { x, y } = practice.cursor, nx = x + direction.dx, ny = y + direction.dy;
+    if (x !== 2 || y !== 0 || direction.dx !== 1 || direction.dy !== 0) {
+      wrongWallUntil = performance.now() + 2000;
+      drawBoard();
+      return;
+    }
+    if (detourSteps.length) return;
+    wrongWallUntil = 0;
     if (!inBounds(nx, ny)) practice.feedback = '迷路の外には壁を立てられません';
     else {
       const e = edgeKey(x, y, nx, ny);
-      if (fixed().has(e)) practice.feedback = '既存の壁です。黄色い辺を選んでください';
+      if (DEMO_WALLS.has(edge(y * COLS + x, ny * COLS + nx))) practice.feedback = '既存の壁です。黄色い辺を選んでください';
       else if (practice.placed.has(e)) practice.feedback = 'そこにはすでに壁があります';
-      else { practice.placed.add(e); practice.feedback = `${direction.name}側に壁を設置しました`; }
+      else {
+        practice.placed.add(e); practice.feedback = `${direction.name}側に壁を設置しました`;
+        if (e === edgeKey(2, 0, 3, 0)) {
+          const queue = [2], came = new Map([[2, null]]);
+          for (let i = 0; i < queue.length && !came.has(4); i++) {
+            const cell = queue[i], x = cell % COLS, y = Math.floor(cell / COLS);
+            for (const { dx, dy } of DIRECTIONS) {
+              const nx = x + dx, ny = y + dy, next = ny * COLS + nx;
+              if (!inBounds(nx, ny) || came.has(next) || DEMO_WALLS.has(edge(cell, next)) || practice.placed.has(edgeKey(x, y, nx, ny))) continue;
+              came.set(next, cell); queue.push(next);
+            }
+          }
+          if (came.has(4)) {
+            const path = [];
+            for (let cell = 4; cell !== 2; cell = came.get(cell)) path.unshift(cell);
+            let at = Math.max((performance.now() - startedAt) / 1000, DEMO_STEPS.find(point => point.cell === 2).at) + 1;
+            detourSteps = path.map(cell => {
+              const point = { cell, at };
+              at += .7 + (DEMO_FISH.some(fish => fish.cell === cell && !DEMO_ROUTE.slice(0, DEMO_ROUTE.indexOf(2) + 1).includes(cell)) ? 1.6 : 0);
+              return point;
+            });
+          } else practice.feedback = 'ゴールへの道がふさがっています。戻る・次へで練習をやり直してください。';
+        }
+      }
     }
     drawBoard();
   }
@@ -289,8 +534,9 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
     const cell = event.target.closest('.practice-cell');
     if (!cell) return;
     const x = +cell.dataset.x, y = +cell.dataset.y;
-    if (cursorStep()) { practice.cursor = { x, y }; practice.feedback = `選択: ${coordinate(x, y)}`; drawBoard(); return; }
+    if (cursorStep()) { cursorMovedAt = performance.now(); practice.cursor = { x, y }; practice.feedback = ''; drawBoard(); return; }
     const index = DIRECTIONS.findIndex(d => practice.child.x + d.dx === x && practice.child.y + d.dy === y);
+    if (explorerStep() && index < 0 && trail.length < explorerRoute().length) { explorerWrong = true; drawBoard(); return; }
     if (moveStep() && index >= 0) arrow(index);
   };
   controls.onclick = event => {
@@ -299,7 +545,6 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
     if (kbd.dataset.practiceKey === 'Tab') { highlight('Tab'); rotate(); }
     if (kbd.dataset.practiceKey === 'Space') { highlight('Space'); placeWall(); }
   };
-  find('.briefing-close').onclick = close;
   find('.briefing-previous').onclick = () => go(step - 1);
   find('.briefing-next').onclick = () => go(step + 1);
   find('.briefing-launch').onclick = () => onFinish?.();
