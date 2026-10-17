@@ -15,7 +15,7 @@ for (const role of ['parent', 'child']) {
     const run = setup(role), { session, ready } = run;
     assert.equal(session.state.role, role); assert.equal(session.state.game.phase, 'ready');
     assert.equal(session.state.tutorialComplete, false); assert.equal(session.state.partner.ready, true);
-    assert.equal(session.state.game.hp, role === 'parent' ? 16 : null);
+    assert.equal(session.state.game.hp, role === 'parent' ? 20 : null);
     assert.equal('seed' in session.state.game, false);
     if (role === 'parent') assert.deepEqual(session.state.game.secrets, []);
     else assert.ok(session.state.game.items.every(item => !('risk' in item)));
@@ -46,14 +46,15 @@ test('CPU fills only the opposite seat; countdown and pause do not advance eithe
   const child = setup('child'); child.ready(); child.session.advance(6);
   assert.equal(child.session.state.game.moves, 0); assert.ok(child.session.state.game.walls.length > 0);
 });
-test('solo player actions use the same free walls, movement cooldown and settings permissions', () => {
+test('solo player actions use the same wall HP cost, movement cooldown and settings permissions', () => {
   const { session, ready } = setup('parent');
   session.send({ type: 'tutorial' }); session.send({ type: 'settings', settings: { duration: 8 } });
   assert.equal(session.state.game.settings.duration, 8); assert.equal(session.state.tutorialComplete, false);
   ready(); session.advance(3);
   const g = session.state.game;
   const cell = Array.from({ length: g.settings.cols * g.settings.rows }, (_, i) => i).find(i => i % g.settings.cols < g.settings.cols - 1 && !g.base.includes(edge(i, i + 1)));
-  session.send({ type: 'wall', cell, direction: 0 }); assert.equal(session.state.game.walls.length, 1); assert.equal(session.state.game.hp, 16);
+  session.send({ type: 'wall', cell, direction: 0 }); assert.equal(session.state.game.walls.length, 1); assert.equal(session.state.game.hp, 18);
+  session.send({ type: 'wall', cell, direction: 0 }); assert.equal(session.state.game.hp, 18);
   const before = session.state.game.avatar;
   session.send({ type: 'move', direction: 0 }); assert.equal(session.state.game.avatar, before);
   session.send({ type: 'settings', settings: { duration: 120 } }); assert.equal(session.state.game.settings.duration, 8);

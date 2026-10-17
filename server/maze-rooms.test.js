@@ -63,7 +63,7 @@ test('playing keeps private views and role restrictions with no CPU actions', ()
   const parentView = service.view(room, room.members[0]).game, childView = service.view(room, room.members[1]).game;
   assert.deepEqual(parentView.secrets, []); assert.equal(childView.goal, null);
   // HP and risk are the navigator's alone; neither role learns a creature before it is met.
-  assert.equal(parentView.hp, 16); assert.equal(childView.hp, null);
+  assert.equal(parentView.hp, 18); assert.equal(childView.hp, null);
   assert.ok(parentView.items.filter(i => !i.taken).every(i => ['small', 'medium', 'large'].includes(i.size) && [1, 2, 3].includes(i.maxRisk) && !('risk' in i) && !('creature' in i) && !('damage' in i)));
   assert.ok(childView.items.every(i => ['small', 'medium', 'large'].includes(i.size) && !('risk' in i) && !('maxRisk' in i) && !('damage' in i)));
   assert.equal('seed' in childView, false);

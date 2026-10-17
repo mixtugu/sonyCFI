@@ -140,10 +140,22 @@ input[type=number]{width:calc(60px + 4px * var(--text-scale, 1))}.field span inp
 .ocean-world .ending-dialog{background:radial-gradient(ellipse at center,#03263a8c,#03263a00 70%);overflow:visible}
 .ocean-world .ending-dialog::backdrop{background:transparent}
 .ocean-world .ending-dialog .eyebrow{color:#fff;letter-spacing:.5em;text-shadow:0 1px 12px #02283d}
-.ocean-world .ending-dialog h2{color:#fff;text-shadow:0 2px 28px #022a40,0 0 3px #022a4080}
+.ocean-world .ending-dialog h2{color:#fff;font-size:calc(56px * var(--text-scale,1));text-shadow:0 2px 28px #022a40,0 0 3px #022a4080}
+.ocean-world #ending{width:min(1000px,calc(100% - 32px));height:calc(100dvh - 48px);max-height:calc(100dvh - 48px)}
+#ending[open]{display:flex;flex-direction:column;align-items:center}
+#ending h2{flex:none;margin:20px 0}
+#ending #ending-creatures{width:100%;flex:1;min-height:0;order:2}
+#ending #ending-wait{order:3}
+#ending #ending-finish{order:4;flex:none;margin-top:auto}
 .ocean-world .ending-dialog p{color:#eafcff;text-shadow:0 1px 14px #022a40}
 #ending[open] .eyebrow{animation:rise-in 1.2s .5s both}
 #ending[open] h2{animation:ending-title 1.8s .7s cubic-bezier(.2,.8,.2,1) both}
+#ending[open] .ending-highlight{display:inline-block;animation:ending-highlight-glow 3s 2.5s ease-in-out infinite}
+@keyframes ending-highlight-glow{
+  0%,100%{text-shadow:0 0 4px #fff4,0 2px 14px #022a40}
+  50%{text-shadow:0 0 8px #fff9,0 0 20px #a9edff99,0 0 32px #a9edff44}
+}
+@media(prefers-reduced-motion:reduce){#ending[open] .ending-highlight{animation:none}}
 #ending[open] p{animation:rise-in 1.2s 1.4s both}
 #ending[open] button{animation:rise-in 1s 1.9s both}
 @keyframes ending-title{from{opacity:0;letter-spacing:.35em;filter:blur(14px);transform:translateY(12px)}to{opacity:1;letter-spacing:.02em;filter:blur(0);transform:none}}
@@ -163,3 +175,17 @@ input[type=number]{width:calc(60px + 4px * var(--text-scale, 1))}.field span inp
 .wall-style input{margin:0;accent-color:#5fd2c0}
 .wall-style small{flex:1 0 100%;font-size:calc(15px * var(--text-scale, 1))}
 @media(max-width:620px){.countdown-rings i{width:170px;height:170px;left:-85px;top:-85px}.ocean-world .return-art{height:150px}}
+.navigator-result>.eyebrow,.navigator-result>.result-count,.navigator-result>#result-zukan{display:none}
+.navigator-result #final-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:20px 0;font-size:calc(24px * var(--text-scale,1));text-align:center}
+.navigator-result #final-stats strong{display:block;white-space:nowrap}
+.result-wall-icon{display:inline-block;width:1.2em;height:1.2em;object-fit:contain;vertical-align:middle;margin-left:.15em}
+.navigator-result #final-stats strong{font-size:calc(36px * var(--text-scale,1));color:#ffe45c}
+.navigator-result .dialog-actions{justify-content:center}
+#ending-creatures{position:relative;margin-top:20px;height:26vh;overflow:hidden;pointer-events:none}
+#ending-creatures>div{position:absolute;left:var(--fish-x);top:var(--fish-y);width:min(var(--fish-width),18%);animation:ending-fish-swim var(--swim-time) var(--swim-delay) ease-in-out infinite alternate}
+#ending-creatures .creature-art{width:100%;height:auto;object-fit:contain;filter:drop-shadow(0 3px 6px #001b3655);animation:ending-fish-bob var(--bob-time) var(--swim-delay) ease-in-out infinite alternate}
+#ending-creatures .creature-art.is-hidden{filter:brightness(0);opacity:.5}
+@keyframes ending-fish-swim{from{transform:translateX(-55%)}to{transform:translateX(55%)}}
+@keyframes ending-fish-bob{from{transform:translateY(-6px) rotate(-5deg) scaleX(var(--facing))}to{transform:translateY(6px) rotate(5deg) scaleX(var(--facing))}}
+@media(max-width:620px){#ending-creatures{height:28vh}}
+@media(prefers-reduced-motion:reduce){#ending-creatures>div,#ending-creatures .creature-art{animation:none}#ending-creatures .creature-art{transform:scaleX(var(--facing))}}

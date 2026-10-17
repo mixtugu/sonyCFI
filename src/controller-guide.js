@@ -23,7 +23,7 @@ const petal = (a0, a1, r0 = 57, r1 = 99) => `M${point(r1, a0)}A${r1} ${r1} 0 0 1
 // Only the stick, the centre × and the up/right/down/left petals (which aim the wall) are mapped;
 // the diagonal petals are switched off.
 const PETALS = { 0: 'dpad', 90: 'dpad', 180: 'dpad', 270: 'dpad' };
-const ARROW = '<path d="M16 6 26 18h-6v8h-8v-8H6Z"/>';
+const ARROW = '<path class="ps-direction-mark" d="M16 6 28 26H4Z"/>';
 let diagrams = 0;
 export function controllerDiagram(active = []) {
   // Each copy gets its own gradient ids, since a hidden copy's defs do not paint the visible one.
@@ -33,14 +33,32 @@ export function controllerDiagram(active = []) {
     const angle = i * 45, name = PETALS[angle];
     if (!name) return `<g class="ps-petal is-off"><path d="${petal(angle - 19, angle + 19)}"/></g>`;
     const [x, y] = point(78, angle).split(' ').map(Number);
-    return `<g class="ps-petal${on(name)}" data-pad="${name}"><path d="${petal(angle - 19, angle + 19)}"/><g transform="translate(${x - 13} ${y - 13}) scale(.8125) rotate(${angle} 16 16)"><g class="ps-mark">${ARROW}</g></g></g>`;
+    return `<g class="ps-petal${on(name)}" data-pad="${name}" data-angle="${angle}"><path d="${petal(angle - 19, angle + 19)}"/><g transform="translate(${x - 13} ${y - 13}) scale(.8125) rotate(${angle} 16 16)"><g class="ps-mark">${ARROW}</g></g></g>`;
   }).join('');
-  return `<svg class="ps-controller" viewBox="0 0 370 240" role="img" aria-label="Access コントローラー。左にスティック、本体の中央に×ボタン、上下左右に向きのボタン。ほかのボタンは使いません。">
+  return `<svg class="ps-controller" style="--pad-cap:url(#${id}-cap);--pad-active:url(#${id}-active);--pad-off:url(#${id}-off)" viewBox="0 0 370 250" role="img" aria-label="Access コントローラー。左にスティック、本体の中央に×ボタン、上下左右に向きのボタン。ほかのボタンは使いません。">
     <defs><radialGradient id="${id}-ball" cx=".36" cy=".3" r=".75"><stop offset="0" stop-color="#5b6068"/><stop offset=".45" stop-color="#1d2025"/><stop offset="1" stop-color="#050608"/></radialGradient>
+    <linearGradient id="${id}-body" x2=".35" y2="1"><stop stop-color="#52647a"/><stop offset=".4" stop-color="#252f40"/><stop offset="1" stop-color="#080f1b"/></linearGradient>
+    <linearGradient id="${id}-cap" x2=".3" y2="1"><stop stop-color="#ffffff"/><stop offset=".45" stop-color="#e3edf4"/><stop offset="1" stop-color="#8b9eaf"/></linearGradient>
+    <linearGradient id="${id}-active" x2=".3" y2="1"><stop stop-color="#ffffff"/><stop offset=".5" stop-color="#e3f6ff"/><stop offset="1" stop-color="#82b7db"/></linearGradient>
+    <linearGradient id="${id}-off" x2=".3" y2="1"><stop stop-color="#708095"/><stop offset="1" stop-color="#273445"/></linearGradient>
+    <linearGradient id="${id}-metal" x2="1"><stop stop-color="#182330"/><stop offset=".4" stop-color="#a4bdcf"/><stop offset=".65" stop-color="#40576c"/><stop offset="1" stop-color="#101a27"/></linearGradient>
+    <radialGradient id="${id}-shadow"><stop stop-color="#000b"/><stop offset="1" stop-color="#0000"/></radialGradient>
     <radialGradient id="${id}-ring" r=".5"><stop offset=".78" stop-color="#2f6bff" stop-opacity="0"/><stop offset=".9" stop-color="#3f7dff"/><stop offset="1" stop-color="#2f6bff" stop-opacity="0"/></radialGradient></defs>
-    <ellipse cx="226" cy="226" rx="130" ry="9" fill="#0007"/>
-    <g class="ps-stick${on('left')}" data-pad="left"><path d="M38 196q2-20 40-22 38 2 40 22-2 18-40 20-38-2-40-20Z" fill="#202328"/><path d="M118 192l40-14v20l-40 12Z" fill="#202328"/><rect x="71" y="96" width="14" height="88" rx="6" fill="#16181c"/><circle class="ps-ball" cx="78" cy="78" r="34" fill="url(#${id}-ball)"/><ellipse cx="66" cy="64" rx="11" ry="7" fill="#fff" opacity=".18"/></g>
-    <circle cx="${CX}" cy="${CY}" r="108" fill="#1b1d22"/>
+    <ellipse cx="215" cy="228" rx="151" ry="22" fill="url(#${id}-shadow)"/>
+    <circle cx="${CX}" cy="${CY + 9}" r="109" fill="#060d18" stroke="#38506b" stroke-width="2"/>
+    <g class="joystick-direction-arrow" transform="translate(58 17) scale(1.25)" aria-hidden="true"><path d="M16 2 30 16H22V30H10V16H2Z"/></g>
+    <g class="ps-stick${on('left')}" data-pad="left">
+      <path d="M118 163l40-14v20l-40 14Z" fill="url(#${id}-body)"/>
+      <ellipse cx="78" cy="172" rx="43" ry="32" fill="#080f1b"/>
+      <ellipse cx="78" cy="166" rx="43" ry="32" fill="url(#${id}-body)" stroke="#829cb0" stroke-width="1"/>
+      <ellipse cx="78" cy="158" rx="20" ry="15" fill="#0b1420" stroke="#526b80"/>
+      <rect x="71" y="118" width="14" height="40" rx="6" fill="url(#${id}-metal)"/>
+      <ellipse cx="78" cy="150" rx="26" ry="13" fill="#000" opacity=".3"/>
+      <circle class="ps-ball" cx="78" cy="112" r="34" fill="url(#${id}-ball)"/>
+      <ellipse cx="66" cy="98" rx="11" ry="8" fill="#fff" opacity=".18"/>
+    </g>
+    <circle cx="${CX}" cy="${CY}" r="108" fill="url(#${id}-body)" stroke="#a3bdcf" stroke-opacity=".6" stroke-width="1.5"/>
+    <g transform="translate(0 4)" opacity=".7" fill="#030912">${Array.from({ length: 8 }, (_, i) => `<path d="${petal(i * 45 - 19, i * 45 + 19)}"/>`).join('')}</g>
     <g class="ps-petals">${petals}</g>
     <circle cx="${CX}" cy="${CY}" r="53" fill="#15171b"/><circle cx="${CX}" cy="${CY}" r="56" fill="url(#${id}-ring)"/>
     <g class="ps-petal ps-center${on('cross')}" data-pad="cross"><circle cx="${CX}" cy="${CY}" r="38"/><g transform="translate(${CX - 14} ${CY - 14}) scale(.875)"><g class="ps-mark">${marks.cross}</g></g></g>

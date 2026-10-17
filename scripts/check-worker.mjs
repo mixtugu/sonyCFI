@@ -43,11 +43,11 @@ try {
     const canvas = parent.locator('#board-parent'); await canvas.scrollIntoViewIfNeeded(); const box = await canvas.boundingBox();
     await parent.mouse.click(box.x + ((cell % g.settings.cols + 1) * 36 + 13) / (g.settings.cols * 36 + 28) * box.width, box.y + ((Math.floor(cell / g.settings.cols) + .5) * 36 + 14) / (g.settings.rows * 36 + 28) * box.height); break;
   }
-  await expect(parent.locator('#detail-parent')).toHaveText('1 / 12');
+  await expect(parent.locator('#detail-parent')).toHaveText('1 / 8');
   assert.deepEqual(await parent.evaluate(() => window.packet.game.secrets), []);
   assert.equal(await child.evaluate(() => window.packet.game.hp), null);
   await child.reload(); await expect(child.locator('#maze-role')).toHaveText('エクスプローラー'); await expect(parent.locator('#phase')).toHaveText('ひと休み中');
-  await expect(parent.locator('#detail-parent')).toHaveText('1 / 12');
+  await expect(parent.locator('#detail-parent')).toHaveText('1 / 8');
   await parent.locator('#ready-start').click(); await child.locator('#ready-start').click();
   // One round: both see the encyclopedia with only 終了する; ending it opens a new game in the same seats.
   for (const page of [parent, child]) { await expect(page.locator('#result')).toBeVisible({ timeout: 18000 }); await expect(page.locator('#result .dialog-actions button')).toHaveCount(1); }

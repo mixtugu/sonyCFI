@@ -1,5 +1,4 @@
 import './ocean.css';
-import oceanTitle from './ocean-title.svg';
 import { drawWater, drawDiverHD, drawRipple, motionPreference, causticTile } from './ocean-art.js';
 import { createDepths } from './ocean-depths.js';
 import { drawFish, drawJelly } from './maze-renderer.js';
@@ -38,28 +37,22 @@ export function createOceanPresentation() {
   function readBoardRects(now) {
     if (boardRects && now - rectsAt < 1000) return boardRects;
     if (resizes) for (const element of document.querySelectorAll('.workspace, .toolbar, .boards, .board-card')) if (!watched.has(element)) { watched.add(element); resizes.observe(element); }
-    boardRects = [...document.querySelectorAll('.board-card:not([hidden])')].map(board => board.getBoundingClientRect()).filter(rect => rect.width && rect.height);
+    const selector = document.body.classList.contains('sandbox-mode') && window.matchMedia('(min-width:901px)').matches
+      ? '.board-card:not([hidden]) .board-surface canvas, .board-card:not([hidden]) .board-side > *'
+      : '.board-card:not([hidden])';
+    boardRects = [...document.querySelectorAll(selector)].map(board => board.getBoundingClientRect()).filter(rect => rect.width && rect.height);
     rectsAt = now;
     return boardRects;
   }
   let depths = null;
   try { depths = createDepths(depthCanvas); } catch { depths = null; }
   if (!depths) depthCanvas.remove();
-  const intro = document.createElement('div');
-  intro.className = 'ocean-intro';
-  intro.innerHTML = `<div class="ocean-intro-copy"><span class="ocean-kicker">BETWEEN TIDES</span><h1 class="ocean-wordmark"><img src="${oceanTitle}" alt="YOU SEE / I SEE"></h1><p>光をたどって、まだ知らない海へ。</p><span class="dive-line" aria-hidden="true"></span><small>海へ、潜ろう。</small></div><button type="button" class="ocean-skip">スキップ ↘</button>`;
-  let dismissed = motionPreference.matches;
-  const close = () => { dismissed = true; intro.remove(); document.body.classList.remove('ocean-entering'); };
-  if (!dismissed) {
-    document.body.classList.add('ocean-entering'); document.body.append(intro);
-    intro.querySelector('button').onclick = close;
-  }
   const started = performance.now();
   let phase = 'lobby', phaseAt = started, lastDraw = 0, lastTick = started, w = 0, h = 0, pointer = { x: .5, y: .5 }, drift = { x: .5, y: .5 };
   let oxygen = 1, shownAt = 0, hiddenAt = -1e9, frozenDrawn = false, quality = .55, pace = 1 / 30;
   const sim = { clock: 0, depth: SCENES.ready.depth, surface: 0, danger: 0, scroll: 0, bubble: 0, kick: 0, pulseAt: -99, ripple: null };
   const ripples = [];
-  const inGame = () => !!depths && dismissed && phase !== 'lobby';
+  const inGame = () => !!depths && !['lobby', 'entry'].includes(phase);
   const onPointer = event => { pointer = { x: event.clientX / innerWidth, y: event.clientY / innerHeight }; };
   const onDown = event => {
     if (motionPreference.matches) return;
@@ -68,8 +61,6 @@ export function createOceanPresentation() {
   };
   window.addEventListener('pointermove', onPointer, { passive: true });
   window.addEventListener('pointerdown', onDown, { passive: true });
-  const onKey = event => { if (event.key === 'Escape') close(); };
-  window.addEventListener('keydown', onKey);
 
   function drawFlat(now) {
     if (w !== innerWidth || h !== innerHeight) {
@@ -80,17 +71,17 @@ export function createOceanPresentation() {
     const frozen = phase === 'paused';
     const time = motionPreference.matches ? 0 : (frozen ? phaseAt : now) / 1000;
     c.save();
-    const dive = dismissed ? 1 : Math.min(1, Math.max(0, (now - started - 400) / 2000));
+    const dive = 1;
     const offset = motionPreference.matches ? 0 : (drift.x - .5) * 15;
     const ascent = ['result', 'summary', 'ending'].includes(phase) ? (motionPreference.matches ? 1 : Math.min(1, (now - phaseAt) / 2200)) : 0;
     c.translate(offset - 20, -dive * h * .14 + ascent * h * .08);
     drawWater(c, w + 40, h * 1.2, time, { surface: true, detail: w < 600 ? .7 : 1.7 });
-    if (!dismissed || phase === 'lobby' || ascent) {
+    if (phase !== 'entry' && (phase === 'lobby' || ascent)) {
       const mobile = w < 600, swimRate = .48, swimTime = motionPreference.matches ? -Math.PI / 2 : (now - started) / 1000 * swimRate - Math.PI / 2;
-      const introTrack = !dismissed, centerX = introTrack ? w * .5 : w * (mobile ? .82 : .42);
-      const radiusX = w * (introTrack ? mobile ? .18 : .3 : mobile ? .055 : .05);
-      const centerY = h * (introTrack ? mobile ? .075 : .16 : mobile ? .085 : .18);
-      const radiusY = h * (introTrack ? mobile ? .025 : .06 : mobile ? .025 : .075);
+      const centerX = w * (mobile ? .82 : .42);
+      const radiusX = w * (mobile ? .055 : .05);
+      const centerY = h * (mobile ? .085 : .18);
+      const radiusY = h * (mobile ? .025 : .075);
       const dx = centerX + Math.cos(swimTime) * radiusX;
       const dy = centerY + Math.sin(swimTime) * radiusY + dive * h * .14;
       const angle = ascent ? -.65 : phase === 'lobby'
@@ -150,9 +141,21 @@ export function createOceanPresentation() {
     life.setTransform(scale, 0, 0, scale, 0, 0); life.globalCompositeOperation = 'source-over'; life.globalAlpha = 1;
     life.clearRect(0, 0, width, height);
     const time = motionPreference.matches ? 0 : (phase === 'paused' ? phaseAt : now) / 1000;
+    life.save();
+    if (phase === 'ending') {
+      life.beginPath(); life.rect(0, height / 3, width, height * 2 / 3); life.clip();
+    }
     drawFish(life, width, height, time); drawJelly(life, width, height, time);
+    if (phase === 'entry') {
+      const t = motionPreference.matches ? 0 : (now - phaseAt) / 1000;
+      const x = width * (.5 + .32 * Math.sin(t * .22));
+      const y = height * (.45 + .23 * Math.sin(t * .37));
+      const angle = Math.atan2(height * .23 * .37 * Math.cos(t * .37), width * .32 * .22 * Math.cos(t * .22));
+      drawDiverHD(life, x, y, angle, time, .6, 3.3, 0);
+    }
+    life.restore();
     life.globalCompositeOperation = 'destination-out';
-    for (const rect of readBoardRects(now)) life.fillRect(rect.left - 8, rect.top - 8, rect.width + 16, rect.height + 16);
+    if (phase !== 'entry') for (const rect of readBoardRects(now)) life.fillRect(rect.left - 8, rect.top - 8, rect.width + 16, rect.height + 16);
     life.globalCompositeOperation = 'source-over';
   }
 
@@ -162,7 +165,6 @@ export function createOceanPresentation() {
     if (document.hidden || now - lastDraw < (motionPreference.matches ? 250 : 33)) return;
     const dtReal = Math.min(.1, (now - lastTick) / 1000);
     lastDraw = lastTick = now;
-    if (!dismissed && (now - started > 3200 || motionPreference.matches)) close();
     if (phase !== 'paused') { drift.x += (pointer.x - drift.x) * .025; drift.y += (pointer.y - drift.y) * .025; }
     const deep = inGame();
     if (deep && !shownAt) shownAt = now;
@@ -180,7 +182,6 @@ export function createOceanPresentation() {
       if (mapped === phase) return;
       const previous = phase;
       phase = mapped; phaseAt = performance.now(); document.body.dataset.oceanPhase = phase; frozenDrawn = false;
-      if (phase === 'playing') close();
       if (phase === 'paused') ripples.length = 0;
       if (phase === 'playing' && ['ready', 'countdown'].includes(previous)) { sim.kick = 1; sim.pulseAt = sim.clock; }
       if (['result', 'summary'].includes(phase)) sim.kick = .8;
@@ -188,6 +189,6 @@ export function createOceanPresentation() {
     },
     pulse() { if (phase !== 'paused') sim.pulseAt = sim.clock; },
     setOxygen(value) { oxygen = Math.max(0, Math.min(1, +value || 0)); },
-    destroy() { cancelAnimationFrame(raf); resizes?.disconnect(); mutations.disconnect(); window.removeEventListener('resize', staleRects); window.removeEventListener('scroll', staleRects, { capture: true }); close(); canvas.remove(); depthCanvas.remove(); lifeCanvas.remove(); window.removeEventListener('pointermove', onPointer); window.removeEventListener('pointerdown', onDown); window.removeEventListener('keydown', onKey); }
+    destroy() { cancelAnimationFrame(raf); resizes?.disconnect(); mutations.disconnect(); window.removeEventListener('resize', staleRects); window.removeEventListener('scroll', staleRects, { capture: true }); canvas.remove(); depthCanvas.remove(); lifeCanvas.remove(); window.removeEventListener('pointermove', onPointer); window.removeEventListener('pointerdown', onDown); }
   };
 }

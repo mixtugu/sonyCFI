@@ -80,7 +80,7 @@ try {
     const canvas = parent.locator('#board-parent'); await canvas.scrollIntoViewIfNeeded(); const box = await canvas.boundingBox();
     const { cols, rows } = room.game.settings; await parent.mouse.click(box.x + ((cell % cols + 1) * 36 + 13) / (cols * 36 + 28) * box.width, box.y + ((Math.floor(cell / cols) + .5) * 36 + 14) / (rows * 36 + 28) * box.height); break;
   } }
-  await expect(parent.locator('#detail-parent')).toHaveText('1 / 12'); assert.equal(room.game.walls.size, 1);
+  await expect(parent.locator('#detail-parent')).toHaveText('1 / 8'); assert.equal(room.game.walls.size, 1);
   await child.reload(); await expect(parent.locator('#phase')).toHaveText('ひと休み中'); await expect(child.locator('#maze-role')).toHaveText('エクスプローラー');
   await parent.locator('#ready-start').click(); await child.locator('#ready-start').click(); await expect(child.locator('#phase')).toHaveText('探検中');
   room.game.time = room.game.settings.duration - .01;

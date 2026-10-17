@@ -1,6 +1,7 @@
 import { CREATURES, HP_MAX, RISK_LABELS, SIZES, SIZE_LABELS, creature } from './creatures.js';
 import { creatureArt } from './creature-art.js';
 import wallIcon from './assets/wall-stock.svg';
+import { WALL_DAMAGE } from './maze.js';
 
 const stars = n => `<span class="stars" aria-label="レア度 ${n}">${'★'.repeat(n)}</span>`;
 export const riskMarks = risk => `<b class="risk-marks risk-${risk}" aria-label="${RISK_LABELS[risk]}">${'!'.repeat(risk)}</b>`;
@@ -11,7 +12,7 @@ export function navigatorPanel() {
   return `<div class="hp-panel"><span class="hp-label">HP</span><div class="hp-hearts" id="hp-hearts" role="meter" aria-label="エクスプローラーのHP" aria-valuemin="0" aria-valuemax="${HP_MAX}"></div></div>
 <div class="wall-stock"><div class="wall-stock-head"><b>残りの壁</b><span id="wall-stock-count"></span></div><div class="wall-stock-icons" id="wall-stock-icons" aria-hidden="true"></div></div>
 <div class="contact-card" id="contact-card" aria-live="polite"><p class="contact-empty">エクスプローラーが魚に触れると、<br>出会った生き物がここに出ます。</p></div>
-<ul class="risk-legend" aria-label="「!」は最大の危険度">${[3, 2, 1].map(r => `<li>${riskMarks(r)}<span>最大危険度 ${['', '小', '中', '大'][r]}</span></li>`).join('')}</ul>`;
+<div class="damage-guide"><ul class="risk-legend" aria-label="「!」の数とダメージ">${[3, 2, 1].map(r => `<li>${riskMarks(r)}<span>ダメージ ${['', '小', '中', '大'][r]}</span></li>`).join('')}</ul><p class="wall-damage-note">壁を置くと<br><strong>💛−${WALL_DAMAGE}</strong></p></div>`;
 }
 export function hearts(hp) {
   return Array.from({ length: HP_MAX }, (_, i) => `<i class="heart${i < hp ? '' : ' is-lost'}" aria-hidden="true"></i>`).join('');
@@ -27,11 +28,20 @@ export function contactCard(item) {
 
 // The explorer's encyclopedia: one row per size, undiscovered entries as silhouettes.
 export function explorerPanel() {
-  return `<div class="zukan-head"><b>図鑑</b><span id="zukan-count">0 / ${CREATURES.length}</span></div><div class="zukan" id="zukan"></div>`;
+  return `<div class="zukan-head"><b>図鑑</b><span id="zukan-count">0 / ${CREATURES.length} 種</span></div><div class="zukan" id="zukan"></div>`;
 }
 export function zukan(found, fresh = '', { risk = false } = {}) {
-  return SIZES.map(size => `<div class="zukan-row"><span class="zukan-size">${SIZE_LABELS[size]}</span><div class="zukan-cells">${CREATURES.filter(c => c.size === size).map(c => {
-    const seen = found.has(c.id);
-    return `<div class="zukan-cell${seen ? ' is-found' : ''}${c.id === fresh ? ' is-new' : ''}" role="listitem">${creatureArt(c.id, { hidden: !seen, label: seen ? c.name : '未発見の生き物' })}<span class="zukan-name">${seen ? c.name : '？？？'}</span>${stars(c.stars)}${seen && risk ? riskMarks(c.risk) : ''}</div>`;
-  }).join('')}</div></div>`).join('');
+  return SIZES.map(size => {
+    const creatures = CREATURES.filter(c => c.size === size);
+    if (size === 'large') {
+      const order = ['squid', 'shark', 'mermaid'];
+      creatures.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+    }
+    const discovered = creatures.filter(c => found.has(c.id)).length;
+    const label = `${SIZE_LABELS[size]}サイズ`;
+    return `<section class="zukan-row ${size}" aria-label="${label}"><div class="zukan-size-head"><span class="zukan-size-label"><canvas class="zukan-size-icon" width="96" height="64" data-size="${size}" aria-hidden="true"></canvas><span class="zukan-size">${label}</span></span><span class="zukan-size-count">${discovered} / ${creatures.length} 種</span></div><div class="zukan-cells">${creatures.map(c => {
+      const seen = found.has(c.id);
+      return `<div class="zukan-cell${seen ? ' is-found' : ''}${c.id === fresh ? ' is-new' : ''}" role="listitem">${creatureArt(c.id, { hidden: !seen, label: seen ? c.name : '未発見の生き物' })}<span class="zukan-name">${seen ? c.name : '？？？'}</span>${stars(c.stars)}${seen && risk ? riskMarks(c.risk) : ''}</div>`;
+    }).join('')}</div></section>`;
+  }).join('');
 }

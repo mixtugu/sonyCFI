@@ -53,8 +53,8 @@ try {
   const cursorBefore = await page.evaluate(() => document.querySelector('#board-parent').toDataURL());
   await send({ stick: [1, 0] }, 300);
   assert.notEqual(await page.evaluate(() => document.querySelector('#board-parent').toDataURL()), cursorBefore, 'the stick moves the cursor');
-  for (const number of [7, 5, 3, 1]) { await send({ buttons: [number] }); await send({ buttons: ['centre'] }); if (await page.locator('#detail-parent').textContent() !== '0 / 12') break; }
-  await expect(page.locator('#detail-parent')).toHaveText('1 / 12');   // centre places a wall
+  for (const number of [7, 5, 3, 1]) { await send({ buttons: [number] }); await send({ buttons: ['centre'] }); if (await page.locator('#detail-parent').textContent() !== '0 / 8') break; }
+  await expect(page.locator('#detail-parent')).toHaveText('1 / 8');   // centre places a wall
   assert.deepEqual(errors, []);
   console.log('PASS: Access controller over WebHID: connect button, reconnect, physical 7/5/3/1 aim, centre places, stick moves, remapped Gamepad API input ignored, ?pad readout.');
 } finally { await browser?.close(); await app.close(); }

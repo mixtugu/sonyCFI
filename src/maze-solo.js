@@ -59,13 +59,12 @@ export function createSoloSession({ role = 'parent', settings = () => ({}), onSt
 
 export function connectSoloMaze(options) {
   const mount = document.getElementById('net-room-mount');
-  mount.innerHTML = '<div id="net-room"><p><b id="maze-role"></b> <span id="maze-partner">相手はCPU</span></p><button type="button" id="maze-leave" class="text-button">テストを終了</button></div>';
+  mount.innerHTML = '<div id="net-room"><p><b id="maze-role"></b> <span id="maze-partner">相手はCPU</span></p><button type="button" id="maze-leave" class="secondary home-icon-button" aria-label="Homeに戻る" title="Homeに戻る"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m3 10 9-7 9 7v11h-6v-7H9v7H3Z"/></svg><span>Homeに戻る</span></button></div>';
   const client = createSoloSession({ ...options, onState: packet => {
     document.getElementById('maze-role').textContent = packet.role === 'parent' ? '親役' : '子ども役';
     options.onState(packet);
   } });
   document.getElementById('maze-leave').onclick = () => client.send({ type: 'leave' });
-  document.getElementById('test-restart').onclick = () => client.start();
   // The shared UI and tutorial must exist before the first room snapshot is delivered.
   queueMicrotask(() => client.start());
   return client;

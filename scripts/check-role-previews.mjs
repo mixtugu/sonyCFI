@@ -54,7 +54,7 @@ try {
   await hold([15]); await hold([15]); await expect(page.locator('.briefing-launch')).toBeVisible(); await hold([15]);
   await expect(page.locator('#ready-tutorial')).toBeHidden(); await pad([0]);
   await expect(page.locator('#phase')).toHaveText('探検中');
-  await expect.poll(async () => await page.locator('#detail-parent').textContent()).not.toBe('0 / 12');
+  await expect.poll(async () => await page.locator('#detail-parent').textContent()).not.toBe('0 / 8');
   await hold([1]); await expect(page.locator('#phase')).toHaveText('ひと休み中');
   await pad([0]); await expect(page.locator('#phase')).toHaveText('探検中');
   await hold([1]); await expect(page.locator('#phase')).toHaveText('ひと休み中');

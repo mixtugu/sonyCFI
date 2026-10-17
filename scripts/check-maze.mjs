@@ -38,7 +38,7 @@ try {
   const target = (() => { const s = createMaze({ duration: 5 }, 260831); const { cols, rows } = s.settings; for (let a = 0; a < cols * rows; a++) { const b = neighbor(s, a, 0); if (b >= 0 && !s.base.has(edge(a, b))) return { x: (a % cols + 1) * 36 + 13, y: (Math.floor(a / cols) + .5) * 36 + 14, w: cols * 36 + 28, h: rows * 36 + 28 }; } })();
   const box = await page.locator('#board-parent').boundingBox();
   await page.mouse.click(box.x + target.x / target.w * box.width, box.y + target.y / target.h * box.height);
-  await expect(page.locator('#detail-parent')).toHaveText('1 / 12');
+  await expect(page.locator('#detail-parent')).toHaveText('1 / 8');
   await expect(page.locator('#hp-hearts .heart')).toHaveCount(16);   // walls cost no HP
   // The round ends with only 終了する; the new game keeps this player's role.
   await expect(page.locator('#result')).toBeVisible({ timeout: 9000 }); await expect(page.locator('#result .dialog-actions button')).toHaveCount(1);
@@ -64,4 +64,3 @@ try {
   assert.deepEqual(errors, []);
   console.log('Room lobby, /test mode, desktop/mobile, CPU, pause, result + new game, wall pointer, help and fullscreen passed.');
 } finally { await browser?.close(); await app.close(); }
-
