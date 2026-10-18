@@ -2,6 +2,11 @@ import './maze.css';
 import './ocean-game.css';
 import oceanTitle from './assets/you-see-i-see.png';
 import wallIcon from './assets/wall-stock.svg';
+import mermaidPreviewVideo from './assets/creatures/mermaid-preview.mp4';
+import sharkPreviewVideo from './assets/creatures/shark-preview.mp4';
+import squidPreviewVideo from './assets/creatures/squid-preview.mp4';
+import explorerOpeningVideo from './assets/explorer-opening.mp4';
+import navigatorOpeningVideo from './assets/navigator-opening.mp4';
 import './controller.css';
 import './encyclopedia.css';
 import { controllerDiagram, padAction, playGuide } from './controller-guide.js';
@@ -13,9 +18,11 @@ import { connectSoloMaze } from './maze-solo.js';
 import { createPadReader, firstPad, rumble } from './gamepad.js';
 import { accessConnected, accessSupported, onAccessChange, reconnectAccess, requestAccess } from './access-controller.js';
 import { createTutorial } from './tutorial.js';
-import { createResultScene } from './result-scene.js';
+import { createEndingExplorerScene, createResultScene } from './result-scene.js';
 import { CREATURES, HP_MAX } from './creatures.js';
 import { creatureArt } from './creature-art.js';
+import { createCreatureVideoMatte } from './creature-video-matte.js';
+import { endingCreatureLayout } from './ending-creature-layout.js';
 import { contactCard, explorerPanel, hearts, navigatorPanel, wallStock, zukan } from './encyclopedia-ui.js';
 
 const fields = [['cols', '横のマス数'], ['rows', '縦のマス数'], ['duration', '制限時間（秒）'], ['wallLimit', '壁の枚数'], ['moveMs', '移動間隔（ms）']];
@@ -30,6 +37,42 @@ function paintZukanSizeIcons(root) {
     context.scale(2, 2);
     drawFishIcon(context, 24, 16, canvas.dataset.size, 1);
   }
+}
+function playCreaturePreview(canvas, source, creatureName) {
+  const video = document.createElement('video'), context = canvas.getContext('2d', { willReadFrequently: true });
+  // Color keying also clears enclosed background between the squid's tentacles.
+  const applyMatte = ['mermaid', 'squid'].includes(canvas.dataset.creaturePreview)
+    ? null : createCreatureVideoMatte(canvas.width, canvas.height);
+  video.src = source; video.muted = true; video.loop = true; video.playsInline = true;
+  let frame = 0, stopped = false, lastDraw = -Infinity, lastVideoTime = -1;
+  const draw = now => {
+    if (stopped) return;
+    if (!document.hidden && now - lastDraw >= 1000 / 30 - 1
+      && video.currentTime !== lastVideoTime && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+      lastDraw = now; lastVideoTime = video.currentTime;
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+      if (applyMatte) {
+        applyMatte(pixels.data);
+      } else {
+        const data = pixels.data;
+        for (let i = 0; i < data.length; i += 4) {
+          const brightness = Math.max(data[i], data[i + 1], data[i + 2]);
+          const chroma = brightness - Math.min(data[i], data[i + 1], data[i + 2]);
+          const blackKey = Math.max(0, Math.min(1, (brightness - 12) / 30));
+          const grayKey = Math.max(0, Math.min(1, (chroma - 10) / 20));
+          data[i + 3] = Math.round(data[i + 3] * blackKey * grayKey);
+        }
+      }
+      context.putImageData(pixels, 0, 0);
+    }
+    if (!video.paused && !video.ended) frame = requestAnimationFrame(draw);
+  };
+  video.addEventListener('error', () => console.error(`${creatureName} preview video failed to load.`));
+  video.play().then(() => { if (!stopped) frame = requestAnimationFrame(draw); })
+    .catch(error => console.error(`${creatureName} preview video failed to play:`, error));
+  return () => { stopped = true; cancelAnimationFrame(frame); video.pause(); };
 }
 const sparkles = n => particles('fx-sparkles', n, i => `--x:${(seeded(i, 5) * 100).toFixed(1)}%;--y:${(40 + seeded(i, 6) * 38).toFixed(1)}%;--s:${(8 + seeded(i, 7) * 14).toFixed(0)}px;--d:${(1.8 + seeded(i, 8) * 2.2).toFixed(2)}s;--delay:${(.8 + seeded(i, 9) * 2.5).toFixed(2)}s`);
 const drops = n => particles('fx-drops', n, i => { const a = -Math.PI * (.12 + .76 * seeded(i, 10)), r = 110 + seeded(i, 11) * 250; return `--dx:${(Math.cos(a) * r * 1.5).toFixed(0)}px;--dy:${(Math.sin(a) * r).toFixed(0)}px;--s:${(4 + seeded(i, 12) * 7).toFixed(1)}px;--delay:${(.05 + seeded(i, 13) * .35).toFixed(2)}s`; });
@@ -60,13 +103,14 @@ ${['parent', 'child'].map(role => `<section class="board-card ${role}"><div clas
 </div>
 <div class="interaction-panel"><div class="touch-controls"><div class="dpad"><button data-dir="3" aria-label="上">↑</button><button data-dir="2" aria-label="左">←</button><button data-dir="1" aria-label="下">↓</button><button data-dir="0" aria-label="右">→</button></div><button id="rotate" class="secondary">↻ <span id="direction">右</span></button><button id="place" class="primary">壁を置く</button></div><p id="control-hint" class="hint"></p></div>
 </main>
-<dialog id="settings-dialog" class="settings-dialog"><div class="dialog-head"><h2>設定</h2><button id="settings-close" class="text-button" aria-label="閉じる">✕</button></div><button type="button" class="secondary access-connect" hidden>🎮 Access コントローラーを接続（USB）</button><div id="net-room-mount">${sandboxHome}</div><div class="wall-style" role="radiogroup" aria-label="壁のデザイン"><span>壁のデザイン</span><label><input type="radio" name="wall-style" value="ridge">岩の壁</label><label><input type="radio" name="wall-style" value="reef">サンゴと岩</label><small>この画面だけに反映されます</small></div><form id="settings"><div class="fields">${fields.map(([key, label]) => `<label class="field">${label}${input(key, label)}</label>`).join('')}</div><div class="form-actions"><button type="button" id="defaults" class="text-button">初期値</button><button class="primary" type="submit">適用</button></div></form></dialog>
+<dialog id="settings-dialog" class="settings-dialog"><div class="dialog-head"><h2>設定</h2><button id="settings-close" class="text-button" aria-label="閉じる">✕</button></div><button type="button" class="secondary access-connect" hidden>🎮 Access コントローラーを接続（USB）</button><div id="net-room-mount">${sandboxHome}</div><div class="wall-style" role="radiogroup" aria-label="壁のデザイン"><span>壁のデザイン</span><label><input type="radio" name="wall-style" value="ridge">岩の壁</label><label><input type="radio" name="wall-style" value="reef">サンゴと岩</label><small>この画面だけに反映されます</small></div><form id="settings"><div class="fields">${fields.map(([key, label]) => `<label class="field">${label}${input(key, label)}</label>`).join('')}</div><div class="form-actions"><button type="button" id="defaults" class="text-button">初期値</button><button class="primary" type="submit">適用</button></div></form><section class="ending-preview" aria-labelledby="ending-preview-title"><h3 id="ending-preview-title">エンディングを試す</h3><label class="ending-preview-hp">残りHP <input id="preview-hp" type="number" min="1" max="${HP_MAX}" value="${HP_MAX}" required> / ${HP_MAX}</label><fieldset class="ending-preview-fish"><legend>集まった魚</legend><div>${CREATURES.map(c => `<label><input type="checkbox" name="preview-creature" value="${c.id}">${c.name}</label>`).join('')}</div></fieldset><button type="button" id="preview-ending" class="primary">エンディングを見る</button></section></dialog>
 <div id="notice" role="status"></div>
-<dialog id="solo-start" aria-label="冒険を始める"><button id="solo-start-button" class="primary">冒険を始める</button></dialog>
 <dialog id="result">${waterLight}<div class="return-art" aria-hidden="true"><canvas id="result-scene"></canvas></div><h2 id="result-title">～ 冒険が終わりました ～</h2><p class="result-count"><span id="result-count-label">出会った生き物</span><strong id="result-count"></strong></p><div class="zukan result-zukan" id="result-zukan" role="list" aria-label="図鑑"></div><p id="final-stats"></p><div class="dialog-actions"><button id="close-result" class="primary">次へ</button></div></dialog>
-<dialog id="ready" class="ready-dialog">${waterLight}${bubbles(12)}<p class="eyebrow" id="ready-eyebrow"></p><h2 id="ready-title"></h2><p id="ready-note"></p><div id="ready-tutorial" class="tutorial"></div><button type="button" id="ready-review" class="secondary wide">チュートリアルを確認</button><button type="button" id="ready-start" class="primary wide">準備完了</button><p class="ready-foot"><button type="button" id="ready-settings" class="text-button">⚙ 設定</button></p></dialog>
+<dialog id="game-entry" aria-label="ゲームを開始する"><img class="game-entry-logo" src="${oceanTitle}" alt="YOU SEE / I SEE"><p class="game-entry-tagline">ー 同じ世界、異なる視点が生むバイアス ー</p><button id="game-entry-start" class="primary">ゲームを開始する</button></dialog>
+<dialog id="game-opening" aria-label="オープニング"><video id="game-opening-video" preload="none" playsinline disablepictureinpicture disableremoteplayback aria-label="オープニング動画"></video><div id="game-opening-error" hidden><p role="alert"></p><button type="button" id="game-opening-retry" class="primary">動画を再生する</button></div></dialog>
+<dialog id="ready" class="ready-dialog">${waterLight}${bubbles(12)}<p class="eyebrow" id="ready-eyebrow"></p><h2 id="ready-title"></h2><p id="ready-note"></p><div id="ready-tutorial" class="tutorial"></div><button type="button" id="ready-review" class="secondary wide">チュートリアルを確認</button><button type="button" id="ready-start" class="primary wide">準備完了</button><button type="button" id="ready-back" class="secondary wide" hidden>戻る</button><p class="ready-foot"><button type="button" id="ready-settings" class="text-button">⚙ 設定</button></p></dialog>
 <dialog id="countdown" class="countdown-dialog" aria-label="開始カウントダウン">${bubbles(14, 720)}<h2>まもなく探検が始まります</h2><div class="countdown-core"><span class="countdown-rings" aria-hidden="true"><i></i><i></i><i></i></span><strong id="countdown-number" aria-live="assertive" aria-atomic="true">3</strong></div><div class="depth-gauge" aria-hidden="true"><span>水面</span><i><b></b></i><span>海の底</span></div><button id="countdown-pause" class="secondary">待機に戻る</button></dialog>
-<dialog id="ending" class="ending-dialog"><div class="ending-flash" aria-hidden="true"></div>${drops(24)}${sparkles(18)}<p class="eyebrow">THANK YOU FOR DIVING</p><h2>この海で様々な<br><span class="ending-highlight">出会い</span> や <span class="ending-highlight">危険</span> がありました</h2><p id="ending-wait" class="ending-wait" hidden>相手が探検を終えるのを待っています…</p><button id="ending-finish" class="primary">はじめに戻る</button></dialog>
+<dialog id="ending" class="ending-dialog"><canvas id="ending-explorer" aria-hidden="true"></canvas><div class="ending-flash" aria-hidden="true"></div>${drops(24)}${sparkles(18)}<p class="eyebrow">THANK YOU FOR DIVING</p><h2>この海で様々な<br><span class="ending-highlight">出会い</span> や <span class="ending-highlight">危険</span> がありました</h2><p id="ending-wait" class="ending-wait" hidden>相手が探検を終えるのを待っています…</p><button id="ending-finish" class="primary">はじめに戻る</button></dialog>
 <dialog id="help">${waterLight}<h2>遊び方</h2><p>目標は、ふたりで海の生き物の図鑑を埋めること。迷路の魚のシルエットにエクスプローラーが触れると、正体の生き物が図鑑に登録されます。大きい魚ほどレアな生き物に出会えます。</p><p>ナビゲーターには、魚から現れる生き物の最大の危険度が「!」の数（! 低・!! 中・!!! 高）で見えます。実際の生き物はそれ以下の危険度で、触れるとエクスプローラーのHPがその危険度に応じて減ります。HPはナビゲーターにしか見えず、0にはなりません。大きい魚ほど危険なことが多いので、壁で道をふさぐかどうかはナビゲーター次第です。道がふさがると、エクスプローラーだけの秘密の通路が開きます。</p><p id="keyboard-help">矢印キー/WASDで操作。ナビゲーターはTabで向き、Spaceで設置。Escで一時停止。Fで全画面。</p><div class="pad-help" hidden><b>PlayStation コントローラー</b>${controllerDiagram()}<p>左スティックで移動、上下左右の方向キーで壁の向き、×で決定・壁の設置。</p><p>ナビゲーター：位置を選んで壁を設置</p><div class="controller-actions">${playGuide('parent')}</div><p>エクスプローラー：移動してアイテムを探す</p><div class="controller-actions">${playGuide('child')}</div><p>共通の操作</p><div class="controller-actions">${padAction('prev', '長押しで一時停止')}</div><p>メニュー：左スティックで項目を選択、×で決定、← 長押しで戻る。設定の数値はスティックの左右で変更。設定と遊び方は一時停止中の画面から開けます。</p><p>チュートリアル：練習はふだんと同じ操作。→ 長押しで次へ・確認、← 長押しで戻る。</p>${sandboxMode ? '<p>テストモード：L1 / R1で役割切替、CREATEでリセット。</p>' : ''}</div><button id="help-close" class="primary">OK</button></dialog>
 <div id="room-code" class="room-code" popover="manual" role="status" aria-label="部屋コード" hidden></div>`;
 
@@ -100,6 +144,7 @@ document.querySelector('.wall-style').insertAdjacentHTML('beforebegin', '<label 
 document.querySelector('.wall-style').insertAdjacentHTML('beforebegin', '<fieldset class="font-size-control"><legend>文字サイズ</legend><div class="font-size-options" role="group" aria-label="文字サイズ"><button type="button" data-text-scale="1" aria-pressed="true">標準</button><button type="button" data-text-scale="1.5" aria-pressed="false">1.5倍</button><button type="button" data-text-scale="2" aria-pressed="false">2倍</button></div></fieldset>');
 let game = createMaze(), cursor = game.avatar, direction = 0, seed = 260830, keys = new Set(), last = 0, uiClock = 0, resultShown = false, lastPhase = null, sentOxygen = -1, diveTimer = 0;
 const resultScene = createResultScene($('result-scene'));
+const endingExplorerScene = createEndingExplorerScene($('ending-explorer'));
 const controllerUI = createControllerUI();
 let padSeen = false, shownEditable = null, stateDirty = false;
 let entryStarted = false;
@@ -116,10 +161,10 @@ function diveIn() { const boards = document.querySelector('.boards'); restart(bo
 const keyDirection = { ArrowRight: 0, d: 0, ArrowDown: 1, s: 1, ArrowLeft: 2, a: 2, ArrowUp: 3, w: 3 };
 const descriptions = { parent: '壁を置いてエクスプローラーCPUを守ろう', child: '魚に触れて図鑑を埋めよう', cpu: 'CPU同士を観察' };
 // While the ending plays the camera stays above the surface, even if the next game has already arrived.
-function oceanPhase() { return $('solo-start').open ? 'entry' : $('ending').open ? 'ending' : !$('lobby').hidden ? 'lobby' : game.phase === 'result' && network.active ? 'summary' : game.phase; }
+function oceanPhase() { return $('game-entry').open || $('game-opening').open ? 'entry' : $('ending').open ? 'ending' : !$('lobby').hidden ? 'lobby' : game.phase === 'result' && network.active ? 'summary' : game.phase; }
 function showLobby(on) { if ($('ending').open && !on) return; $('lobby').hidden = !on; document.querySelector('.workspace').hidden = on; window.dispatchEvent(new CustomEvent('ocean-phase', { detail: oceanPhase() })); }
 const network = sandboxMode ? { active: false, connected: false, state: null, send() {} } : (testRole ? connectSoloMaze : connectMaze)({ role: testRole, settings: () => Object.fromEntries(new FormData($('settings'))), notice,
-  onLeave: () => { if (testRole) { location.assign('/'); return; } entryStarted = false; $('solo-start').close(); tutorial.stop(); $('ready').close(); $('help').close(); $('ending').close(); $('countdown').close(); $('settings-dialog').close(); setImmersive(false); document.querySelector('.boards').classList.remove('network-boards'); document.querySelectorAll('.board-card').forEach(b => b.hidden = false); reset(); showLobby(true); },
+  onLeave: () => { if (testRole) { location.assign('/'); return; } entryStarted = false; $('game-entry').close(); $('game-opening-video').pause(); $('game-opening').close(); tutorial.stop(); $('ready').close(); $('help').close(); $('ending').close(); $('countdown').close(); $('settings-dialog').close(); setImmersive(false); document.querySelector('.boards').classList.remove('network-boards'); document.querySelectorAll('.board-card').forEach(b => b.hidden = false); reset(); showLobby(true); },
   onState: packet => {
     showLobby(false);
     const changed = network.stateRound !== packet.round || network.stateCode !== packet.code;
@@ -138,10 +183,10 @@ const network = sandboxMode ? { active: false, connected: false, state: null, se
 function notice(message) { $('notice').textContent = message; $('notice').classList.add('show'); clearTimeout(notice.timer); notice.timer = setTimeout(() => $('notice').classList.remove('show'), 2600); }
 const tutorial = createTutorial($('ready-tutorial'), { onStep: () => update(), onFinish: () => { if (!tutorial.last) return; tutorial.stop(); network.send({ type: 'tutorial' }); update(); }, onClose: () => update() });
 function readyPrompt() {
-  if ($('ending').open) return;   // the next game's briefing waits for the ending scene
-  if (!entryStarted && game.phase === 'ready' && !network.state.tutorialComplete) {
-    if (!$('solo-start').open) {
-      reveal($('solo-start'));
+  if ($('ending').open || $('game-opening').open) return;
+  if (!entryStarted && game.phase === 'ready' && !network.state.tutorialComplete && !$('result').open) {
+    if (!$('game-entry').open) {
+      reveal($('game-entry'));
       window.dispatchEvent(new CustomEvent('ocean-phase', { detail: oceanPhase() }));
     }
     return;
@@ -150,10 +195,11 @@ function readyPrompt() {
   if (!waiting) { if ($('ready').open) { $('ready').close(); tutorial.stop(); } return; }
   const { partner, ready, match, tutorialComplete } = network.state, paused = game.phase === 'paused';
   const startWasUsable = $('ready').open && !$('ready-start').hidden && !$('ready-start').disabled;
+  const backWasUsable = $('ready').open && !$('ready-back').hidden && !$('ready-back').disabled;
   const partnerLine = testRole ? '相手はCPU · 準備完了' : partner.connected ? partner.ready ? '相手は準備完了' : partner.tutorialComplete ? '相手は準備中' : '相手はチュートリアルを確認中' : '相手を待っています';
   $('ready-eyebrow').textContent = `${paused ? 'ひと休み中' : '探検の準備'} · ${partnerLine}`;
   $('ready-title').innerHTML = `<span class="ready-role-intro"> あなたは…</span><strong class="ready-role-name">${game.mode === 'parent' ? 'ナビゲーター' : 'エクスプローラー'}</strong>`;
-  $('ready-note').textContent = !paused && tutorialComplete ? '「もう一度見る」　…　もう一度操作方法を確認できます。\n「準備完了」　…　3秒のカウントダウン後にゲームが開始します。' : testRole ? (paused ? '準備完了で3秒後に再開します。' : 'チュートリアルを確認して準備完了を押すと\n3秒のカウンダウン後にゲームが開始します。') : network.state.reason || 'チュートリアルを確認して準備完了を押してください。二人の準備ができたら3秒後に始まります。';
+  $('ready-note').textContent = !paused && tutorialComplete ? '' : testRole ? (paused ? '準備完了で3秒後に再開します。' : 'チュートリアルを確認して準備完了を押すと\n3秒のカウンダウン後にゲームが開始します。') : network.state.reason || 'チュートリアルを確認して準備完了を押してください。二人の準備ができたら3秒後に始まります。';
   // Close the countdown first: its close restores focus, which would undo the focus set below.
   if ($('countdown').open) $('countdown').close();
   if (!$('ready').open) {
@@ -169,14 +215,18 @@ function readyPrompt() {
   $('ready').classList.toggle('tutorial-confirmed', !briefing && !paused && tutorialComplete);
   tutorial.setKicker(`${game.mode === 'parent' ? 'ナビゲーター' : 'エクスプローラー'} · ${$('ready-eyebrow').textContent}`);
   $('ready-eyebrow').hidden = $('ready-title').hidden = $('ready-note').hidden = $('ready-start').hidden = briefing;
+  $('ready-note').hidden = briefing || (!paused && tutorialComplete);
   $('ready-eyebrow').hidden = true;
   $('ready-tutorial').hidden = !briefing;
   $('ready-settings').hidden = true;
   document.querySelector('.ready-foot').hidden = true;
   $('ready-review').hidden = briefing || paused || ready;
-  $('ready-review').textContent = tutorialComplete ? 'もう一度見る' : 'チュートリアルを確認';
+  $('ready-review').textContent = tutorialComplete ? 'もう一度チュートリアルを見る' : 'チュートリアルを確認';
   $('ready-start').disabled = !network.connected || ready || !tutorialComplete;
-  $('ready-start').textContent = ready ? '相手の準備を待っています' : paused ? '再開する' : !tutorialComplete ? 'チュートリアルを確認してください' : '準備完了';
+  $('ready-start').textContent = ready ? paused ? '相手の準備を待っています' : 'ゲームがもう少しで始まります…' : paused ? '再開する' : !tutorialComplete ? 'チュートリアルを確認してください' : 'ゲームスタート！';
+  $('ready-back').hidden = briefing || paused || !ready;
+  $('ready-back').disabled = !network.connected;
+  if (!backWasUsable && !$('ready-back').hidden && !$('ready-back').disabled && !$('settings-dialog').open && !$('help').open) $('ready-back').focus({ preventScroll: true });
   // Once the button becomes usable it takes focus, so a controller's × confirms without hunting for it.
   if (!startWasUsable && !$('ready-start').hidden && !$('ready-start').disabled && !$('settings-dialog').open && !$('help').open) $('ready-start').focus({ preventScroll: true });
 }
@@ -202,27 +252,49 @@ function wall() { if (game.mode !== 'parent') return; if (network.active) { netw
 function rotate() { direction = (direction + 1) % 4; update(); }
 $('start').onclick = toggle; $('reset').onclick = () => { if (!network.active) reset(); }; $('close-result').onclick = () => endGame();
 // Leave the ending only after confirmation; a room also waits for the partner.
-let endingWaiting = false;
+let endingWaiting = false, endingPreview = null, endingCreaturePreviews = [];
 function endGame() {
-  const found = collection();
+  const found = endingPreview?.found || collection();
+  const hp = endingPreview?.hp ?? game.hp;
   let sea = $('ending-creatures');
   if (!sea) {
     sea = document.createElement('div'); sea.id = 'ending-creatures';
     sea.setAttribute('role', 'list'); sea.setAttribute('aria-label', 'この海の生き物');
     $('ending').append(sea);
   }
-  sea.hidden = game.mode !== 'parent';
-  sea.innerHTML = game.mode === 'parent' ? CREATURES.map((c, i) => {
-    const width = { small: 54, medium: 76, large: 100 }[c.size];
-    return `<div role="listitem" style="--fish-x:${15 + seeded(i, 10) * 60}%;--fish-y:${12 + seeded(i, 11) * 52}%;--fish-width:${width}px;--swim-time:${4 + seeded(i, 12) * 5}s;--swim-delay:${-seeded(i, 13) * 18}s;--bob-time:${1.8 + seeded(i, 14) * 2}s;--facing:${i % 2 ? -1 : 1}">${creatureArt(c.id, { hidden: !found.has(c.id), label: found.has(c.id) ? c.name : '未発見の生き物' })}</div>`;
-  }).join('') : '';
+  sea.hidden = false;
+  endingCreaturePreviews.forEach(stop => stop()); endingCreaturePreviews = [];
+  const layout = endingCreatureLayout(CREATURES, found);
+  sea.innerHTML = CREATURES.map((c, i) => {
+    const width = { butterflyfish: 64, octopus: 120 }[c.id] ?? { small: 64, medium: 84, large: 280 }[c.size];
+    const { x, y, side } = layout.get(c.id);
+    const videoPreview = found.has(c.id) && ({ shark: sharkPreviewVideo, mermaid: mermaidPreviewVideo, squid: squidPreviewVideo })[c.id];
+    const picture = videoPreview
+      ? `<canvas class="creature-art" width="256" height="144" data-creature-preview="${c.id}" role="img" aria-label="${c.name}"></canvas>`
+      : creatureArt(c.id, { hidden: !found.has(c.id), label: found.has(c.id) ? c.name : '未発見の生き物' });
+    const facing = c.id === 'jellyfish' ? 1 : i % 2 ? -1 : 1;
+    return `<div role="listitem" data-size="${c.size}" data-side="${side}"${videoPreview ? ` class="ending-video-creature ending-video-creature-${c.id}"` : ''}${facing < 0 ? ' data-swims-left' : ''}${c.id === 'jellyfish' ? ' data-fixed-facing' : ''} style="--fish-x:${x}%;--fish-y:${y}%;--fish-width:${width}px;--fish-max-width:${width / 9.6}%;--swim-time:${4 + seeded(i, 12) * 5}s;--swim-delay:${-seeded(i, 13) * 18}s;--bob-time:${1.8 + seeded(i, 14) * 2}s;--facing:${facing}"><div class="ending-creature-facing">${picture}</div></div>`;
+  }).join('');
   $('result').close(); resultScene.stop?.();
-  if (network.active && game.phase === 'result') network.send({ type: 'again' });
+  if (!endingPreview && network.active && game.phase === 'result') network.send({ type: 'again' });
   document.querySelector('.workspace').hidden = true;
   window.dispatchEvent(new CustomEvent('ocean-phase', { detail: 'ending' }));
-  endingWaiting = false; $('ending-wait').hidden = true; reveal($('ending'));
+  endingWaiting = false; $('ending-wait').hidden = true;
+  reveal($('ending')); endingExplorerScene.play(hp, HP_MAX);
+  for (const canvas of sea.querySelectorAll('[data-creature-preview]')) {
+    const creatureId = canvas.dataset.creaturePreview;
+    const source = { shark: sharkPreviewVideo, mermaid: mermaidPreviewVideo, squid: squidPreviewVideo }[creatureId];
+    const creature = CREATURES.find(item => item.id === creatureId);
+    endingCreaturePreviews.push(playCreaturePreview(canvas, source, creature.name));
+  }
 }
 function finishEnding() {
+  if (endingPreview) {
+    endingPreview = null;
+    endingWaiting = false; $('ending').close();
+    location.assign('/test/1');
+    return;
+  }
   if (network.active && game.phase === 'result') {
     // A partner who has gone cannot start the next game; return to the lobby instead.
     if (!network.state.partner.connected) { $('ending').close(); network.send({ type: 'leave' }); return; }
@@ -238,16 +310,58 @@ function finishEnding() {
   update();
 }
 $('ending-finish').onclick = finishEnding;
+$('ending').addEventListener('close', () => {
+  endingExplorerScene.stop();
+  endingCreaturePreviews.forEach(stop => stop());
+  endingCreaturePreviews = [];
+});
 $('ending').addEventListener('cancel', event => { event.preventDefault(); finishEnding(); });
-$('result').addEventListener('cancel', event => { if (network.active) { event.preventDefault(); $('close-result').click(); } });
+$('result').addEventListener('cancel', event => { if (endingPreview || network.active) { event.preventDefault(); $('close-result').click(); } });
 $('countdown').addEventListener('cancel', event => { event.preventDefault(); suspend(); });
-$('solo-start').addEventListener('cancel', event => event.preventDefault());
-$('solo-start-button').onclick = () => {
+$('game-entry').addEventListener('cancel', event => event.preventDefault());
+$('game-entry-start').onclick = () => {
   entryStarted = true;
-  $('solo-start').close();
+  $('game-entry').close();
+  if (game.mode === 'child' || game.mode === 'parent') {
+    const role = game.mode === 'child' ? 'エクスプローラー' : 'ナビゲーター';
+    const video = $('game-opening-video');
+    video.src = game.mode === 'child' ? explorerOpeningVideo : navigatorOpeningVideo;
+    video.setAttribute('aria-label', `${role}のオープニング動画`);
+    $('game-opening').setAttribute('aria-label', `${role}のオープニング`);
+    reveal($('game-opening'));
+    playOpening();
+  }
   window.dispatchEvent(new CustomEvent('ocean-phase', { detail: oceanPhase() }));
   update();
 };
+function openingError(message, error) {
+  console.error(message, error);
+  $('game-opening-error').hidden = false;
+  $('game-opening-error').querySelector('p').textContent = message;
+  $('game-opening-retry').focus();
+}
+function playOpening() {
+  $('game-opening-error').hidden = true;
+  const video = $('game-opening-video');
+  if (video.error) video.load();
+  video.play().catch(error => {
+    if ($('game-opening').open) openingError('動画を再生できませんでした。再生ボタンで再試行してください。', error);
+  });
+}
+$('game-opening-retry').onclick = playOpening;
+$('game-opening').addEventListener('cancel', event => event.preventDefault());
+$('game-opening').addEventListener('close', () => {
+  if (!$('game-opening').open) $('game-opening-video').pause();
+});
+$('game-opening-video').addEventListener('error', event => {
+  if ($('game-opening').open) openingError('動画を読み込めませんでした。再生ボタンで再試行してください。', event);
+});
+$('game-opening-video').addEventListener('ended', () => {
+  if (!$('game-opening').open) return;
+  $('game-opening').close();
+  window.dispatchEvent(new CustomEvent('ocean-phase', { detail: oceanPhase() }));
+  update();
+});
 $('countdown-pause').onclick = () => suspend();
 document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => setMode(b.dataset.mode));
 document.querySelectorAll('[data-dir]').forEach(b => b.onclick = () => control(+b.dataset.dir));
@@ -292,13 +406,13 @@ function positionSettingsDock() {
   const parent = settingsModalStack.at(-1) || document.body;
   if (settingsDock.matches(':popover-open')) settingsDock.hidePopover();
   if (settingsDock.parentElement !== parent) parent.append(settingsDock);
-  settingsDock.showPopover();
+  if (!$('game-opening').open) settingsDock.showPopover();
   if (cornerLogo.matches(':popover-open')) cornerLogo.hidePopover();
   if (cornerLogo.parentElement !== parent) parent.append(cornerLogo);
   syncCornerLogo();
 }
 function syncCornerLogo() {
-  const visible = $('lobby').hidden && game.phase !== 'playing' && !($('ready').open && $('ready').classList.contains('briefing'));
+  const visible = $('lobby').hidden && !$('game-entry').open && !$('game-opening').open && game.phase !== 'playing' && !($('ready').open && $('ready').classList.contains('briefing'));
   if (visible && !cornerLogo.matches(':popover-open')) cornerLogo.showPopover();
   else if (!visible && cornerLogo.matches(':popover-open')) cornerLogo.hidePopover();
 }
@@ -318,6 +432,7 @@ positionSettingsDock();
 // The ready prompt covers the board with a blurred backdrop, so the button is large and hard to miss.
 $('ready').addEventListener('cancel', event => event.preventDefault());
 $('ready-start').onclick = toggle;
+$('ready-back').onclick = () => network.send({ type: 'unready' });
 $('ready-review').onclick = () => { tutorial.start(game.mode, game.settings); update(); };
 $('ready-settings').onclick = () => $('settings-dialog').showModal();
 // The wall design is a personal display preference, remembered in this browser only.
@@ -358,11 +473,22 @@ document.querySelectorAll('[name=wall-style]').forEach(radio => radio.onchange =
   try { localStorage.setItem('maze-wall-style', radio.value); } catch { /* storage unavailable */ }
 });
 $('settings-close').onclick =() => { $('settings-dialog').close(); };
+$('preview-ending').onclick = () => {
+  const hp = Number($('preview-hp').value);
+  if (!Number.isInteger(hp) || hp < 1 || hp > HP_MAX) { $('preview-hp').reportValidity(); return; }
+  const found = new Set([...document.querySelectorAll('[name="preview-creature"]:checked')].map(input => input.value));
+  endingPreview = { hp, found };
+  $('settings-dialog').close();
+  $('game-entry').close();
+  $('lobby').hidden = true;
+  showResult(found, hp, 0, game.settings.wallLimit);
+};
 $('settings').onsubmit = event => { event.preventDefault(); const values = Object.fromEntries(new FormData(event.target)); $('settings-dialog').close(); if (network.active) { network.send({ type: 'settings', settings: values }); return; } reset(values, seed + 1); if (!$('lobby').hidden) return; notice('新しい設定で迷路を作りました。'); };
 $('defaults').onclick = () => { for (const [key, value] of Object.entries(DEFAULTS)) $('settings').elements[key].value = value; reset(DEFAULTS, 260830); notice('初期設定に戻しました。'); };
 $('board-parent').onpointermove = event => { if (game.mode !== 'parent') return; const hit = pointerCell(event.currentTarget, game, event); if (hit) { cursor = hit.cell; direction = hit.direction; } };
 $('board-parent').onclick = event => { if (game.mode !== 'parent') return; const hit = pointerCell(event.currentTarget, game, event); if (hit) { cursor = hit.cell; direction = hit.direction; event.currentTarget.focus(); wall(); } };
 window.addEventListener('keydown', event => {
+  if ($('game-opening').open) return;
   if (event.target.matches('input, select, textarea') || $('help').open || $('result').open || $('settings-dialog').open || !$('lobby').hidden) return;
   if ($('countdown').open || $('ending').open) return;
   if ($('ready').open) { if (!$('ready-tutorial').hidden) tutorial.key(event); return; }
@@ -429,20 +555,22 @@ function update() {
   setHTML($('control-hint'), padSeen ? playGuide(game.mode) : game.mode === 'parent' ? 'マスの端をクリック、またはSpaceで壁を設置' : game.mode === 'child' ? '矢印/WASDで移動 · 点線は秘密の通路' : '');
   if (game.phase === 'result' && !resultShown) {
     resultShown = true; keys.clear();
-    // A game is one round; its result offers only the way out, to the ending and the next game.
-    $('result-title').textContent = '～ 冒険が終わりました ～';
-    const navigatorResult = game.mode === 'parent';
-    $('result').classList.toggle('navigator-result', navigatorResult);
     const found = collection();
-    $('result-count-label').textContent = 'この海で出会った生き物';
-    $('result-count').textContent = `${found.size} / ${CREATURES.length} 種`;
-    $('result-zukan').innerHTML = zukan(found);
-    paintZukanSizeIcons($('result-zukan'));
-    $('final-stats').hidden = !navigatorResult;
-    $('final-stats').innerHTML = navigatorResult ? `<span>残ったHP💛 <strong>${game.hp}/${HP_MAX}</strong></span><span>置いた壁<img class="result-wall-icon" src="${wallIcon}" alt="壁"> <strong>${game.walls.size}/${game.settings.wallLimit}</strong></span>` : '';
-    reveal($('result')); resultScene.play();
+    showResult(found, game.hp, game.walls.size, game.settings.wallLimit);
   }
   syncCornerLogo();
+}
+function showResult(found, hp, walls, wallLimit) {
+  $('result-title').textContent = '～ 冒険が終わりました ～';
+  $('result-count-label').parentElement.hidden = game.mode === 'parent';
+  $('result-count-label').textContent = 'この海で出会った生き物';
+  $('result-count').textContent = `${found.size} / ${CREATURES.length} 種`;
+  $('result-zukan').hidden = game.mode === 'parent';
+  $('result-zukan').innerHTML = zukan(found);
+  paintZukanSizeIcons($('result-zukan'));
+  $('final-stats').hidden = game.mode === 'child';
+  $('final-stats').innerHTML = `<span>残ったHP💛 <strong>${hp}/${HP_MAX}</strong></span><span>置いた壁<img class="result-wall-icon" src="${wallIcon}" alt="壁"> <strong>${walls}/${wallLimit}</strong></span>`;
+  reveal($('result')); resultScene.play(hp, HP_MAX);
 }
 // The encyclopedia starts empty every round.
 function collection() {
@@ -528,10 +656,6 @@ function pollPad(now) {
   const screen = [...document.querySelectorAll('dialog[open]')].map(dialog => dialog.id).join() + `|${$('lobby').hidden}|${tutorial.running && !$('ready-tutorial').hidden ? tutorial.step : '-'}|${game.phase}`;
   if (screen !== padScreen) { padScreen = screen; readPad.consume(); input.tapped.clear(); input.long.clear(); }
   if (controllerUI.editing) { controllerUI.keyboard(input); return -1; }
-  if ($('solo-start').open && !$('settings-dialog').open) {
-    if (on('cross')) $('solo-start-button').click();
-    return -1;
-  }
   if ($('help').open) {
     if (on('cross') || on('circle')) $('help-close').click();
     else if (input.step >= 0) $('help').scrollBy(0, input.step === 1 || input.step === 0 ? 100 : -100);
@@ -542,6 +666,11 @@ function pollPad(now) {
     else controllerUI.navigate($('settings-dialog'), input);
     return -1;
   }
+  if ($('game-opening').open) {
+    if (on('cross') && $('game-opening-video').paused) playOpening();
+    return -1;
+  }
+  if ($('game-entry').open) { if (on('cross')) $('game-entry-start').click(); return -1; }
   if ($('ending').open) { if (on('cross') || on('circle')) finishEnding(); return -1; }
   if ($('countdown').open) { if (on('circle') || on('cross')) suspend(); return -1; }
   if ($('result').open) {

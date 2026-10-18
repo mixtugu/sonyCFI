@@ -68,6 +68,35 @@ test('playing keeps private views and role restrictions with no CPU actions', ()
   assert.ok(childView.items.every(i => ['small', 'medium', 'large'].includes(i.size) && !('risk' in i) && !('maxRisk' in i) && !('damage' in i)));
   assert.equal('seed' in childView, false);
 });
+for (const role of ['parent', 'child']) {
+  test(`${role} can cancel readiness without leaving or losing tutorial confirmation`, () => {
+    const { service, parent, child, room, both } = setup();
+    const player = role === 'parent' ? parent : child, other = role === 'parent' ? child : parent;
+    const member = room.members.find(m => m.role === role);
+    const game = room.game, token = member.token;
+    both('tutorial');
+    service.handle(player, { type: 'ready' });
+    service.handle(player, { type: 'unready' });
+    service.handle(player, { type: 'unready' });
+    assert.equal(member.ready, false); assert.equal(member.tutorialComplete, true);
+    assert.equal(member.token, token); assert.equal(room.game, game); assert.equal(room.members.length, 2);
+    assert.equal(service.view(room, member).ready, false);
+    service.handle(other, { type: 'ready' });
+    service.tick(5); assert.equal(game.phase, 'ready'); assert.equal(game.time, 0);
+    service.handle(player, { type: 'ready' });
+    assert.equal(game.phase, 'countdown');
+    service.tick(1);
+    service.handle(player, { type: 'unready' });
+    assert.equal(game.phase, 'ready'); assert.equal(room.countdown, 0);
+    assert.equal(room.members.find(m => m !== member).ready, true);
+    service.tick(5); assert.equal(game.phase, 'ready');
+    service.handle(player, { type: 'ready' });
+    assert.equal(room.countdown, 3);
+    service.tick(3); assert.equal(game.phase, 'playing');
+    service.handle(player, { type: 'unready' });
+    assert.equal(game.phase, 'playing'); assert.equal(member.ready, true);
+  });
+}
 test('a creature stays hidden until met and is then shared; only the navigator sees the damage', () => {
   const { service, room } = setup(), item = room.game.items[0];
   const member = role => room.members.find(m => m.role === role);

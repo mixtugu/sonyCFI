@@ -142,10 +142,9 @@ export function createOceanPresentation() {
     life.clearRect(0, 0, width, height);
     const time = motionPreference.matches ? 0 : (phase === 'paused' ? phaseAt : now) / 1000;
     life.save();
-    if (phase === 'ending') {
-      life.beginPath(); life.rect(0, height / 3, width, height * 2 / 3); life.clip();
+    if (phase !== 'ending') {
+      drawFish(life, width, height, time); drawJelly(life, width, height, time);
     }
-    drawFish(life, width, height, time); drawJelly(life, width, height, time);
     if (phase === 'entry') {
       const t = motionPreference.matches ? 0 : (now - phaseAt) / 1000;
       const x = width * (.5 + .32 * Math.sin(t * .22));

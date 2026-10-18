@@ -110,16 +110,16 @@ body:not(.sandbox-mode) .child-side .zukan-size-icon{width:48px;height:32px}
 .result-zukan{text-align:left;border:1px solid #9bbaff30;border-radius:14px;background:#0a2350b3}
 .result-zukan .zukan-cells{grid-template-columns:repeat(auto-fill,minmax(96px,1fr))}.result-zukan .zukan-name{font-size:calc(12px * var(--text-scale,1))}
 #result .dialog-actions{justify-content:center;margin-top:12px}
-.ocean-world #result:not(.navigator-result){padding:16px 20px}
-.ocean-world #result:not(.navigator-result) .return-art{height:clamp(24px,10dvh,80px);margin:-16px -20px 10px}
-#result:not(.navigator-result) h2{font-size:calc(26px * var(--text-scale,1));margin:6px 0 8px}
+.ocean-world #result{padding:16px 20px}
+.ocean-world #result .return-art{height:clamp(24px,10dvh,80px);margin:-16px -20px 10px}
+#result h2{font-size:calc(26px * var(--text-scale,1));margin:6px 0 8px}
 #result .result-count{margin:4px 0 8px!important}
 #result .result-count strong{font-size:calc(24px * var(--text-scale,1))}
 #result .result-zukan{gap:6px;padding:6px}
 #result .zukan-row{gap:4px}
 #result .zukan-cell .creature-art{height:clamp(24px,8dvh,64px);max-height:none}
 @media(max-height:600px){
-  #result:not(.navigator-result)>.return-art{display:none}
+  #result>.return-art{display:none}
   #result .result-zukan{gap:4px}
   #result .zukan-cell{padding:2px}
 }

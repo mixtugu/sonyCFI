@@ -77,7 +77,7 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
 <div class="briefing-hp hp-panel" hidden><span class="hp-label">HP</span><div class="hp-hearts" role="meter" aria-label="エクスプローラーのHP" aria-valuemin="1" aria-valuemax="${HP_MAX}"></div><strong class="briefing-hp-value"></strong></div>
 <div class="briefing-oxygen oxygen" hidden><span class="oxygen-valve" aria-hidden="true"><i class="oxygen-knob"></i><i class="oxygen-neck"></i></span><span class="oxygen-body"><span class="oxygen-track"><span class="oxygen-fill"></span><span class="oxygen-ticks"></span></span><span class="oxygen-band"></span><span class="oxygen-band"></span><strong></strong><span class="oxygen-label">O₂</span></span></div>
 <div class="practice-feedback" role="status" aria-live="polite"></div></div>
-<div class="briefing-copy"><div class="briefing-count"></div><h3 class="briefing-title"></h3><p class="briefing-description"></p><div class="briefing-controls"></div><div class="briefing-pad" hidden></div><div class="briefing-zukan zukan" role="list" aria-label="小サイズの図鑑" hidden></div></div>
+<div class="briefing-copy"><div class="briefing-count"></div><h3 class="briefing-title"></h3><p class="briefing-description"></p><div class="briefing-controls"></div><div class="briefing-pad" hidden></div><div class="briefing-zukan zukan" role="list" aria-label="小サイズの図鑑" hidden></div><p class="briefing-rarity-bubble" hidden>★が多いほどレアな生き物だよ！</p></div>
 </div>
 <div class="briefing-footer"><button type="button" class="secondary briefing-previous">戻る</button><div class="briefing-nav"><button type="button" class="secondary briefing-next">次へ</button><button type="button" class="primary briefing-launch" hidden>確認して待機へ</button></div></div>`;
   const find = selector => container.querySelector(selector);
@@ -186,6 +186,7 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
     const explorerGuide = explorerStep();
     const showController = !collectionDemo() && (controller || cursorStep() || explorerGuide);
     find('.briefing-zukan').hidden = !collectionDemo();
+    find('.briefing-rarity-bubble').hidden = !collectionDemo();
     find('.briefing-pad').classList.toggle('is-wall-guide', cursorStep() || explorerGuide);
     find('.briefing-pad').classList.toggle('is-explorer-guide', explorerGuide);
     find('.briefing-pad').hidden = !showController;
@@ -310,13 +311,15 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
     const autoDemo = navigatorDemo || collectionDemo();
     const elapsed = (performance.now() - startedAt) / 1000;
     const stopAt = DEMO_STEPS.find(point => point.cell === 2).at;
+    if (timedDemo() || collectionDemo()) {
+      const remaining = Math.max(0, 30 - elapsed), oxygen = find('.briefing-oxygen');
+      oxygen.querySelector('strong').textContent = `00:${String(Math.ceil(remaining)).padStart(2, '0')}`;
+      oxygen.querySelector('.oxygen-fill').style.width = `${remaining / 30 * 100}%`;
+    }
     if (timedDemo()) {
       const moves = Math.max(0, Math.min(5, Math.floor((elapsed - 2) / .7)));
       practice.cursor = { x: Math.max(0, moves - 3), y: Math.max(0, ROWS - 1 - moves) };
       if (!detourSteps.length && elapsed >= stopAt + 1) placeWall();
-      const remaining = Math.max(0, 30 - elapsed), oxygen = find('.briefing-oxygen');
-      oxygen.querySelector('strong').textContent = `00:${String(Math.ceil(remaining)).padStart(2, '0')}`;
-      oxygen.querySelector('.oxygen-fill').style.width = `${remaining / 30 * 100}%`;
       feedback.textContent = detourSteps.length ? elapsed >= detourSteps.at(-1).at + .4 ? 'ゴールに到着！守ってあげられたね。' : '壁をよけて、下の道からゴールへ向かうよ' : '時間内にゴールを目指そう';
     }
     const demoTime = collectionDemo() ? Math.min(elapsed, stopAt) : wallDemo() ? detourSteps.length ? elapsed : Math.min(elapsed, stopAt) : elapsed % DEMO_DURATION;
@@ -368,7 +371,7 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
       avatar: autoDemo ? demoTrail.at(-1) : avatar, goal: COLS - 1,
       trail: autoDemo ? demoTrail : trail,
       base: autoDemo ? DEMO_WALLS : convertEdges(fixed()), walls: riskExample ? new Set() : walls,
-      secrets: new Set(),
+      secrets: new Set(explorerWallAppeared() ? [edge(7, 12)] : []),
       items: autoDemo ? demoItems : DEMO_FISH.map(fish => ({ ...fish, taken: taken.has(fish.cell) })),
     }, role, practice.cursor.y * COLS + practice.cursor.x, (practice.direction + 3) % 4, { cursor: wallDemo(), resolution, markScale: .65, wallDamage: wallDemo() ? WALL_DAMAGE : undefined, guideRoute: guideRoute() });
   }
