@@ -60,7 +60,7 @@ void main() {
   p += normalize(p - uPulse.xy + 1e-4) * pw * .018 + normalize(p - uRipple.xy + 1e-4) * rw * .01;
 
   float d = uDepth, s = smoothstep(0., 1., uSurface);
-  float wlFlat = mix(.95, -.06, s);
+  float wlFlat = mix(.95, .02, s);
   float wl = wlFlat + (.022 * sin(p.x * 5. + t * 1.4) + .011 * sin(p.x * 12.7 - t * 2.3)) * s;
 
   vec3 top = mix(vec3(.14, .36, .74), vec3(.015, .045, .14), d);

@@ -87,6 +87,12 @@ export class MazeRooms {
       if (room.members.length === 2 && room.members.every(m => m.tutorialComplete && m.ready && m.socket?.readyState === 1)) {
         g.phase = 'countdown'; room.countdown = 3; room.reason = '';
       }
+    } else if (data.type === 'unready' && ['ready', 'paused', 'countdown'].includes(g.phase)) {
+      member.ready = false;
+      if (g.phase === 'countdown') {
+        g.phase = g.time > 0 ? 'paused' : 'ready';
+        room.countdown = 0;
+      }
     } else if (data.type === 'pause' && ['playing', 'countdown'].includes(g.phase)) {
       this.pause(room, 'ひと休み中です。二人とも準備ができたら再開します。');
     } else if (data.type === 'again' && g.phase === 'result') {
