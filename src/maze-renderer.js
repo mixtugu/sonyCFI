@@ -632,11 +632,18 @@ export function drawMaze(canvas, s, role, cursor, direction, options = {}) {
     c.stroke(); c.restore();
     const b = neighbor(s, cursor, direction);
     if (b >= 0) {
-      const valid = !s.base.has(edge(cursor, b)) && !s.walls.has(edge(cursor, b)) && s.walls.size < s.settings.wallLimit, coords = segment(cursor, b);
+      const onWall = s.base.has(edge(cursor, b)) || s.walls.has(edge(cursor, b));
+      const valid = !onWall && s.walls.size < s.settings.wallLimit, coords = segment(cursor, b);
       const ghost = new Path2D(); ghost.moveTo(coords[0], coords[1]); ghost.lineTo(coords[2], coords[3]);
       c.save(); c.lineCap = 'round';
       if (valid) { c.globalCompositeOperation = 'lighter'; c.strokeStyle = `rgba(255,200,140,${.18 + .12 * pulse})`; c.lineWidth = 14; c.stroke(ghost); c.globalCompositeOperation = 'source-over'; }
-      c.globalAlpha = valid ? .7 + .3 * pulse : .6; c.strokeStyle = valid ? '#ffe1a3' : '#768e98'; c.lineWidth = 5; c.stroke(ghost); c.restore();
+      // A dark outline under the preview keeps it legible even directly over a wall's bright top,
+      // where a plain translucent line would blend in; blocked spots turn red instead of blue-gray,
+      // since the gray used to read as part of the wall itself.
+      c.globalAlpha = 1; c.strokeStyle = 'rgba(4,10,18,.8)'; c.lineWidth = valid ? 9 : 8; c.stroke(ghost);
+      c.globalAlpha = valid ? .7 + .3 * pulse : .92; c.strokeStyle = valid ? '#ffe1a3' : '#ff6a58'; c.lineWidth = valid ? 5 : 4.2; c.stroke(ghost);
+      if (onWall) { c.setLineDash([3, 3]); c.lineDashOffset = -amb * 6; c.globalAlpha = .8; c.strokeStyle = '#fff3ef'; c.lineWidth = 1.4; c.stroke(ghost); c.setLineDash([]); }
+      c.restore();
     }
   }
   c.restore();
