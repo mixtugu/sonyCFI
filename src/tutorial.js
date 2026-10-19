@@ -4,6 +4,7 @@ import { HP_MAX, applyDamage, creature } from './creatures.js';
 import { hearts, zukan } from './encyclopedia-ui.js';
 import { controllerDiagram, padIcon } from './controller-guide.js';
 import oceanTitle from './assets/you-see-i-see.png';
+import { createSoundObserver } from './sound-effects.js';
 
 // The pre-round briefing: three short steps per role (the navigator's run danger → walls → time), each a title, one line of description and one
 // line of controls. The first steps carry a 5×4 practice board to try the controls on.
@@ -38,6 +39,7 @@ const DIRECTIONS = [
 ];
 const KEY_DIRECTION = { ArrowUp: 0, w: 0, ArrowRight: 1, d: 1, ArrowDown: 2, s: 2, ArrowLeft: 3, a: 3 };
 const COLS = 5, ROWS = 4;
+const cursorIcon = '<svg class="cursor-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H4v4M16 3h4v4M20 16v4h-4M8 20H4v-4"/></svg>';
 const edgeKey = (ax, ay, bx, by) => { const a = `${ax},${ay}`, b = `${bx},${by}`; return a < b ? `${a}|${b}` : `${b}|${a}`; };
 const inBounds = (x, y) => x >= 0 && y >= 0 && x < COLS && y < ROWS;
 const coordinate = (x, y) => `${String.fromCharCode(65 + x)}-${String(ROWS - y).padStart(2, '0')}`;
@@ -66,7 +68,7 @@ for (let cell = 0; cell < COLS * ROWS; cell++) for (const next of [cell % COLS <
 for (const [a, b] of [[10, 11], [11, 12], [12, 17], [17, 16], [17, 18], [18, 19]]) DEMO_WALLS.delete(edge(a, b));
 DEMO_WALLS.delete(edge(14, 19));
 
-export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
+export function createTutorial(container, { onStep, onFinish, onClose, onSound } = {}) {
   container.innerHTML = `
 <div class="briefing-top"><span class="briefing-kicker"></span><span class="briefing-practice-notice" hidden>実際に操作してみてね</span><img class="briefing-logo" src="${oceanTitle}" alt="YOU SEE / I SEE"></div>
 <div class="briefing-progress" aria-label="チュートリアル進行状況"><span></span><span></span><span></span></div>
@@ -84,6 +86,8 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
   const art = find('.briefing-art'), board = find('.briefing-board'), feedback = find('.practice-feedback'), controls = find('.briefing-controls'), layout = find('.briefing-layout');
   let running = false, controller = false, role = 'parent', settings = {}, step = 0, keyTimer = 0, shownStep = -1, loop = 0, painted = 0;
   const practice = { cursor: { x: 2, y: 2 }, direction: 1, child: { x: 0, y: 3 }, placed: new Set(), feedback: '' };
+  const soundObserver = createSoundObserver(name => onSound?.(name), { deadline: false });
+  let soundPosition = null;
   let startedAt = 0;
   let trail = [15];
   const taken = new Set();
@@ -97,6 +101,7 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
   let registeredSmall = null;
 
   function resetPresentation() {
+    soundObserver.reset(); soundPosition = null;
     startedAt = performance.now();
     cursorMovedAt = startedAt;
     detourSteps = [];
@@ -193,7 +198,7 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
     if (showController) {
       const diagram = controllerDiagram(cursorStep() ? ['left', 'dpad', 'cross'] : moveStep() ? ['left', 'dpad'] : ['dpad']);
       find('.briefing-pad').innerHTML = cursorStep()
-        ? `<span class="wall-guide-note">ジョイスティックで<br>カーソル位置を移動</span>${diagram}<span class="wall-guide-note">ボタンの向きに<br>壁を置く</span><span class="wall-guide-hint" hidden></span>`
+        ? `<span class="wall-guide-note">ジョイスティックで<br>カーソル${cursorIcon}を移動</span>${diagram}<span class="wall-guide-note">ボタンの向きに<br>壁を置く</span><span class="wall-guide-hint" hidden></span>`
         : explorerGuide ? `<span class="wall-guide-note explorer-comment-space">ジョイスティックで<br>ナビゲーターを移動</span>${diagram}<span class="wall-guide-note explorer-comment-space" aria-hidden="true"></span><span class="wall-guide-hint" hidden></span>` : diagram;
     }
     find('.briefing-previous').innerHTML = controller ? `${padIcon('prev')} 長押しで戻る` : '戻る';
@@ -274,7 +279,7 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
     const instruction = reached ? '右に壁を立てよう' : '■のマスへカーソルを動かそう';
     if (feedback.textContent !== instruction) {
       if (reached) feedback.textContent = instruction;
-      else feedback.innerHTML = '<span class="cursor-target-symbol">■</span>のマスへカーソルを動かそう';
+      else feedback.innerHTML = `<span class="cursor-target-symbol">■</span>のマスへカーソル${cursorIcon}を動かそう`;
     }
     const direction = y > 0 ? { text: '上に倒してみよう', angle: 0, x: 0, y: -12 }
       : x < 2 ? { text: '右に倒してみよう', angle: 90, x: 12, y: 0 }
@@ -339,7 +344,10 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
     }
     if (navigatorDemo) {
       const cycle = riskExample ? Math.floor(elapsed / DEMO_DURATION) : 0;
-      if (cycle !== demoCycle) { resetMazeScene(find('.briefing-canvas')); demoCycle = cycle; }
+      if (cycle !== demoCycle) {
+        resetMazeScene(find('.briefing-canvas')); demoCycle = cycle;
+        soundObserver.reset(); soundPosition = null;
+      }
       const met = demoItems.filter(fish => fish.taken), hp = applyDamage(met.reduce((value, fish) => applyDamage(value, fish.damage), HP_MAX), wallDemo() ? practice.placed.size * WALL_DAMAGE : 0);
       if (hp !== demoHp) {
         const meter = find('.briefing-hp .hp-hearts'), panel = find('.briefing-hp');
@@ -365,7 +373,7 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
     // Draw at the size the board is shown (in device pixels), in half steps so resizing seldom repaints layers.
     const canvas = find('.briefing-canvas'), shown = (canvas.clientWidth || BOARD_WIDTH) * (devicePixelRatio || 1);
     const resolution = Math.min(6, Math.max(2, Math.ceil(shown / BOARD_WIDTH * 2) / 2));
-    drawMaze(canvas, {
+    const scene = {
       settings: { ...settings, cols: COLS, rows: ROWS, wallLimit: 20 },
       mode: role, phase: 'playing', time: autoDemo ? demoTime : elapsed, moves: (autoDemo ? demoTrail : trail).length - 1,
       avatar: autoDemo ? demoTrail.at(-1) : avatar, goal: COLS - 1,
@@ -373,7 +381,18 @@ export function createTutorial(container, { onStep, onFinish, onClose } = {}) {
       base: autoDemo ? DEMO_WALLS : convertEdges(fixed()), walls: riskExample ? new Set() : walls,
       secrets: new Set(explorerWallAppeared() ? [edge(7, 12)] : []),
       items: autoDemo ? demoItems : DEMO_FISH.map(fish => ({ ...fish, taken: taken.has(fish.cell) })),
-    }, role, practice.cursor.y * COLS + practice.cursor.x, (practice.direction + 3) % 4, { cursor: wallDemo(), resolution, markScale: .65, wallDamage: wallDemo() ? WALL_DAMAGE : undefined, guideRoute: guideRoute() });
+    };
+    soundObserver.update({
+      ...scene,
+      items: parent() ? scene.items : scene.items.map(({ damage, ...item }) => item),
+    });
+    const position = { avatar: scene.avatar, cursor: practice.cursor.y * COLS + practice.cursor.x };
+    if (soundPosition) {
+      if (cursorStep() && position.cursor !== soundPosition.cursor) onSound?.('move');
+      if (position.avatar === scene.goal && soundPosition.avatar !== scene.goal) onSound?.('finish');
+    }
+    soundPosition = position;
+    drawMaze(canvas, scene, role, practice.cursor.y * COLS + practice.cursor.x, (practice.direction + 3) % 4, { cursor: wallDemo(), resolution, markScale: .65, wallDamage: wallDemo() ? WALL_DAMAGE : undefined, guideRoute: guideRoute() });
   }
   function drawBoard() {
     const interactive = cursorStep() || moveStep();

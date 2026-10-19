@@ -11,6 +11,7 @@ import './controller.css';
 import './encyclopedia.css';
 import { controllerDiagram, padAction, playGuide } from './controller-guide.js';
 import { createControllerUI } from './controller-ui.js';
+import { createSoundEffects, createSoundObserver, deadlineRhythm } from './sound-effects.js';
 import { DEFAULTS, LIMITS, createMaze, start, tick, move, placeWall, neighbor } from './maze.js';
 import { drawFishIcon, drawMaze, pointerCell, setTextScale, setWallStyle, WALL_STYLES } from './maze-renderer.js';
 import { connectMaze } from './maze-network.js';
@@ -115,6 +116,46 @@ ${['parent', 'child'].map(role => `<section class="board-card ${role}"><div clas
 <div id="room-code" class="room-code" popover="manual" role="status" aria-label="部屋コード" hidden></div>`;
 
 const $ = id => document.getElementById(id);
+const deadlineGlow = document.createElement('div');
+deadlineGlow.id = 'deadline-glow';
+deadlineGlow.setAttribute('popover', 'manual');
+deadlineGlow.setAttribute('aria-hidden', 'true');
+deadlineGlow.hidden = true;
+document.body.append(deadlineGlow);
+document.querySelector('.wall-style').insertAdjacentHTML('beforebegin', `<fieldset class="sound-settings"><legend>効果音</legend><label><input id="sound-enabled" type="checkbox">効果音を鳴らす</label><label for="sound-volume">音量 <output id="sound-volume-value"></output></label><input id="sound-volume" type="range" min="0" max="100" step="5" aria-label="効果音の音量"><button id="sound-preview" type="button" class="secondary">音を試す</button><small>このブラウザーだけに保存されます。音が出ない場合は画面をクリックしてください。</small></fieldset>`);
+const sound = createSoundEffects({
+  storage: {
+    getItem: key => localStorage.getItem(key),
+    setItem: (key, value) => localStorage.setItem(key, value),
+  },
+  createContext: () => new AudioContext(),
+  report: (message, error) => { console.error(message, error); notice(message); },
+});
+const soundObserver = createSoundObserver(name => { if (!document.hidden) sound.play(name); });
+function showSoundSettings() {
+  const { enabled, volume } = sound.settings;
+  $('sound-enabled').checked = enabled;
+  $('sound-volume').value = volume;
+  $('sound-volume-value').textContent = `${volume}%`;
+  $('sound-preview').disabled = !enabled || volume === 0;
+}
+showSoundSettings();
+$('sound-enabled').onchange = () => {
+  sound.configure({ enabled: $('sound-enabled').checked }); showSoundSettings();
+  void sound.unlock();
+};
+$('sound-volume').oninput = () => { sound.configure({ volume: Number($('sound-volume').value) }); showSoundSettings(); };
+$('sound-volume').onchange = () => { void sound.unlock().then(ready => { if (ready) sound.play('confirm'); }); };
+$('sound-preview').onclick = () => { void sound.unlock().then(ready => { if (ready) sound.play('encounter'); }); };
+window.addEventListener('pointerdown', () => { void sound.unlock(); });
+window.addEventListener('keydown', () => { void sound.unlock(); });
+document.addEventListener('click', event => {
+  const button = event.target.closest('button');
+  if (!button || button.disabled || button.closest('.sound-settings, .touch-controls') || button.id === 'board-parent') return;
+  void sound.unlock().then(ready => { if (ready) sound.play('confirm'); });
+});
+document.addEventListener('visibilitychange', () => { if (document.hidden) sound.stop(); });
+window.addEventListener('blur', () => sound.stop());
 // Open long help content at its heading, including after a network pause reorders dialogs.
 // The Access controller is read over WebHID; the browser asks permission once, from a click or key.
 function accessButtons() { document.querySelectorAll('.access-connect').forEach(button => { button.hidden = !accessSupported() || accessConnected(); }); }
@@ -170,6 +211,8 @@ const network = sandboxMode ? { active: false, connected: false, state: null, se
     const changed = network.stateRound !== packet.round || network.stateCode !== packet.code;
     network.stateRound = packet.round; network.stateCode = packet.code;
     game = { ...packet.game, mode: packet.role, base: new Set(packet.game.base), walls: new Set(packet.game.walls), secrets: new Set(packet.game.secrets) };
+    if (changed) soundObserver.reset();
+    soundObserver.update(game, packet.countdown);
     if (changed) { tutorial.stop(); $('ready').close(); $('countdown').close(); cursor = game.avatar; resultShown = false; keys.clear(); $('result').close(); for (const [key, value] of Object.entries(game.settings)) $('settings').elements[key].value = value; }
     if (game.phase !== 'playing') keys.clear();
     document.querySelector('.boards').classList.add('network-boards');
@@ -181,7 +224,7 @@ const network = sandboxMode ? { active: false, connected: false, state: null, se
   }
 });
 function notice(message) { $('notice').textContent = message; $('notice').classList.add('show'); clearTimeout(notice.timer); notice.timer = setTimeout(() => $('notice').classList.remove('show'), 2600); }
-const tutorial = createTutorial($('ready-tutorial'), { onStep: () => update(), onFinish: () => { if (!tutorial.last) return; tutorial.stop(); network.send({ type: 'tutorial' }); update(); }, onClose: () => update() });
+const tutorial = createTutorial($('ready-tutorial'), { onSound: name => { if (!document.hidden && $('ready').open && !$('ready-tutorial').hidden) sound.play(name); }, onStep: () => update(), onFinish: () => { if (!tutorial.last) return; tutorial.stop(); network.send({ type: 'tutorial' }); update(); }, onClose: () => update() });
 function readyPrompt() {
   if ($('ending').open || $('game-opening').open) return;
   if (!entryStarted && game.phase === 'ready' && !network.state.tutorialComplete && !$('result').open) {
@@ -243,17 +286,23 @@ function roomCode() {
   if (open) element.hidePopover();
   element.showPopover(); element.dataset.above = above;
 }
-function reset(settings = game.settings, nextSeed = seed) { const mode = game.mode; game = createMaze(settings, nextSeed); game.mode = mode; seed = nextSeed; cursor = game.avatar; keys.clear(); resultShown = false; $('result').close(); update(); render(); }
+function reset(settings = game.settings, nextSeed = seed) { const mode = game.mode; game = createMaze(settings, nextSeed); game.mode = mode; seed = nextSeed; cursor = game.avatar; keys.clear(); resultShown = false; soundObserver.reset(); $('result').close(); update(); render(); }
 function setMode(mode) { if (network.active) return; game.mode = mode; keys.clear(); update(); }
 // A finished round is followed by the same maze with the roles exchanged, so both sides play it.
 function toggle() { if (network.active) { if (['ready', 'paused'].includes(game.phase) && !network.state.tutorialComplete) return; network.send({ type: ['playing', 'countdown'].includes(game.phase) ? 'pause' : game.phase === 'result' ? 'again' : 'ready' }); return; } if (game.phase === 'result') { endGame(); return; } if (game.phase === 'playing') { game.phase = 'paused'; keys.clear(); } else start(game); update(); }
-function control(dir) { if (game.mode === 'parent') { const n = neighbor(game, cursor, dir); if (n >= 0) cursor = n; } else if (game.mode === 'child') { if (network.active) network.send({ type: 'move', direction: dir }); else move(game, dir); } }
+function setCursor(cell) {
+  if (cell === cursor || cell < 0) return;
+  cursor = cell;
+  if (game.mode === 'parent' && game.phase === 'playing' && !document.hidden) sound.play('move');
+}
+function control(dir) { if (game.mode === 'parent') { setCursor(neighbor(game, cursor, dir)); } else if (game.mode === 'child') { if (network.active) network.send({ type: 'move', direction: dir }); else move(game, dir); } }
 function wall() { if (game.mode !== 'parent') return; if (network.active) { network.send({ type: 'wall', cell: cursor, direction }); return; } if (!placeWall(game, cursor, direction)) notice(game.phase !== 'playing' ? '探検を始めてから壁を置いてください。' : game.walls.size >= game.settings.wallLimit ? '設置できる壁をすべて使いました。' : 'すでに壁があります。空いている通路を選んでください。'); update(); }
 function rotate() { direction = (direction + 1) % 4; update(); }
 $('start').onclick = toggle; $('reset').onclick = () => { if (!network.active) reset(); }; $('close-result').onclick = () => endGame();
 // Leave the ending only after confirmation; a room also waits for the partner.
 let endingWaiting = false, endingPreview = null, endingCreaturePreviews = [];
 function endGame() {
+  if ($('ending').open) return;
   const found = endingPreview?.found || collection();
   const hp = endingPreview?.hp ?? game.hp;
   let sea = $('ending-creatures');
@@ -281,6 +330,8 @@ function endGame() {
   window.dispatchEvent(new CustomEvent('ocean-phase', { detail: 'ending' }));
   endingWaiting = false; $('ending-wait').hidden = true;
   reveal($('ending')); endingExplorerScene.play(hp, HP_MAX);
+  sound.stop('bubbles');
+  if (!document.hidden) sound.play('surface');
   for (const canvas of sea.querySelectorAll('[data-creature-preview]')) {
     const creatureId = canvas.dataset.creaturePreview;
     const source = { shark: sharkPreviewVideo, mermaid: mermaidPreviewVideo, squid: squidPreviewVideo }[creatureId];
@@ -385,6 +436,7 @@ document.addEventListener('fullscreenchange', () => {
   for (const dialog of dialogs) { dialog.classList.remove('entering'); dialog.close(); dialog.showModal(); }
   if (focused?.isConnected) focused.focus({ preventScroll: true });
   $('room-code').dataset.above = ''; roomCode();
+  if (deadlineGlow.matches(':popover-open')) { deadlineGlow.hidePopover(); deadlineGlow.showPopover(); }
 });
 $('rotate').onclick = rotate; $('place').onclick = wall;
 $('result').addEventListener('close', () => resultScene.stop());
@@ -485,8 +537,8 @@ $('preview-ending').onclick = () => {
 };
 $('settings').onsubmit = event => { event.preventDefault(); const values = Object.fromEntries(new FormData(event.target)); $('settings-dialog').close(); if (network.active) { network.send({ type: 'settings', settings: values }); return; } reset(values, seed + 1); if (!$('lobby').hidden) return; notice('新しい設定で迷路を作りました。'); };
 $('defaults').onclick = () => { for (const [key, value] of Object.entries(DEFAULTS)) $('settings').elements[key].value = value; reset(DEFAULTS, 260830); notice('初期設定に戻しました。'); };
-$('board-parent').onpointermove = event => { if (game.mode !== 'parent') return; const hit = pointerCell(event.currentTarget, game, event); if (hit) { cursor = hit.cell; direction = hit.direction; } };
-$('board-parent').onclick = event => { if (game.mode !== 'parent') return; const hit = pointerCell(event.currentTarget, game, event); if (hit) { cursor = hit.cell; direction = hit.direction; event.currentTarget.focus(); wall(); } };
+$('board-parent').onpointermove = event => { if (game.mode !== 'parent') return; const hit = pointerCell(event.currentTarget, game, event); if (hit) { setCursor(hit.cell); direction = hit.direction; } };
+$('board-parent').onclick = event => { if (game.mode !== 'parent') return; const hit = pointerCell(event.currentTarget, game, event); if (hit) { setCursor(hit.cell); direction = hit.direction; event.currentTarget.focus(); wall(); } };
 window.addEventListener('keydown', event => {
   if ($('game-opening').open) return;
   if (event.target.matches('input, select, textarea') || $('help').open || $('result').open || $('settings-dialog').open || !$('lobby').hidden) return;
@@ -504,6 +556,7 @@ window.addEventListener('keyup', event => keys.delete(event.key));
 function suspend() { keys.clear(); if (['playing', 'countdown'].includes(game.phase)) { if (network.active) network.send({ type: 'pause' }); else game.phase = 'paused'; update(); } }
 window.addEventListener('blur', suspend); document.addEventListener('visibilitychange', () => { if (document.hidden) suspend(); });
 function update() {
+  soundObserver.update(game, network.state?.countdown || 0);
   // Playing defaults to fullscreen; leaving 'playing' does not force it back off (the user may toggle it off mid-round).
   if (game.phase === 'playing' && lastPhase !== 'playing') { setImmersive(true); if (['ready', 'countdown'].includes(lastPhase)) diveIn(); }
   if (lastPhase !== game.phase) window.dispatchEvent(new CustomEvent('ocean-phase', { detail: oceanPhase() }));
@@ -525,6 +578,13 @@ function update() {
   setText($('phase'), { ready: '開始前', countdown: 'まもなく開始', playing: '探検中', paused: 'ひと休み中', result: '探検完了' }[game.phase]);
   $('phase-dot').classList.toggle('live', game.phase === 'playing');
   const remaining = Math.ceil(game.settings.duration - game.time); setText($('timer'), `${String(Math.floor(remaining / 60)).padStart(2, '0')}:${String(remaining % 60).padStart(2, '0')}`);
+  const warning = game.phase === 'playing' && remaining > 0 && remaining <= 5 && !document.hidden;
+  const rhythm = deadlineRhythm(game.settings.duration - game.time);
+  if (rhythm) deadlineGlow.style.setProperty('--deadline-period', `${rhythm.period}s`);
+  deadlineGlow.hidden = !warning;
+  if (warning && !deadlineGlow.matches(':popover-open')) deadlineGlow.showPopover();
+  else if (!warning && deadlineGlow.matches(':popover-open')) deadlineGlow.hidePopover();
+  if (!warning) sound.stop('alarm');
   $('timer').classList.toggle('urgent', remaining <= 5 && game.phase === 'playing');
   const oxygen = Math.max(0, Math.min(100, (game.settings.duration - game.time) / game.settings.duration * 100));
   if (Math.round(oxygen) !== sentOxygen) { sentOxygen = Math.round(oxygen); window.dispatchEvent(new CustomEvent('ocean-oxygen', { detail: oxygen / 100 })); }
