@@ -1,4 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap');
+.sound-settings{display:grid;gap:10px;margin:16px 0;padding:16px;border:1px solid var(--line);border-radius:12px;text-align:left}
+.sound-settings label{display:flex;align-items:center;gap:10px}.sound-settings input[type=range]{width:100%}.sound-settings small{color:var(--muted)}.sound-settings output{margin-left:auto}
+#deadline-glow{position:fixed;inset:0;width:100vw;height:100dvh;max-width:none;max-height:none;margin:0;padding:0;border:0;background:transparent;pointer-events:none;z-index:2147483647;box-shadow:inset 0 0 55px 18px #e22b36b3;animation:deadline-glow var(--deadline-period,1s) ease-in-out infinite}
+@keyframes deadline-glow{0%,100%{box-shadow:inset 0 0 55px 18px #e22b36b3}50%{box-shadow:inset 0 0 85px 28px #e22b36e6}}
+@media(prefers-reduced-motion:reduce){#deadline-glow{animation:none}}
 :root{--text-scale:1;--deep:#00194d;--sea:#2459a6;--foam:#eaf0fa;--line:#d1def0;--muted:#627b9b;--coral:#e0735a;font-family:'Noto Sans JP',sans-serif;font-size:calc(21px * var(--text-scale, 1));color:var(--deep);background:linear-gradient(#eaf0fa,#f7fbfc 320px) #f7fbfc;min-height:100vh;font-synthesis:none}
 *{box-sizing:border-box}body{margin:0}button,input,select{font:inherit;color:inherit}button{cursor:pointer;border:0;touch-action:manipulation}button:disabled{opacity:.45;cursor:default}input:disabled{opacity:.6}[hidden]{display:none!important}a{color:inherit;text-decoration:none}
 button:focus-visible,a:focus-visible,canvas:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid #f2b56b;outline-offset:3px}
@@ -74,6 +79,7 @@ button:focus-visible,a:focus-visible,canvas:focus-visible,input:focus-visible,su
 .practice-cell.is-cursor-target{background:#ffe45c40;box-shadow:inset 0 0 0 2px #ffe45c,inset 0 0 18px #ffe45c80,0 0 12px #ffe45c80;pointer-events:auto;animation:cursor-target-blink 1.2s ease-in-out infinite}
 @keyframes cursor-target-blink{50%{opacity:.15}}
 .cursor-target-symbol{color:#ffe45c;text-shadow:0 0 8px #ffe45c80}
+.cursor-icon{width:1.05em;height:1.05em;margin:0 .12em;vertical-align:-.2em;fill:none;stroke:#ffe45c;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 3px #ffe45c80)}
 .ocean-world .practice-feedback.is-wrong-direction{color:#ffe45c}
 .briefing-art .briefing-oxygen{margin:0 10px 10px;padding-top:0}
 .briefing-oxygen .oxygen-body{width:auto;flex:1;min-width:0;height:40px}
