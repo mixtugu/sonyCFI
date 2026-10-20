@@ -41,6 +41,12 @@ try {
   await expect(guest.locator('body')).toHaveClass(/spectating/);
   await expect(guest.locator('#game-entry')).toBeVisible(); await expect(entry(guest)).toBeHidden();
   await expect(guest.locator('#room-code')).toHaveText('A · 観戦中');
+  // Alone, the host explores; the switch above settings offers the navigator for this round.
+  assert.equal(room().members[0].role, 'child');
+  await expect(host.locator('#solo-navigator')).toBeVisible(); await expect(host.locator('#solo-navigator')).toHaveAttribute('aria-pressed', 'false');
+  await expect(guest.locator('#solo-navigator')).toBeHidden();
+  const [switchBox, gearBox] = await Promise.all([host.locator('#solo-navigator').boundingBox(), host.locator('#settings-open').boundingBox()]);
+  assert.ok(switchBox.y + switchBox.height <= gearBox.y && Math.abs(switchBox.width - gearBox.width) < 2, 'a gear-sized switch just above settings');
 
   // The host's opening video and briefing steps are followed.
   await entry(host).click();
@@ -59,24 +65,35 @@ try {
   await expect(guest.locator('#ready-title')).toContainText('相手は');
   await expect(guest.locator('#ready-tutorial')).toBeHidden(); await expect(guest.locator('#ready-start')).toBeHidden();
 
-  // Countdown, then the game: the guest watches the host's navigator view while the CPU explores.
+  // Countdown, then the game: the guest watches the host's explorer view while the CPU navigates.
   await host.locator('#ready-start').click();
   await expect(guest.locator('#countdown')).toBeVisible();
   await expect(guest.locator('#countdown-pause')).toBeHidden();
   await expect(host.locator('#phase')).toHaveText('探検中', { timeout: 6000 });
   await expect(guest.locator('#countdown')).toBeHidden();
   await expect(guest.locator('#ready')).toBeHidden();
-  await expect(guest.locator('#board-parent')).toBeVisible();
+  await expect(guest.locator('#board-child')).toBeVisible(); await expect(host.locator('#board-child')).toBeVisible();
   await expect(guest.locator('#start')).toBeHidden(); await expect(host.locator('#start')).toBeVisible();
+  await expect.poll(() => room().game.walls.size, { timeout: 8000 }).toBeGreaterThan(0);   // the CPU navigator
   const start = room().game.avatar;
-  await expect.poll(() => room().game.avatar, { timeout: 5000 }).not.toBe(start);
+  await host.locator('#board-child').focus();
+  for (const key of ['ArrowUp', 'ArrowRight', 'ArrowDown', 'ArrowLeft']) { await host.keyboard.down(key); await host.waitForTimeout(700); await host.keyboard.up(key); if (room().game.avatar !== start) break; }
+  assert.notEqual(room().game.avatar, start, 'the host explores');
   await guest.screenshot({ path: 'artifacts/solo-guest-game.png' });
+
+  // Nobody new can come in while the host plays alone.
+  const stranger = await open();
+  await stranger.goto(url); await stranger.locator('#maze-join button').click();
+  await expect(stranger.locator('#notice')).toContainText('ひとりで遊んでいるため参加できません');
+  await expect(stranger.locator('#lobby')).toBeVisible();
+  assert.equal(room().members.length, 2); assert.equal(room().game.phase, 'playing');
+  await stranger.context().close();
 
   // A guest reload neither pauses nor resets the host's game, and picks the mirror back up.
   const game = room().game;
   await guest.reload();
   await expect(guest.locator('body')).toHaveClass(/spectating/);
-  await expect(guest.locator('#board-parent')).toBeVisible();
+  await expect(guest.locator('#board-child')).toBeVisible();
   assert.equal(room().game, game); assert.equal(game.phase, 'playing');
   await expect(host.locator('#phase')).toHaveText('探検中');
 
@@ -98,6 +115,19 @@ try {
   await expect(guest.locator('#players-guest')).toBeVisible();
   await expect(guest.locator('body')).not.toHaveClass(/spectating/);
   assert.equal(room().game.phase, 'ready'); assert.equal(room().chosen, false); assert.equal(room().members.length, 2);
+
+  // Solo again, now switched to navigator for this round: the CPU explores and the guest follows.
+  await host.locator('[data-players=solo]').click();
+  await expect(host.locator('#solo-navigator')).toHaveAttribute('aria-pressed', 'false', { message: 'the switch was cleared with the round' });
+  await host.locator('#solo-navigator').click();
+  await expect(host.locator('#solo-navigator')).toHaveAttribute('aria-pressed', 'true');
+  assert.equal(room().members[0].role, 'parent');
+  await host.screenshot({ path: 'artifacts/solo-navigator-switch.png' });
+  await host.locator('#solo-navigator').click();
+  await expect(host.locator('#solo-navigator')).toHaveAttribute('aria-pressed', 'false'); assert.equal(room().members[0].role, 'child');
+  // The player count is chosen once per game; leaving it via the duo choice is the next game's.
+  room().game.phase = 'ready'; app.mazeRooms.reset(room()); app.mazeRooms.broadcast(room());
+  await expect(host.locator('#players-host')).toBeVisible();
 
   // Two players this time: both get their own start screen.
   await host.locator('[data-players=duo]').click();

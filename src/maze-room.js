@@ -73,11 +73,11 @@ export class MazeRooms {
       const room = this.rooms.get(typeof data.code === 'string' ? data.code.trim().toUpperCase() : '');
       if (!room) return this.error(socket, '部屋が見つかりません。コードを確認するか、新しい部屋を作ってください。', 'missing');
       if (data.type === 'join') {
-        // A guest who left a solo game's waiting seat without a word (closed tab) hands it to the next guest.
-        const vacated = room.members.find(m => !this.plays(room, m) && m.socket?.readyState !== 1);
-        if (room.members.length >= 2 && vacated) { if (vacated.socket) this.bindings.delete(vacated.socket); room.members = room.members.filter(m => m !== vacated); }
+        // While the host plays alone, nobody new can come in; a guest already in the room may still reconnect.
+        if (room.solo && room.chosen) return this.error(socket, 'いまはひとりで遊んでいるため参加できません。終わるまでお待ちください。', 'solo');
         if (room.members.length >= 2) return this.error(socket, 'この部屋にはすでに二人が参加しています。', 'full');
-        this.add(room, room.members[0].role === 'parent' ? 'child' : 'parent', socket); return;
+        // Seats, not this round's roles: a solo host may be playing the other seat's role.
+        this.add(room, room.members[0].seat === 'parent' ? 'child' : 'parent', socket); return;
       }
       if (data.type === 'resume') {
         const member = room.members.find(m => m.token && m.token === data.token);
@@ -110,12 +110,17 @@ export class MazeRooms {
       // The host's client reports which screen it shows, so a spectating guest can follow along.
       if (typeof data.screen === 'string' && /^(entry|opening|tutorial:[0-9]|ready|countdown|game|result|ending)$/.test(data.screen)) room.hostScreen = data.screen;
     } else if (data.type === 'players' && g.phase === 'ready' && member === room.members[0] && typeof data.solo === 'boolean') {
-      // The host chooses, before the start screen, whether to play as two or alone.
+      // The host chooses, before the start screen, whether to play as two or alone. Alone, the host
+      // explores and the CPU navigates, unless the host switches to navigator for this round.
       if (room.solo !== data.solo || !room.chosen) {
         room.solo = data.solo; room.chosen = true; room.countdown = 0;
-        room.members.forEach(m => { m.ready = false; });
+        room.members.forEach(m => { m.role = m.seat; m.ready = false; m.tutorialComplete = false; });
+        if (room.solo) room.members[0].role = 'child';
         room.reason = this.readyReason(room);
       }
+    } else if (data.type === 'soloRole' && g.phase === 'ready' && room.solo && room.chosen && member === room.members[0] && ['parent', 'child'].includes(data.role)) {
+      // Lasts for this round only: the next game resets roles and asks for the player count again.
+      if (member.role !== data.role) { member.role = data.role; member.ready = false; member.tutorialComplete = false; room.countdown = 0; }
     } else if (data.type === 'tutorial' && g.phase === 'ready') {
       member.tutorialComplete = true;
     } else if (data.type === 'ready' && ['ready', 'paused'].includes(g.phase)) {

@@ -454,6 +454,20 @@ const settingsDock = document.createElement('div');
 settingsDock.id = 'settings-dock';
 settingsDock.setAttribute('popover', 'manual');
 settingsDock.append($('settings-open'));
+// Alone the host explores; on the start screen this switch, just above settings, lets the host play
+// the navigator instead. The room clears it with the round, since every game resets the roles.
+const navigatorSwitch = document.createElement('button');
+navigatorSwitch.type = 'button'; navigatorSwitch.id = 'solo-navigator'; navigatorSwitch.className = 'secondary'; navigatorSwitch.hidden = true;
+navigatorSwitch.title = 'このラウンドはナビゲーターで遊ぶ'; navigatorSwitch.setAttribute('aria-label', navigatorSwitch.title);
+navigatorSwitch.innerHTML = `<img src="${wallIcon}" alt="" aria-hidden="true">`;
+navigatorSwitch.setAttribute('aria-pressed', 'false');
+navigatorSwitch.onclick = () => network.send({ type: 'soloRole', role: game.mode === 'parent' ? 'child' : 'parent' });
+settingsDock.prepend(navigatorSwitch);
+function syncNavigatorSwitch() {
+  const available = network.active && !testRole && !spectating && !!network.state?.host && network.state.solo && network.state.chosen && game.phase === 'ready' && $('game-entry').open;
+  navigatorSwitch.hidden = !available;
+  setAttr(navigatorSwitch, 'aria-pressed', game.mode === 'parent');
+}
 const settingsModalStack = [...document.querySelectorAll('dialog[open]')];
 const cornerLogo = document.createElement('div');
 cornerLogo.id = 'corner-logo';
@@ -722,7 +736,7 @@ function update() {
     const found = collection();
     showResult(found, game.hp, game.walls.size, game.settings.wallLimit);
   }
-  syncCornerLogo();
+  syncCornerLogo(); syncNavigatorSwitch();
 }
 function showResult(found, hp, walls, wallLimit) {
   $('result-title').textContent = '～ 冒険が終わりました ～';
@@ -840,7 +854,11 @@ function pollPad(now) {
   }
   // The host picks a button with the stick and ×; the waiting guest has nothing to press.
   if ($('players-choice').open) { if (!$('players-host').hidden) controllerUI.navigate($('players-host'), input); return -1; }
-  if ($('game-entry').open) { if (on('cross')) $('game-entry-start').click(); return -1; }
+  if ($('game-entry').open) {
+    // With the navigator switch offered, the stick moves between start, the switch and settings.
+    if (!navigatorSwitch.hidden) controllerUI.navigate($('game-entry'), input); else if (on('cross')) $('game-entry-start').click();
+    return -1;
+  }
   if ($('ending').open) { if (on('cross') || on('circle')) finishEnding(); return -1; }
   if ($('countdown').open) { if (on('circle') || on('cross')) suspend(); return -1; }
   if ($('result').open) {
