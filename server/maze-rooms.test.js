@@ -250,6 +250,25 @@ test('every game starts with the host choosing the number of players; nobody can
   // The next game asks again; until then the guest is no longer spectating, just waiting.
   assert.equal(room.chosen, false); assert.equal(child.packets.at(-1).chosen, false); assert.equal(child.packets.at(-1).spectator, false);
 });
+test('the host restart takes both back to the player-count choice from any phase, keeping the room', () => {
+  for (const solo of [false, true]) {
+    const { service, parent, child, room, both } = setup();
+    service.handle(parent, { type: 'players', solo });
+    if (solo) { service.handle(parent, { type: 'tutorial' }); service.handle(parent, { type: 'ready' }); } else { both('tutorial'); both('ready'); }
+    service.tick(3); assert.equal(room.game.phase, 'playing');
+    service.handle(child, { type: 'restart' }); assert.equal(room.game.phase, 'playing', 'only the host restarts');
+    const round = room.round, tokens = room.members.map(m => m.token);
+    service.handle(parent, { type: 'restart' });
+    assert.equal(room.round, round + 1); assert.equal(room.game.phase, 'ready'); assert.equal(room.chosen, false);
+    assert.deepEqual(room.members.map(m => m.role), ['parent', 'child']); assert.deepEqual(room.members.map(m => m.token), tokens);
+    for (const s of [parent, child]) { const view = s.packets.at(-1); assert.equal(view.chosen, false); assert.equal(view.spectator, false); assert.equal(view.restarted, true); }
+    assert.equal(service.rooms.get('A'), room);
+  }
+  // Also from the report, where a player who already left is dropped from the room.
+  const { service, parent, child, room } = setup(); room.game.phase = 'result'; service.broadcast(room);
+  service.handle(child, { type: 'leave' }); service.handle(parent, { type: 'restart' });
+  assert.equal(room.members.length, 1); assert.equal(room.game.phase, 'ready');
+});
 test('a host alone in the room can play solo without anyone joining', () => {
   const service = new MazeRooms(), host = socket();
   service.handle(host, { type: 'create' }); const room = service.rooms.get('A');

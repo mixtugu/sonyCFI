@@ -215,6 +215,14 @@ const network = sandboxMode ? { active: false, connected: false, state: null, se
     if (changed) soundObserver.reset();
     soundObserver.update(game, packet.countdown);
     if (changed) { tutorial.stop(); $('ready').close(); $('countdown').close(); cursor = game.avatar; resultShown = false; keys.clear(); $('result').close(); for (const [key, value] of Object.entries(game.settings)) $('settings').elements[key].value = value; }
+    // After the host's reset, whatever either side had open gives way to the player-count choice.
+    if (changed && packet.restarted) {
+      if ($('game-opening').open) { $('game-opening-video').pause(); $('game-opening').close(); }
+      for (const id of ['game-entry', 'ending', 'help']) if ($(id).open) $(id).close();
+      endingWaiting = false; $('ending-wait').hidden = true; entryStarted = false;
+      document.querySelector('.workspace').hidden = false;
+      notice('最初の画面に戻りました。');
+    }
     if (game.phase !== 'playing') keys.clear();
     document.querySelector('.boards').classList.add('network-boards');
     document.querySelectorAll('.board-card').forEach(b => b.hidden = !b.classList.contains(packet.role));
@@ -650,6 +658,11 @@ $('defaults').onclick = () => { for (const [key, value] of Object.entries(DEFAUL
 $('board-parent').onpointermove = event => { if (game.mode !== 'parent') return; const hit = pointerCell(event.currentTarget, game, event); if (hit) { setCursor(hit.cell); direction = hit.direction; } };
 $('board-parent').onclick = event => { if (game.mode !== 'parent') return; const hit = pointerCell(event.currentTarget, game, event); if (hit) { setCursor(hit.cell); direction = hit.direction; event.currentTarget.focus(); wall(); } };
 window.addEventListener('keydown', event => {
+  // Y is the host's reset: from any screen, both go back to choosing the number of players.
+  if ((event.key === 'y' || event.key === 'Y') && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey
+    && network.active && !testRole && network.state?.host && !event.target.matches('input, select, textarea')) {
+    event.preventDefault(); network.send({ type: 'restart' }); return;
+  }
   if ($('game-opening').open) return;
   if (event.target.matches('input, select, textarea') || $('help').open || $('result').open || $('settings-dialog').open || !$('lobby').hidden) return;
   if ($('countdown').open || $('ending').open || spectating) return;

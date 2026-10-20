@@ -106,7 +106,11 @@ export class MazeRooms {
     }
     // A guest waiting out a solo game only watches; nothing it sends reaches the game.
     if (!this.plays(room, member)) return;
-    if (data.type === 'screen' && member === room.members[0]) {
+    if (data.type === 'restart' && member === room.members[0]) {
+      // The host's reset: from any screen, both go back to the player-count choice, still in the room.
+      room.members = room.members.filter(m => m.token);
+      this.reset(room); room.hostScreen = 'entry'; room.restartRound = room.round;
+    } else if (data.type === 'screen' && member === room.members[0]) {
       // The host's client reports which screen it shows, so a spectating guest can follow along.
       if (typeof data.screen === 'string' && /^(entry|opening|tutorial:[0-9]|ready|countdown|game|result|ending)$/.test(data.screen)) room.hostScreen = data.screen;
     } else if (data.type === 'players' && g.phase === 'ready' && member === room.members[0] && typeof data.solo === 'boolean') {
@@ -169,7 +173,7 @@ export class MazeRooms {
     const g = room.game, review = g.phase === 'result', parent = seen.role === 'parent';
     // Only send public state plus this role's information; never send the seed or hidden item values.
     return { type: 'state', code: room.code, round: room.round, role: seen.role, host: member === room.members[0], ready: seen.ready, tutorialComplete: !!seen.tutorialComplete, countdown: Math.ceil(room.countdown || 0), again: seen.again,
-      solo: !!room.solo, chosen: !!room.chosen, spectator, hostScreen: room.hostScreen || 'entry',
+      solo: !!room.solo, chosen: !!room.chosen, spectator, hostScreen: room.hostScreen || 'entry', restarted: room.restartRound === room.round,
       match: { leg: room.leg, done: review, results: room.results },
       partner: { connected: room.members.some(m => m !== member && m.socket?.readyState === 1), ready: room.members.some(m => m !== member && m.ready), tutorialComplete: room.members.some(m => m !== member && m.tutorialComplete), again: room.members.some(m => m !== member && m.again) }, reason: room.reason,
       game: { settings: g.settings, phase: g.phase, time: g.time, avatar: g.avatar, goal: parent || review ? g.goal : null,

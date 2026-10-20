@@ -134,6 +134,21 @@ try {
   await expect(entry(guest)).toBeVisible(); await expect(entry(host)).toBeVisible();
   await expect(guest.locator('#room-code')).toHaveText('A');
   assert.equal(room().solo, false);
+
+  // The host's Y resets both to the player-count choice: the guest's Y does nothing.
+  await guest.keyboard.press('y'); await host.waitForTimeout(300); assert.equal(room().chosen, true);
+  await host.keyboard.press('y');
+  await expect(host.locator('#players-host')).toBeVisible(); await expect(guest.locator('#players-guest')).toBeVisible();
+  await expect(entry(host)).toBeHidden(); await expect(entry(guest)).toBeHidden();
+  // Also mid-way through a solo start, with the guest spectating the opening video.
+  await host.locator('[data-players=solo]').click(); await entry(host).click();
+  await expect(guest.locator('#game-opening')).toBeVisible();
+  await host.keyboard.press('Y');
+  await expect(host.locator('#game-opening')).toBeHidden(); await expect(guest.locator('#game-opening')).toBeHidden();
+  await expect(host.locator('#players-host')).toBeVisible(); await expect(guest.locator('#players-guest')).toBeVisible();
+  await expect(guest.locator('body')).not.toHaveClass(/spectating/);
+  await expect(host.locator('#notice')).toContainText('最初の画面に戻りました');
+  assert.equal(room().members.length, 2); assert.equal(room().chosen, false);
   assert.deepEqual(errors, []);
   console.log('PASS: host choice on the start screen, guest spectating start/opening/briefing steps/ready/countdown/game/result/ending, reload without pause, no leave button, back to duo.');
 } finally {
