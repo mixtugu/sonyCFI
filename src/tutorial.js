@@ -570,6 +570,7 @@ export function createTutorial(container, { onStep, onFinish, onClose, onSound }
   find('.briefing-previous').onclick = () => go(step - 1);
   find('.briefing-next').onclick = () => go(step + 1);
   find('.briefing-launch').onclick = () => onFinish?.();
-  return { start, stop, key, pad, setKicker, setController: value => { if (controller !== value) { controller = value; update(); } }, next: () => go(step + 1),
+  // goTo lets a spectating guest follow the host's current step.
+  return { start, stop, key, pad, setKicker, setController: value => { if (controller !== value) { controller = value; update(); } }, next: () => go(step + 1), goTo: go,
     get step() { return step; }, get last() { return last(); }, get running() { return running; } };
 }

@@ -105,7 +105,7 @@ export class MazeRoom extends DurableObject {
     if (adapter && service.bindings.has(adapter)) service.disconnect(adapter);
     else if (member && !member.socket) {
       member.ready = false; member.again = false; room.touched = Date.now();
-      if (['playing', 'countdown'].includes(room.game.phase)) service.pause(room, '相手との接続が切れました。再接続を待っています。');
+      if (service.plays(room, member) && ['playing', 'countdown'].includes(room.game.phase)) service.pause(room, '相手との接続が切れました。再接続を待っています。');
     }
     service.broadcast(room); await this.commit(room, outbox);
   }

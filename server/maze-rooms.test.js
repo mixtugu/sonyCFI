@@ -9,6 +9,7 @@ function setup() {
   assert.equal(room.code, 'A');
   service.handle(child, { type: 'join', code: room.code });
   assert.deepEqual(room.members.map(m => m.role), ['parent', 'child']);
+  service.handle(parent, { type: 'players', solo: false });
   const both = type => { service.handle(parent, { type }); service.handle(child, { type }); };
   const ready = () => { both('tutorial'); both('ready'); };
   return { service, parent, child, room, both, ready };
@@ -140,6 +141,97 @@ test('settings invalidate tutorial approvals and cannot discard a finished game'
   assert.ok(room.members.every(m => !m.ready && !m.tutorialComplete));
   room.game.phase = 'result'; service.broadcast(room);
   service.handle(parent, { type: 'settings', settings: { duration: 120 } }); assert.equal(room.game.phase, 'result'); assert.equal(room.game.settings.duration, 45);
+});
+test('only the host chooses solo, and only before the start', () => {
+  const { service, parent, child, room, both } = setup();
+  service.handle(child, { type: 'players', solo: true }); assert.equal(room.solo, false);
+  both('tutorial'); service.handle(child, { type: 'ready' });
+  service.handle(parent, { type: 'players', solo: true });
+  assert.equal(room.solo, true); assert.ok(room.members.every(m => !m.ready));
+  assert.equal(service.view(room, room.members[0]).spectator, false); assert.equal(service.view(room, room.members[1]).spectator, true);
+  service.handle(parent, { type: 'players', solo: false }); assert.equal(room.solo, false);
+  service.handle(parent, { type: 'players', solo: true });
+  service.handle(parent, { type: 'ready' }); service.tick(3); assert.equal(room.game.phase, 'playing');
+  service.handle(parent, { type: 'players', solo: false }); assert.equal(room.solo, true, 'cannot switch mid-game');
+});
+test('a solo host plays with the CPU explorer; the waiting guest can neither act nor pause nor reset it', () => {
+  const { service, parent, child, room } = setup();
+  service.handle(parent, { type: 'players', solo: true });
+  service.handle(parent, { type: 'tutorial' }); service.handle(parent, { type: 'ready' });
+  assert.equal(room.game.phase, 'countdown', 'the guest does not need to be ready');
+  service.tick(3); assert.equal(room.game.phase, 'playing');
+  const start = room.game.avatar;
+  for (let i = 0; i < 30; i++) service.tick(.1);
+  assert.notEqual(room.game.avatar, start, 'the CPU moves the explorer');
+  const game = room.game, time = game.time, moves = game.moves;
+  for (const type of ['pause', 'unready', 'ready', 'tutorial']) service.handle(child, { type });
+  service.handle(child, { type: 'move', direction: 0 });
+  assert.equal(game.phase, 'playing'); assert.equal(game.moves, moves);
+  service.disconnect(child); assert.equal(game.phase, 'playing', 'a guest dropping out does not pause');
+  const guest = socket(); service.handle(guest, { type: 'resume', code: room.code, token: room.members[1].token });
+  assert.equal(guest.packets.at(-1).spectator, true);
+  service.handle(guest, { type: 'leave' });
+  assert.equal(room.game, game, 'the guest leaving does not reset the game'); assert.equal(game.phase, 'playing'); assert.equal(room.members.length, 1);
+  assert.ok(game.time > time - 1e-9);
+  // A new guest can join mid-game and simply waits.
+  const late = socket(); service.handle(late, { type: 'join', code: room.code });
+  assert.equal(late.packets.at(-1).spectator, true); assert.equal(game.phase, 'playing');
+  // A waiting guest who vanishes (closed tab) frees the seat for the next one; the host is untouched.
+  service.disconnect(late);
+  const next = socket(); service.handle(next, { type: 'join', code: room.code });
+  assert.equal(next.packets.at(-1).spectator, true); assert.equal(room.members.length, 2); assert.equal(game.phase, 'playing');
+  service.tick(game.settings.duration); assert.equal(game.phase, 'result');
+  service.handle(parent, { type: 'again' });
+  assert.equal(room.game.phase, 'ready', 'the host alone starts the next game'); assert.equal(room.solo, true);
+  assert.equal(service.rooms.get('A'), room);
+});
+test('a solo host whose connection drops pauses the game; the host leaving hands the room back as a duo', () => {
+  const { service, parent, child, room } = setup();
+  service.handle(parent, { type: 'players', solo: true }); service.handle(parent, { type: 'tutorial' }); service.handle(parent, { type: 'ready' }); service.tick(3);
+  service.disconnect(parent); assert.equal(room.game.phase, 'paused');
+  const back = socket(); service.handle(back, { type: 'resume', code: room.code, token: room.members[0].token });
+  service.handle(back, { type: 'ready' }); service.tick(3); assert.equal(room.game.phase, 'playing');
+  service.handle(back, { type: 'leave' });
+  assert.equal(room.solo, false); assert.equal(room.members.length, 1); assert.equal(room.game.phase, 'ready');
+  assert.equal(child.packets.at(-1).host, true); assert.equal(child.packets.at(-1).spectator, false);
+});
+test('a spectating guest follows the host: the host view, readiness and reported screen', () => {
+  const { service, parent, child, room } = setup();
+  service.handle(parent, { type: 'players', solo: true });
+  service.handle(parent, { type: 'screen', screen: 'tutorial:1' });
+  service.handle(child, { type: 'screen', screen: 'ending' });
+  service.handle(parent, { type: 'screen', screen: '<script>' });
+  let view = child.packets.at(-1);
+  assert.equal(view.spectator, true); assert.equal(view.hostScreen, 'tutorial:1');
+  assert.equal(view.role, 'parent', 'the guest sees the navigator view, as the host does');
+  assert.equal(view.game.hp, room.game.hp); assert.deepEqual(view.game.secrets, []);
+  service.handle(parent, { type: 'tutorial' }); service.handle(parent, { type: 'ready' });
+  view = child.packets.at(-1); assert.equal(view.tutorialComplete, true); assert.equal(view.ready, true);
+  // Back to duo the guest has its own view again.
+  service.handle(parent, { type: 'unready' }); service.handle(parent, { type: 'players', solo: false });
+  view = child.packets.at(-1); assert.equal(view.spectator, false); assert.equal(view.role, 'child'); assert.equal(view.game.hp, null);
+});
+test('every game starts with the host choosing the number of players; nobody can start before that', () => {
+  const service = new MazeRooms(), parent = socket(), child = socket();
+  service.handle(parent, { type: 'create' }); const room = service.rooms.get('A');
+  service.handle(child, { type: 'join', code: 'A' });
+  assert.equal(child.packets.at(-1).chosen, false); assert.equal(child.packets.at(-1).spectator, false);
+  for (const s of [parent, child]) { service.handle(s, { type: 'tutorial' }); service.handle(s, { type: 'ready' }); }
+  assert.equal(room.game.phase, 'ready', 'no start before the choice');
+  service.handle(child, { type: 'players', solo: false }); assert.equal(room.chosen, false, 'only the host chooses');
+  service.handle(parent, { type: 'players', solo: true });
+  assert.equal(child.packets.at(-1).chosen, true); assert.equal(child.packets.at(-1).spectator, true);
+  service.handle(parent, { type: 'ready' }); service.tick(3); service.tick(room.game.settings.duration + 1);
+  assert.equal(room.game.phase, 'result');
+  service.handle(parent, { type: 'again' });
+  // The next game asks again; until then the guest is no longer spectating, just waiting.
+  assert.equal(room.chosen, false); assert.equal(child.packets.at(-1).chosen, false); assert.equal(child.packets.at(-1).spectator, false);
+});
+test('a host alone in the room can play solo without anyone joining', () => {
+  const service = new MazeRooms(), host = socket();
+  service.handle(host, { type: 'create' }); const room = service.rooms.get('A');
+  service.handle(host, { type: 'tutorial' }); service.handle(host, { type: 'ready' }); assert.equal(room.game.phase, 'ready');
+  service.handle(host, { type: 'players', solo: true }); service.handle(host, { type: 'ready' }); assert.equal(room.game.phase, 'countdown');
 });
 test('leaving after the report preserves the other player totals and rejects a departed token', () => {
   const { service, parent, child, room } = setup(); room.game.phase = 'result'; service.broadcast(room);

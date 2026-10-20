@@ -119,20 +119,20 @@ button:focus-visible,a:focus-visible,canvas:focus-visible,input:focus-visible,su
 #settings-dock{position:fixed;inset:auto 24px 24px auto;margin:0;padding:0;border:0;background:transparent;overflow:visible}
 #corner-logo{position:fixed;inset:18px 24px auto auto;margin:0;padding:0;border:0;background:transparent;pointer-events:none;overflow:visible}
 #corner-logo img{display:block;width:112px;height:auto}
-#game-entry{text-align:center;padding:48px}
-#game-entry[open]{display:flex;flex-direction:column;align-items:center;gap:40px;width:min(620px,calc(100% - 32px))}
-#game-entry .game-entry-logo{display:block;width:min(440px,100%);height:auto}
-#game-entry .game-entry-tagline{margin:0;font-size:calc(24px * var(--text-scale,1));line-height:1.8;color:#eafcff;text-shadow:0 1px 12px #02283d}
+:is(#game-entry,#players-choice){text-align:center;padding:48px}
+#game-entry[open],#players-choice[open]{display:flex;flex-direction:column;align-items:center;gap:40px;width:min(620px,calc(100% - 32px))}
+:is(#game-entry,#players-choice) .game-entry-logo{display:block;width:min(440px,100%);height:auto}
+:is(#game-entry,#players-choice) .game-entry-tagline{margin:0;font-size:calc(24px * var(--text-scale,1));line-height:1.8;color:#eafcff;text-shadow:0 1px 12px #02283d}
 #game-entry-start{min-width:180px;padding:18px 36px;font-size:calc(28px * var(--text-scale,1))}
-.ocean-world #game-entry{background:transparent;border:0;box-shadow:none}
-#game-entry::backdrop{background:transparent;backdrop-filter:none}
+.ocean-world :is(#game-entry,#players-choice){background:transparent;border:0;box-shadow:none}
+#game-entry::backdrop,#players-choice::backdrop{background:transparent;backdrop-filter:none}
 .ocean-world #game-opening{width:100vw;max-width:100vw;height:100dvh;max-height:100dvh;margin:0;padding:0;border:0;border-radius:0;background:#000;overflow:hidden}
 #game-opening::backdrop{background:#000;backdrop-filter:none}
 #game-opening-video{display:block;width:100%;height:100%;object-fit:contain}
 #game-opening-error{position:absolute;inset:auto 24px 32px;padding:16px;text-align:center;background:#092f43ee;border-radius:12px}
 #game-opening-error p{color:#fff}
-body:has(#game-entry[open]) .workspace{display:none}
-html:has(#game-entry[open]),body:has(#game-entry[open]){overflow:hidden}
+body:has(#game-entry[open],#players-choice[open]) .workspace{display:none}
+html:has(#game-entry[open],#players-choice[open]),body:has(#game-entry[open],#players-choice[open]){overflow:hidden}
 .home-icon-button{display:flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:10px 16px;border-radius:12px;white-space:nowrap}
 .home-icon-button svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linejoin:round}
 @media(min-width:901px){
@@ -259,6 +259,15 @@ input[type=number]{background:#082a3c;color:#d6eddf;border-color:#82c3bf40}.brie
 .ocean-world .countdown-dialog{text-align:center;width:min(500px,calc(100% - 32px));padding:40px 24px;background:radial-gradient(ellipse at top,#236371,#09273c 75%)}
 .countdown-dialog h2{font-size:calc(30px * var(--text-scale, 1));font-weight:500}.countdown-dialog .eyebrow{font-size:calc(18px * var(--text-scale, 1));letter-spacing:.13em}.countdown-dialog>strong{display:block;font-size:calc(clamp(135px,27vw,225px) * var(--text-scale, 1));font-weight:500;line-height:1.4;color:#daefe0;font-variant-numeric:tabular-nums;text-shadow:0 0 40px #b8efcd55}.countdown-dialog::backdrop{background:#031925ae}
 .ocean-world .ending-dialog{width:min(650px,calc(100% - 32px));text-align:center;border:none;background:transparent;box-shadow:none;padding:35px 20px}.ocean-world .ending-dialog::backdrop{background:#092f4320;backdrop-filter:none}.ending-dialog h2{font-weight:500;font-size:calc(clamp(37.5px,6vw,57px) * var(--text-scale, 1));line-height:1.6}.ending-dialog .eyebrow{letter-spacing:.2em;font-size:calc(15px * var(--text-scale, 1))}.ending-dialog p{color:#c4e5d9}.ending-dialog button{margin-top:22px}
+/* Before the start screen the host picks the number of players; the guest waits on the same background. */
+.players-host{display:flex;flex-direction:column;align-items:center;gap:20px}
+.players-question{margin:0;font-size:calc(26px * var(--text-scale,1));font-weight:700;color:#eafcff;text-shadow:0 1px 12px #02283d}
+.players-buttons{display:flex;flex-wrap:wrap;justify-content:center;gap:16px}
+.players-buttons button{min-width:180px;padding:18px 36px;font-size:calc(28px * var(--text-scale,1))}
+.players-wait{margin:0;font-size:calc(24px * var(--text-scale,1));line-height:1.8;color:#eafcff;text-shadow:0 1px 12px #02283d}
+/* A guest spectating the host's solo game sees the host's screens with every action removed. */
+body.spectating :is(#start, #game-entry-start, #game-opening-error, .briefing-footer, .briefing-close, #ready-start, #ready-review, #ready-back, .ready-foot, #countdown-pause, #close-result, #ending-finish, #ending-wait, #maze-leave, .touch-controls){display:none!important}
+body.spectating dialog:not(#settings-dialog, #help), body.spectating .board-surface{pointer-events:none}
 #ready-review{margin-bottom:10px}.ready-dialog.briefing #ready-settings{font-size:calc(16.5px * var(--text-scale, 1))}
 .board-surface{overflow:auto;min-width:0;overscroll-behavior:contain}
 .board-surface canvas{transform:scale(var(--maze-display-zoom,1));transform-origin:center center}

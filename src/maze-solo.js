@@ -4,7 +4,7 @@ import { tick } from './maze.js';
 // In-memory transport around the real room engine. Only the other seat is automated.
 // No WebSocket, room service or saved multiplayer session is used by these previews.
 export function createSoloSession({ role = 'parent', settings = () => ({}), onState, onLeave, notice = () => {} }) {
-  let service, room, human, bot, initializing = false;
+  let service, room, human, bot, host, initializing = false;
   const client = { active: false, connected: true, state: null, start, send, advance };
   function socket(seat) {
     return { readyState: 1, send(raw) {
@@ -18,6 +18,8 @@ export function createSoloSession({ role = 'parent', settings = () => ({}), onSt
   function automatePartner() {
     const member = service.bindings.get(bot)?.member;
     if (!member) return;
+    // A preview is always the two-seat game (the CPU in the other seat), so the host's choice is made for it.
+    if (room.game.phase === 'ready' && !room.chosen) service.handle(host, { type: 'players', solo: false });
     if (room.game.phase === 'result' && human && service.bindings.get(human).member.again) service.handle(bot, { type: 'again' });
     if (room.game.phase === 'ready' && !member.tutorialComplete) service.handle(bot, { type: 'tutorial' });
     if (['ready', 'paused'].includes(room.game.phase) && member.tutorialComplete && !member.ready) service.handle(bot, { type: 'ready' });
@@ -29,7 +31,7 @@ export function createSoloSession({ role = 'parent', settings = () => ({}), onSt
     service.handle(parent, { type: 'create', settings: settings() });
     room = [...service.rooms.values()][0];
     service.handle(child, { type: 'join', code: room.code });
-    human = role === 'parent' ? parent : child; bot = role === 'parent' ? child : parent;
+    human = role === 'parent' ? parent : child; bot = role === 'parent' ? child : parent; host = parent;
     automatePartner(); initializing = false;
     client.active = true; service.broadcast(room);
   }

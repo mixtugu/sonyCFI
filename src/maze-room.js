@@ -1,4 +1,4 @@
-import { createMaze, move, placeWall } from './maze.js';
+import { createMaze, move, placeWall, tick } from './maze.js';
 
 // Shared by Node, Workers and the offline role previews.
 const randomHex = length => Array.from(crypto.getRandomValues(new Uint8Array(length)), byte => byte.toString(16).padStart(2, '0')).join('');
@@ -14,13 +14,20 @@ export class MazeRooms {
     room.members.push(member); this.bindings.set(socket, { room, member }); this.session(room, member); this.broadcast(room);
   }
   session(room, member) { this.send(member.socket, { type: 'session', code: room.code, token: member.token }); }
+  // In a solo game the host plays alone against the CPU; the guest stays in the room and waits.
+  // Only the members returned here take part: their readiness starts the game, their connection
+  // pauses it, and their actions reach it.
+  // Every game begins with the host choosing the number of players (`chosen`); until then both wait.
+  players(room) { return room.solo && room.chosen ? room.members.slice(0, 1) : room.members; }
+  plays(room, member) { return this.players(room).includes(member); }
+  readyReason(room) { return room.solo ? 'ひとりで探検します。チュートリアルを確認して準備完了を押すと3秒後に始まります。' : 'チュートリアルを確認し、二人とも準備完了を押すと3秒後に始まります。'; }
   // A game is a single round; players keep their seats from game to game.
   reset(room, settings = room.game?.settings) {
     room.game = createMaze(settings, randomSeed()); room.game.mode = 'duo'; room.round++;
     room.leg = 1; room.results = []; room.members.forEach(m => { m.role = m.seat; });
     room.members.forEach(m => { m.ready = false; m.tutorialComplete = false; m.again = false; });
-    room.countdown = 0;
-    room.reason = 'チュートリアルを確認し、二人とも準備完了を押すと3秒後に始まります。';
+    room.countdown = 0; room.solo = !!room.solo; room.chosen = false;
+    room.reason = this.readyReason(room);
   }
   finish(room) {
     if (room.game.phase !== 'result') return;
@@ -34,6 +41,15 @@ export class MazeRooms {
       elapsed = Math.max(0, elapsed - room.countdown); room.countdown = remaining;
       if (remaining > 1e-9) return;
       room.countdown = 0; room.game.phase = 'playing';
+    }
+    if (room.game.phase === 'playing' && elapsed > 0 && room.solo && room.members[0]) {
+      // Solo: the CPU takes the seat the host is not playing. Step in the engine's 0.1 s slices so a
+      // long gap (a slow tick, or Worker hibernation) plays out the same as a steady clock.
+      const g = room.game;
+      g.mode = room.members[0].role;
+      for (let left = elapsed; left > 1e-9 && g.phase === 'playing'; left -= .1) tick(g, Math.min(.1, left));
+      g.mode = 'duo';
+      return;
     }
     if (room.game.phase === 'playing' && elapsed > 0) {
       // Duo rooms have no CPU simulation; consume the complete wall-clock delta (also after Worker hibernation).
@@ -57,6 +73,9 @@ export class MazeRooms {
       const room = this.rooms.get(typeof data.code === 'string' ? data.code.trim().toUpperCase() : '');
       if (!room) return this.error(socket, '部屋が見つかりません。コードを確認するか、新しい部屋を作ってください。', 'missing');
       if (data.type === 'join') {
+        // A guest who left a solo game's waiting seat without a word (closed tab) hands it to the next guest.
+        const vacated = room.members.find(m => !this.plays(room, m) && m.socket?.readyState !== 1);
+        if (room.members.length >= 2 && vacated) { if (vacated.socket) this.bindings.delete(vacated.socket); room.members = room.members.filter(m => m !== vacated); }
         if (room.members.length >= 2) return this.error(socket, 'この部屋にはすでに二人が参加しています。', 'full');
         this.add(room, room.members[0].role === 'parent' ? 'child' : 'parent', socket); return;
       }
@@ -74,17 +93,36 @@ export class MazeRooms {
       if (g.phase === 'result') {
         // Keep the match's encyclopedia readable for the partner who is still reviewing the match.
         member.socket = null; member.token = null; member.ready = false; member.again = false;
-      } else { room.members = room.members.filter(m => m !== member); this.reset(room); }
+      } else if (!this.plays(room, member)) {
+        // A waiting guest leaving must not disturb the host's solo game.
+        room.members = room.members.filter(m => m !== member);
+      } else {
+        // The remaining member becomes the host and chooses again, starting from a duo room.
+        room.members = room.members.filter(m => m !== member); room.solo = false; this.reset(room);
+      }
       this.send(socket, { type: 'left' }); this.broadcast(room);
       if (!room.members.some(m => m.token)) this.rooms.delete(room.code);
       return;
     }
-    if (data.type === 'tutorial' && g.phase === 'ready') {
+    // A guest waiting out a solo game only watches; nothing it sends reaches the game.
+    if (!this.plays(room, member)) return;
+    if (data.type === 'screen' && member === room.members[0]) {
+      // The host's client reports which screen it shows, so a spectating guest can follow along.
+      if (typeof data.screen === 'string' && /^(entry|opening|tutorial:[0-9]|ready|countdown|game|result|ending)$/.test(data.screen)) room.hostScreen = data.screen;
+    } else if (data.type === 'players' && g.phase === 'ready' && member === room.members[0] && typeof data.solo === 'boolean') {
+      // The host chooses, before the start screen, whether to play as two or alone.
+      if (room.solo !== data.solo || !room.chosen) {
+        room.solo = data.solo; room.chosen = true; room.countdown = 0;
+        room.members.forEach(m => { m.ready = false; });
+        room.reason = this.readyReason(room);
+      }
+    } else if (data.type === 'tutorial' && g.phase === 'ready') {
       member.tutorialComplete = true;
     } else if (data.type === 'ready' && ['ready', 'paused'].includes(g.phase)) {
       if (!member.tutorialComplete) return this.error(socket, 'チュートリアルを最後まで確認してください。', 'tutorial');
       member.ready = true;
-      if (room.members.length === 2 && room.members.every(m => m.tutorialComplete && m.ready && m.socket?.readyState === 1)) {
+      const players = this.players(room);
+      if (room.chosen && players.length === (room.solo ? 1 : 2) && players.every(m => m.tutorialComplete && m.ready && m.socket?.readyState === 1)) {
         g.phase = 'countdown'; room.countdown = 3; room.reason = '';
       }
     } else if (data.type === 'unready' && ['ready', 'paused', 'countdown'].includes(g.phase)) {
@@ -94,10 +132,12 @@ export class MazeRooms {
         room.countdown = 0;
       }
     } else if (data.type === 'pause' && ['playing', 'countdown'].includes(g.phase)) {
-      this.pause(room, 'ひと休み中です。二人とも準備ができたら再開します。');
+      this.pause(room, room.solo ? 'ひと休み中です。準備ができたら再開します。' : 'ひと休み中です。二人とも準備ができたら再開します。');
     } else if (data.type === 'again' && g.phase === 'result') {
-      // A finished game restarts only after both players have ended it.
-      member.again = true; if (room.members.length === 2 && room.members.every(m => m.again && m.socket?.readyState === 1)) this.reset(room);
+      // A finished game restarts only after everyone who played has ended it (just the host when solo).
+      member.again = true;
+      const players = this.players(room);
+      if (players.length === (room.solo ? 1 : 2) && players.every(m => m.again && m.socket?.readyState === 1)) this.reset(room);
     } else if (data.type === 'settings' && g.phase === 'ready' && member === room.members[0]) {
       this.reset(room, data.settings);
     } else if (data.type === 'move' && g.phase === 'playing') {
@@ -114,13 +154,17 @@ export class MazeRooms {
   disconnect(socket) {
     const binding = this.bindings.get(socket); if (!binding) return;
     this.bindings.delete(socket); const { room, member } = binding; member.socket = null; member.ready = false; member.again = false; room.touched = Date.now();
-    if (['playing', 'countdown'].includes(room.game.phase)) this.pause(room, '相手との接続が切れたため探検を停止しました。再接続を待っています。');
+    // A waiting guest's connection does not matter to a solo game; only a player's drop pauses it.
+    if (this.plays(room, member) && ['playing', 'countdown'].includes(room.game.phase)) this.pause(room, '相手との接続が切れたため探検を停止しました。再接続を待っています。');
     this.broadcast(room);
   }
   view(room, member) {
-    const g = room.game, review = g.phase === 'result', parent = member.role === 'parent';
+    // A spectating guest sees exactly what the host sees: the host's role, readiness and screen.
+    const spectator = !this.plays(room, member), seen = spectator && room.members[0] ? room.members[0] : member;
+    const g = room.game, review = g.phase === 'result', parent = seen.role === 'parent';
     // Only send public state plus this role's information; never send the seed or hidden item values.
-    return { type: 'state', code: room.code, round: room.round, role: member.role, host: member === room.members[0], ready: member.ready, tutorialComplete: !!member.tutorialComplete, countdown: Math.ceil(room.countdown || 0), again: member.again,
+    return { type: 'state', code: room.code, round: room.round, role: seen.role, host: member === room.members[0], ready: seen.ready, tutorialComplete: !!seen.tutorialComplete, countdown: Math.ceil(room.countdown || 0), again: seen.again,
+      solo: !!room.solo, chosen: !!room.chosen, spectator, hostScreen: room.hostScreen || 'entry',
       match: { leg: room.leg, done: review, results: room.results },
       partner: { connected: room.members.some(m => m !== member && m.socket?.readyState === 1), ready: room.members.some(m => m !== member && m.ready), tutorialComplete: room.members.some(m => m !== member && m.tutorialComplete), again: room.members.some(m => m !== member && m.again) }, reason: room.reason,
       game: { settings: g.settings, phase: g.phase, time: g.time, avatar: g.avatar, goal: parent || review ? g.goal : null,

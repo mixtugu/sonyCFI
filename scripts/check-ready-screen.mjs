@@ -43,6 +43,8 @@ try {
 
   await page.goto(`http://127.0.0.1:${app.port}`);
   await page.locator('#maze-create button').click();
+  // Every room game opens with the host choosing the number of players.
+  await page.locator('#players-choice [data-players=duo]').click();
   await openTutorial();
   await finishTutorial();
   await page.locator('#ready-start').click();

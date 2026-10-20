@@ -108,6 +108,7 @@ ${['parent', 'child'].map(role => `<section class="board-card ${role}"><div clas
 <div id="notice" role="status"></div>
 <dialog id="result">${waterLight}<div class="return-art" aria-hidden="true"><canvas id="result-scene"></canvas></div><h2 id="result-title">～ 冒険が終わりました ～</h2><p class="result-count"><span id="result-count-label">出会った生き物</span><strong id="result-count"></strong></p><div class="zukan result-zukan" id="result-zukan" role="list" aria-label="図鑑"></div><p id="final-stats"></p><div class="dialog-actions"><button id="close-result" class="primary">次へ</button></div></dialog>
 <dialog id="game-entry" aria-label="ゲームを開始する"><img class="game-entry-logo" src="${oceanTitle}" alt="YOU SEE / I SEE"><p class="game-entry-tagline">ー 同じ世界、異なる視点が生むバイアス ー</p><button id="game-entry-start" class="primary">ゲームを開始する</button></dialog>
+<dialog id="players-choice" class="entry-screen" aria-label="遊ぶ人数"><img class="game-entry-logo" src="${oceanTitle}" alt="YOU SEE / I SEE"><p class="game-entry-tagline">ー 同じ世界、異なる視点が生むバイアス ー</p><div id="players-host" class="players-host"><p class="players-question">何人で遊びますか？</p><div class="players-buttons" role="group" aria-label="遊ぶ人数"><button type="button" class="primary" data-players="duo">ふたりで</button><button type="button" class="primary" data-players="solo">ひとりで</button></div></div><p id="players-guest" class="players-wait" role="status" hidden>相手が人数を選ぶと、次へ進めます。<br>しばらくお待ちください。</p></dialog>
 <dialog id="game-opening" aria-label="オープニング"><video id="game-opening-video" preload="none" playsinline disablepictureinpicture disableremoteplayback aria-label="オープニング動画"></video><div id="game-opening-error" hidden><p role="alert"></p><button type="button" id="game-opening-retry" class="primary">動画を再生する</button></div></dialog>
 <dialog id="ready" class="ready-dialog">${waterLight}${bubbles(12)}<p class="eyebrow" id="ready-eyebrow"></p><h2 id="ready-title"></h2><p id="ready-note"></p><div id="ready-tutorial" class="tutorial"></div><button type="button" id="ready-review" class="secondary wide">チュートリアルを確認</button><button type="button" id="ready-start" class="primary wide">準備完了</button><button type="button" id="ready-back" class="secondary wide" hidden>戻る</button><p class="ready-foot"><button type="button" id="ready-settings" class="text-button">⚙ 設定</button></p></dialog>
 <dialog id="countdown" class="countdown-dialog" aria-label="開始カウントダウン">${bubbles(14, 720)}<h2>まもなく探検が始まります</h2><div class="countdown-core"><span class="countdown-rings" aria-hidden="true"><i></i><i></i><i></i></span><strong id="countdown-number" aria-live="assertive" aria-atomic="true">3</strong></div><div class="depth-gauge" aria-hidden="true"><span>水面</span><i><b></b></i><span>海の底</span></div><button id="countdown-pause" class="secondary">待機に戻る</button></dialog>
@@ -202,7 +203,7 @@ function diveIn() { const boards = document.querySelector('.boards'); restart(bo
 const keyDirection = { ArrowRight: 0, d: 0, ArrowDown: 1, s: 1, ArrowLeft: 2, a: 2, ArrowUp: 3, w: 3 };
 const descriptions = { parent: '壁を置いてエクスプローラーCPUを守ろう', child: '魚に触れて図鑑を埋めよう', cpu: 'CPU同士を観察' };
 // While the ending plays the camera stays above the surface, even if the next game has already arrived.
-function oceanPhase() { return $('game-entry').open || $('game-opening').open ? 'entry' : $('ending').open ? 'ending' : !$('lobby').hidden ? 'lobby' : game.phase === 'result' && network.active ? 'summary' : game.phase; }
+function oceanPhase() { return $('players-choice').open || $('game-entry').open || $('game-opening').open ? 'entry' : $('ending').open ? 'ending' : !$('lobby').hidden ? 'lobby' : game.phase === 'result' && network.active ? 'summary' : game.phase; }
 function showLobby(on) { if ($('ending').open && !on) return; $('lobby').hidden = !on; document.querySelector('.workspace').hidden = on; window.dispatchEvent(new CustomEvent('ocean-phase', { detail: oceanPhase() })); }
 const network = sandboxMode ? { active: false, connected: false, state: null, send() {} } : (testRole ? connectSoloMaze : connectMaze)({ role: testRole, settings: () => Object.fromEntries(new FormData($('settings'))), notice,
   onLeave: () => { if (testRole) { location.assign('/'); return; } entryStarted = false; $('game-entry').close(); $('game-opening-video').pause(); $('game-opening').close(); tutorial.stop(); $('ready').close(); $('help').close(); $('ending').close(); $('countdown').close(); $('settings-dialog').close(); setImmersive(false); document.querySelector('.boards').classList.remove('network-boards'); document.querySelectorAll('.board-card').forEach(b => b.hidden = false); reset(); showLobby(true); },
@@ -220,7 +221,7 @@ const network = sandboxMode ? { active: false, connected: false, state: null, se
     // Packets can arrive several times a frame; the frame loop applies the newest one once (and draws).
     stateDirty = true;
     // The partner has ended too, so the ending scene that was waiting moves on to the new game.
-    if (endingWaiting && (game.phase !== 'result' || !packet.partner.connected)) finishEnding();
+    if (endingWaiting && (game.phase !== 'result' || (!packet.partner.connected && !packet.solo))) finishEnding();
   }
 });
 function notice(message) { $('notice').textContent = message; $('notice').classList.add('show'); clearTimeout(notice.timer); notice.timer = setTimeout(() => $('notice').classList.remove('show'), 2600); }
@@ -239,7 +240,7 @@ function readyPrompt() {
   const { partner, ready, match, tutorialComplete } = network.state, paused = game.phase === 'paused';
   const startWasUsable = $('ready').open && !$('ready-start').hidden && !$('ready-start').disabled;
   const backWasUsable = $('ready').open && !$('ready-back').hidden && !$('ready-back').disabled;
-  const partnerLine = testRole ? '相手はCPU · 準備完了' : partner.connected ? partner.ready ? '相手は準備完了' : partner.tutorialComplete ? '相手は準備中' : '相手はチュートリアルを確認中' : '相手を待っています';
+  const partnerLine = testRole ? '相手はCPU · 準備完了' : network.state.solo ? 'ひとりで探検' : partner.connected ? partner.ready ? '相手は準備完了' : partner.tutorialComplete ? '相手は準備中' : '相手はチュートリアルを確認中' : '相手を待っています';
   $('ready-eyebrow').textContent = `${paused ? 'ひと休み中' : '探検の準備'} · ${partnerLine}`;
   $('ready-title').innerHTML = `<span class="ready-role-intro"> あなたは…</span><strong class="ready-role-name">${game.mode === 'parent' ? 'ナビゲーター' : 'エクスプローラー'}</strong>`;
   $('ready-note').textContent = !paused && tutorialComplete ? '' : testRole ? (paused ? '準備完了で3秒後に再開します。' : 'チュートリアルを確認して準備完了を押すと\n3秒のカウンダウン後にゲームが開始します。') : network.state.reason || 'チュートリアルを確認して準備完了を押してください。二人の準備ができたら3秒後に始まります。';
@@ -276,7 +277,8 @@ function readyPrompt() {
 // The room code sits small in the top-right corner. As a popover it stays above the modal
 // dialogs, and is lifted again whenever the set of open dialogs changes.
 function roomCode() {
-  const element = $('room-code'), code = network.active && !testRole ? network.state?.code || '' : '';
+  const element = $('room-code'), room = network.active && !testRole ? network.state?.code || '' : '';
+  const code = room && network.state?.spectator ? `${room} · 観戦中` : room;
   if (element.textContent !== code) element.textContent = code;
   if (!element.showPopover) { element.hidden = !code; return; }
   element.hidden = false;
@@ -325,7 +327,8 @@ function endGame() {
     return `<div role="listitem" data-size="${c.size}" data-side="${side}"${videoPreview ? ` class="ending-video-creature ending-video-creature-${c.id}"` : ''}${facing < 0 ? ' data-swims-left' : ''}${c.id === 'jellyfish' ? ' data-fixed-facing' : ''} style="--fish-x:${x}%;--fish-y:${y}%;--fish-width:${width}px;--fish-max-width:${width / 9.6}%;--swim-time:${4 + seeded(i, 12) * 5}s;--swim-delay:${-seeded(i, 13) * 18}s;--bob-time:${1.8 + seeded(i, 14) * 2}s;--facing:${facing}"><div class="ending-creature-facing">${picture}</div></div>`;
   }).join('');
   $('result').close(); resultScene.stop?.();
-  if (!endingPreview && network.active && game.phase === 'result') network.send({ type: 'again' });
+  // A solo host ends the game only on leaving the ending, so the spectating guest sees the ending too.
+  if (!endingPreview && network.active && game.phase === 'result' && !(network.state.solo && network.state.host)) network.send({ type: 'again' });
   document.querySelector('.workspace').hidden = true;
   window.dispatchEvent(new CustomEvent('ocean-phase', { detail: 'ending' }));
   endingWaiting = false; $('ending-wait').hidden = true;
@@ -347,8 +350,10 @@ function finishEnding() {
     return;
   }
   if (network.active && game.phase === 'result') {
-    // A partner who has gone cannot start the next game; return to the lobby instead.
-    if (!network.state.partner.connected) { $('ending').close(); network.send({ type: 'leave' }); return; }
+    // A partner who has gone cannot start the next game; return to the lobby instead. A solo host
+    // needs no partner: the server starts the next game on its own, so just wait for it here.
+    if (!network.state.partner.connected && !network.state.solo) { $('ending').close(); network.send({ type: 'leave' }); return; }
+    if (network.state.solo && network.state.host) { network.send({ type: 'again' }); endingWaiting = true; return; }
     endingWaiting = true; $('ending-wait').hidden = false; return;
   }
   entryStarted = false;
@@ -464,7 +469,7 @@ function positionSettingsDock() {
   syncCornerLogo();
 }
 function syncCornerLogo() {
-  const visible = $('lobby').hidden && !$('game-entry').open && !$('game-opening').open && game.phase !== 'playing' && !($('ready').open && $('ready').classList.contains('briefing'));
+  const visible = $('lobby').hidden && !$('game-entry').open && !$('players-choice').open && !$('game-opening').open && game.phase !== 'playing' && !($('ready').open && $('ready').classList.contains('briefing'));
   if (visible && !cornerLogo.matches(':popover-open')) cornerLogo.showPopover();
   else if (!visible && cornerLogo.matches(':popover-open')) cornerLogo.hidePopover();
 }
@@ -485,6 +490,97 @@ positionSettingsDock();
 $('ready').addEventListener('cancel', event => event.preventDefault());
 $('ready-start').onclick = toggle;
 $('ready-back').onclick = () => network.send({ type: 'unready' });
+// Every game opens with the host choosing the number of players, before the start screen; the guest
+// waits on the same background until the host has chosen.
+$('players-choice').addEventListener('cancel', event => event.preventDefault());
+$('players-choice').onclick = event => {
+  const button = event.target.closest('[data-players]');
+  if (button && network.state?.host) network.send({ type: 'players', solo: button.dataset.players === 'solo' });
+};
+function playersChoice() {
+  const choosing = network.active && !testRole && game.phase === 'ready' && !network.state?.chosen && !$('ending').open;
+  if (!choosing) { if ($('players-choice').open) $('players-choice').close(); return false; }
+  if ($('game-opening').open) { $('game-opening-video').pause(); $('game-opening').close(); }
+  for (const id of ['game-entry', 'ready', 'countdown', 'result']) if ($(id).open) $(id).close();
+  tutorial.stop(); entryStarted = false;
+  const host = !!network.state.host;
+  $('players-host').hidden = !host; $('players-guest').hidden = host;
+  if (!$('players-choice').open) { reveal($('players-choice')); window.dispatchEvent(new CustomEvent('ocean-phase', { detail: oceanPhase() })); }
+  return true;
+}
+// The screen the host shows. In a solo game the host reports it to the room, and the guest follows it.
+function hostScreen() {
+  if ($('ending').open) return 'ending';
+  if ($('result').open) return 'result';
+  if ($('countdown').open) return 'countdown';
+  if ($('game-opening').open) return 'opening';
+  if ($('game-entry').open) return 'entry';
+  if ($('ready').open) return !$('ready-tutorial').hidden && tutorial.running ? `tutorial:${tutorial.step}` : 'ready';
+  return 'game';
+}
+let sentScreen = '', sentScreenAt = 0;
+function reportScreen() {
+  if (!network.active || testRole || !network.state?.host || !network.state.solo || !network.state.chosen) return;
+  const screen = hostScreen(), now = performance.now();
+  if (screen === network.state.hostScreen) { sentScreen = screen; return; }
+  if (screen === sentScreen && now - sentScreenAt < 1000) return;   // already on its way
+  sentScreen = screen; sentScreenAt = now; network.send({ type: 'screen', screen });
+}
+// A guest of a solo game spectates: it shows the host's screen and the host's view of the maze,
+// with every action hidden. Leaving the solo game hands the guest its own screens back.
+const MIRRORED = ['game-entry', 'game-opening', 'ready', 'countdown', 'result', 'ending'];
+let spectating = false;
+function closeMirrored(id) {
+  $(id).close();
+  if (id === 'game-opening') $('game-opening-video').pause();
+  if (id === 'ready') tutorial.stop();
+  if (id === 'ending') document.querySelector('.workspace').hidden = false;
+}
+function spectate() {
+  if (!network.active || !network.state?.spectator) {
+    if (spectating) {
+      spectating = false; document.body.classList.remove('spectating');
+      for (const id of MIRRORED) if ($(id).open) closeMirrored(id);
+      entryStarted = false; resultShown = false; endingWaiting = false;
+    }
+    return false;
+  }
+  spectating = true; document.body.classList.add('spectating'); keys.clear();
+  if ($('players-choice').open) $('players-choice').close();   // the host has chosen; follow the host now
+  const screen = network.state.hostScreen || 'entry', step = screen.startsWith('tutorial:') ? Number(screen.slice(9)) : -1;
+  const want = step >= 0 ? 'ready' : { entry: 'game-entry', opening: 'game-opening', ready: 'ready', countdown: 'countdown', result: 'result', ending: 'ending' }[screen] || '';
+  // Results open only when the host's do.
+  resultShown = true;
+  for (const id of MIRRORED) if (id !== want && $(id).open) closeMirrored(id);
+  if (want === 'game-entry' && !$('game-entry').open) reveal($('game-entry'));
+  if (want === 'game-opening' && !$('game-opening').open) {
+    const video = $('game-opening-video');
+    video.src = game.mode === 'child' ? explorerOpeningVideo : navigatorOpeningVideo;
+    video.muted = true;   // no click from the guest, so play muted to be allowed to autoplay
+    reveal($('game-opening')); video.play().catch(() => {});
+  }
+  if (want === 'ready') {
+    if (!$('ready').open) reveal($('ready'));
+    if (step >= 0) { if (!tutorial.running) tutorial.start(game.mode, game.settings); tutorial.goTo(step); } else if (tutorial.running) tutorial.stop();
+    const briefing = step >= 0;
+    $('ready').classList.toggle('briefing', briefing); $('ready').classList.remove('tutorial-confirmed');
+    tutorial.setKicker(`観戦中 · ${game.mode === 'parent' ? 'ナビゲーター' : 'エクスプローラー'}`);
+    $('ready-tutorial').hidden = !briefing; $('ready-title').hidden = $('ready-note').hidden = briefing;
+    setHTML($('ready-title'), `<span class="ready-role-intro"> 相手は…</span><strong class="ready-role-name">${game.mode === 'parent' ? 'ナビゲーター' : 'エクスプローラー'}</strong>`);
+    setText($('ready-note'), game.phase === 'paused' ? '相手がひと休みしています。' : '相手が準備しています。');
+    for (const id of ['ready-eyebrow', 'ready-start', 'ready-review', 'ready-back']) $(id).hidden = true;
+    document.querySelector('.ready-foot').hidden = true;
+  }
+  if (want === 'countdown') {
+    const number = String(network.state.countdown || 1), changed = $('countdown-number').textContent !== number;
+    if (changed) $('countdown-number').textContent = number;
+    if (!$('countdown').open) { reveal($('countdown')); countdownTick(); } else if (changed) countdownTick();
+  }
+  if (want === 'result' && !$('result').open) showResult(collection(), game.hp, game.walls.size, game.settings.wallLimit);
+  // The guest's 'again' from endGame is ignored by the room: only the host ends a solo game.
+  if (want === 'ending' && !$('ending').open) endGame();
+  return true;
+}
 $('ready-review').onclick = () => { tutorial.start(game.mode, game.settings); update(); };
 $('ready-settings').onclick = () => $('settings-dialog').showModal();
 // The wall design is a personal display preference, remembered in this browser only.
@@ -542,7 +638,7 @@ $('board-parent').onclick = event => { if (game.mode !== 'parent') return; const
 window.addEventListener('keydown', event => {
   if ($('game-opening').open) return;
   if (event.target.matches('input, select, textarea') || $('help').open || $('result').open || $('settings-dialog').open || !$('lobby').hidden) return;
-  if ($('countdown').open || $('ending').open) return;
+  if ($('countdown').open || $('ending').open || spectating) return;
   if ($('ready').open) { if (!$('ready-tutorial').hidden) tutorial.key(event); return; }
   const dir = keyDirection[event.key];
   if (dir !== undefined) { event.preventDefault(); keys.add(event.key); if (game.mode === 'parent') control(dir); }
@@ -570,10 +666,12 @@ function update() {
   if (network.active) {
     // The room code itself lives in the top-right corner; the chip only names a test run.
     setText($('room-chip-code'), game.mode === 'parent' ? 'ナビゲーター' : 'エクスプローラー');
-    setText($('room-chip-partner'), testRole ? '🤖' : '');
-    $('room-chip-partner').hidden = !testRole;
+    // Only the /test previews name the CPU partner; a solo room game does not.
+    const cpuPartner = testRole;
+    setText($('room-chip-partner'), cpuPartner ? '🤖' : '');
+    $('room-chip-partner').hidden = !cpuPartner;
     $('room-chip-partner').setAttribute('aria-label', '相手はCPU');
-    $('room-chip-partner').title = testRole ? '相手はCPU' : '';
+    $('room-chip-partner').title = cpuPartner ? '相手はCPU' : '';
   }
   setText($('phase'), { ready: '開始前', countdown: 'まもなく開始', playing: '探検中', paused: 'ひと休み中', result: '探検完了' }[game.phase]);
   $('phase-dot').classList.toggle('live', game.phase === 'playing');
@@ -595,14 +693,20 @@ function update() {
     modeText = network.state.reason || '対戦中';
     if (['ready', 'paused'].includes(game.phase)) startText = network.state.ready ? '相手を待機中' : '準備完了';
     if (game.phase === 'result') startText = '終了する';
-    readyPrompt();
-    if (game.phase === 'countdown') {
-      const number = String(network.state.countdown);
-      const changed = $('countdown-number').textContent !== number;
-      if (changed) $('countdown-number').textContent = number;
-      if (!$('countdown').open) { $('settings-dialog').close(); reveal($('countdown')); countdownTick(); }
-      else if (changed) countdownTick();
-    } else if ($('countdown').open) $('countdown').close();
+    // A guest of the host's solo game spectates the host's screens instead of its own; before any
+    // of that, the host chooses the number of players.
+    const watching = spectate();
+    if (!watching && !playersChoice()) {
+      readyPrompt();
+      if (game.phase === 'countdown') {
+        const number = String(network.state.countdown);
+        const changed = $('countdown-number').textContent !== number;
+        if (changed) $('countdown-number').textContent = number;
+        if (!$('countdown').open) { $('settings-dialog').close(); reveal($('countdown')); countdownTick(); }
+        else if (changed) countdownTick();
+      } else if ($('countdown').open) $('countdown').close();
+    }
+    reportScreen();
   } else { if ($('ready').open) { $('ready').close(); tutorial.stop(); } if (game.phase === 'result') startText = '終了する'; }
   setText($('start'), startText); setText($('mode-description'), modeText);
   for (const role of ['parent', 'child']) setText($('badge-' + role), game.mode === role ? 'あなた' : 'CPU');
@@ -663,7 +767,7 @@ function sidePanels() {
 }
 // Boards are not drawn while the game screen is hidden (lobby, ending); they resume on return.
 const workspace = document.querySelector('.workspace');
-function render() { if (workspace.hidden) return; for (const role of ['parent', 'child']) if (!network.active || game.mode === role) drawMaze($('board-' + role), game, role, cursor, direction); }
+function render() { if (workspace.hidden) return; for (const role of ['parent', 'child']) if (!network.active || game.mode === role) drawMaze($('board-' + role), game, role, cursor, direction, spectating ? { cursor: false } : undefined); }
 let networkClock = 0;
 // Game time advances from wall-clock deltas; rAF only paces drawing. A watchdog keeps the round
 // moving when the browser stops painting the tab without firing blur/visibilitychange.
@@ -683,6 +787,8 @@ function controllerHints() {
   if (controllerUI.editing) { scope = $('controller-keyboard'); hint = padAction('left', '文字を選択') + padAction('cross', '入力') + padAction('prev', '長押しで戻る'); }
   else if ($('help').open) { scope = $('help'); hint = padAction('left', 'スクロール') + padAction('prev', '長押しで閉じる'); }
   else if ($('settings-dialog').open) { scope = $('settings-dialog'); hint = menu + padAction('left', '数値は左右で変更'); }
+  else if (spectating) hint = '';
+  else if ($('players-choice').open) { scope = $('players-choice'); hint = $('players-host').hidden ? '' : padAction('left', '項目を選択') + padAction('cross', '決定'); }
   else if ($('ending').open) { scope = $('ending'); hint = padAction('cross', 'はじめに戻る'); }
   else if ($('countdown').open) { scope = $('countdown'); hint = padAction('prev', '長押しで待機に戻る'); }
   else if ($('result').open) { scope = $('result'); hint = padAction('left', '項目を選択') + padAction('cross', '決定') + padAction('prev', network.active ? '長押しで終了' : '長押しで閉じる'); }
@@ -726,10 +832,14 @@ function pollPad(now) {
     else controllerUI.navigate($('settings-dialog'), input);
     return -1;
   }
+  // A spectator only watches the host's screens.
+  if (spectating) return -1;
   if ($('game-opening').open) {
     if (on('cross') && $('game-opening-video').paused) playOpening();
     return -1;
   }
+  // The host picks a button with the stick and ×; the waiting guest has nothing to press.
+  if ($('players-choice').open) { if (!$('players-host').hidden) controllerUI.navigate($('players-host'), input); return -1; }
   if ($('game-entry').open) { if (on('cross')) $('game-entry-start').click(); return -1; }
   if ($('ending').open) { if (on('cross') || on('circle')) finishEnding(); return -1; }
   if ($('countdown').open) { if (on('circle') || on('cross')) suspend(); return -1; }
