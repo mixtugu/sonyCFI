@@ -58,6 +58,8 @@ export function createControllerUI() {
   }
   return {
     navigate,
+    // Make an element the current controller selection (highlighted and focused), e.g. a screen's default button.
+    select: mark,
     hint(scope, html, connected) {
       hint.hidden = !connected || !html;
       if (!connected) { marked?.classList.remove('controller-focus'); return; }

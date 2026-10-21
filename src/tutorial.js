@@ -2,7 +2,7 @@ import { drawMaze, resetMazeScene } from './maze-renderer.js';
 import { edge, DEFAULTS, WALL_DAMAGE } from './maze.js';
 import { HP_MAX, applyDamage, creature } from './creatures.js';
 import { hearts, zukan } from './encyclopedia-ui.js';
-import { controllerDiagram, padIcon } from './controller-guide.js';
+import { controllerDiagram, padIcon, petalIcon } from './controller-guide.js';
 import oceanTitle from './assets/you-see-i-see.png';
 import { createSoundObserver } from './sound-effects.js';
 import { FISH_ICON_PATH } from './fish-icon.js';
@@ -24,10 +24,10 @@ const GUIDES = {
   child: [
     { title: '魚探しに出かけよう', symbol: 'エ', tag: 'EXPLORER',
       description: () => 'ジョイスティックの向きに合わせて\nエクスプローラーを動かせるよ。\n大きい魚ほど、レアな生き物に出会えるかも…！',
-      controls: () => '<kbd data-practice-key="Arrow">矢印キー</kbd>でエクスプローラーを操縦 · マスをタップしても移動' },
+      controls: () => '<kbd data-practice-key="Arrow">矢印キー</kbd>で移動' },
     { title: '新しい道を冒険しよう', symbol: '↗', tag: 'SECRET PASSAGE',
       description: () => '途中で壁が現れて進むのをじゃましてくるよ。\nでも、大丈夫。代わりに新しい道が出来るみたい！',
-      controls: () => '<kbd data-practice-key="Arrow">矢印キー</kbd>でエクスプローラーを操縦 · マスをタップしても移動' },
+      controls: () => '<kbd data-practice-key="Arrow">矢印キー</kbd>で移動' },
     { title: '時間内に魚をたくさん集めよう', symbol: 'O₂', tag: 'TIME LIMIT',
       description: () => '制限時間は30秒だよ。\n出会った魚は図鑑に登録されるよ。\nできるだけレアな魚を集めよう！',
       controls: () => '' },
@@ -100,21 +100,21 @@ DEMO_WALLS.delete(edge(14, 19));
 
 export function createTutorial(container, { onStep, onFinish, onClose, onSound } = {}) {
   container.innerHTML = `
-<div class="briefing-top"><span class="briefing-kicker"></span><span class="briefing-practice-notice" hidden>実際に操作してみてね</span><img class="briefing-logo" src="${oceanTitle}" alt="YOU SEE / I SEE"></div>
+<div class="briefing-top"><div class="briefing-count"></div><span class="briefing-kicker" hidden></span><span class="briefing-practice-notice" hidden>実際に操作してみてね</span><img class="briefing-logo" src="${oceanTitle}" alt="YOU SEE / I SEE"></div>
 <div class="briefing-progress" aria-label="チュートリアル進行状況"><span></span><span></span><span></span></div>
 <div class="briefing-layout">
 <div class="briefing-art" tabindex="-1">
 <div class="briefing-art-heading"><span class="briefing-art-tag"></span><span class="briefing-example">練習</span></div>
-<div class="briefing-maze"><canvas class="briefing-canvas" aria-hidden="true"></canvas><div class="briefing-board" role="grid" aria-label="練習用の迷路"></div><div class="briefing-wall-bubble" hidden>壁が現れた！</div></div>
+<div class="briefing-maze"><canvas class="briefing-canvas" aria-hidden="true"></canvas><div class="briefing-board" role="grid" aria-label="練習用の迷路"></div><div class="briefing-wall-bubble" hidden>壁が現れた！</div><div class="demo-badge" hidden><i aria-hidden="true"></i>説明動画</div></div>
 <div class="briefing-hp hp-panel" hidden><span class="hp-label">HP</span><div class="hp-hearts" role="meter" aria-label="エクスプローラーのHP" aria-valuemin="1" aria-valuemax="${HP_MAX}"></div><strong class="briefing-hp-value"></strong></div>
 <div class="briefing-oxygen oxygen" hidden><span class="oxygen-valve" aria-hidden="true"><i class="oxygen-knob"></i><i class="oxygen-neck"></i></span><span class="oxygen-body"><span class="oxygen-track"><span class="oxygen-fill"></span><span class="oxygen-ticks"></span></span><span class="oxygen-band"></span><span class="oxygen-band"></span><strong></strong><span class="oxygen-label">O₂</span></span></div>
 <div class="practice-feedback" role="status" aria-live="polite"></div></div>
-<div class="briefing-copy"><div class="briefing-count"></div><h3 class="briefing-title"></h3><p class="briefing-description"></p><div class="briefing-controls"></div><div class="briefing-pad" hidden></div><div class="briefing-zukan zukan" role="list" aria-label="小サイズの図鑑" hidden></div><p class="briefing-rarity-bubble" hidden>★が多いほどレアな生き物だよ！</p></div>
+<div class="briefing-copy"><h3 class="briefing-title"></h3><p class="briefing-description"></p><div class="briefing-controls"></div><div class="briefing-pad" hidden></div><div class="briefing-zukan zukan" role="list" aria-label="小サイズの図鑑" hidden></div><p class="briefing-rarity-bubble" hidden>★が多いほどレアな生き物だよ！</p></div>
 </div>
-<div class="briefing-footer"><button type="button" class="secondary briefing-previous">戻る</button><div class="briefing-nav"><button type="button" class="secondary briefing-next">次へ</button><button type="button" class="primary briefing-launch" hidden>確認して待機へ</button></div></div>`;
+<div class="briefing-footer"><button type="button" class="secondary briefing-previous">戻る</button><div class="briefing-nav"><button type="button" class="secondary briefing-next">次へ</button><button type="button" class="primary briefing-launch" hidden>確認して準備完了</button></div></div>`;
   const find = selector => container.querySelector(selector);
   const art = find('.briefing-art'), board = find('.briefing-board'), feedback = find('.practice-feedback'), controls = find('.briefing-controls'), layout = find('.briefing-layout');
-  let running = false, controller = false, role = 'parent', settings = {}, step = 0, keyTimer = 0, shownStep = -1, loop = 0, painted = 0;
+  let running = false, controller = false, role = 'parent', settings = {}, step = 0, keyTimer = 0, shownStep = -1, loop = 0, painted = 0, goalStep = -1;
   const practice = { cursor: { x: 2, y: 2 }, direction: 1, child: { x: 0, y: 3 }, placed: new Set(), feedback: '' };
   const soundObserver = createSoundObserver(name => onSound?.(name), { deadline: false });
   let soundPosition = null;
@@ -167,7 +167,7 @@ export function createTutorial(container, { onStep, onFinish, onClose, onSound }
   }));
 
   function start(nextRole, nextSettings) {
-    role = nextRole === 'parent' ? 'parent' : 'child'; settings = { ...DEFAULTS, ...nextSettings }; step = 0; running = true;
+    role = nextRole === 'parent' ? 'parent' : 'child'; settings = { ...DEFAULTS, ...nextSettings }; step = 0; running = true; goalStep = -1;
     practice.cursor = { x: 0, y: ROWS - 1 }; practice.direction = 1; practice.child = { x: 0, y: 3 }; practice.placed.clear();
     practice.feedback = '';
     trail = [15]; taken.clear(); resetPresentation();
@@ -205,7 +205,10 @@ export function createTutorial(container, { onStep, onFinish, onClose, onSound }
     const interactive = cursorStep() || explorerStep();
     const practiceNotice = find('.briefing-practice-notice');
     practiceNotice.hidden = false;
-    practiceNotice.textContent = interactive ? '実際に操作してみてね' : '説明動画だよ';
+    practiceNotice.textContent = interactive ? '実際に操作してみてね' : '▶ 説明動画（見るだけ）';
+    // A watch-only step reads as a video: a playing badge over the board.
+    art.classList.toggle('is-demo', !interactive);
+    find('.demo-badge').hidden = interactive;
     practiceNotice.classList.toggle('is-interactive', interactive);
     find('.briefing-title').textContent = guide.title;
     setGuideDescription(find('.briefing-description'), guide.description(settings));
@@ -229,11 +232,11 @@ export function createTutorial(container, { onStep, onFinish, onClose, onSound }
       const diagram = controllerDiagram(cursorStep() ? ['left', 'dpad', 'cross'] : moveStep() ? ['left', 'dpad'] : ['dpad']);
       find('.briefing-pad').innerHTML = cursorStep()
         ? `<span class="wall-guide-note">ジョイスティックで<br>カーソル${cursorIcon}を移動</span>${diagram}<span class="wall-guide-note">ボタンの向きに<br>壁を置く</span><span class="wall-guide-hint" hidden></span>`
-        : explorerGuide ? `<span class="wall-guide-note explorer-comment-space">ジョイスティックで<br>ナビゲーターを移動</span>${diagram}<span class="wall-guide-note explorer-comment-space" aria-hidden="true"></span><span class="wall-guide-hint" hidden></span>` : diagram;
+        : explorerGuide ? `<span class="wall-guide-note explorer-comment-space">ジョイスティックで<br>エクスプローラーを移動</span>${diagram}<span class="wall-guide-note explorer-comment-space" aria-hidden="true"></span><span class="wall-guide-hint" hidden></span>` : diagram;
     }
-    find('.briefing-previous').innerHTML = controller ? `${padIcon('prev')} 長押しで戻る` : '戻る';
-    find('.briefing-next').innerHTML = controller ? `${padIcon('next')} 長押しで次へ` : '次へ';
-    find('.briefing-launch').innerHTML = controller ? `${padIcon('next')} 長押しで確認` : '確認して待機へ';
+    find('.briefing-previous').innerHTML = controller ? `${petalIcon('prev')} 長押しで戻る` : '戻る';
+    find('.briefing-next').innerHTML = controller ? `${petalIcon('next')} 長押しで次へ` : '次へ';
+    find('.briefing-launch').innerHTML = controller ? `${petalIcon('next')} 長押しで準備完了` : '確認して準備完了';
     container.classList.toggle('pad-briefing', controller);
     find('.briefing-count').textContent = `${String(step + 1).padStart(2, '0')} / ${String(steps().length).padStart(2, '0')}`;
     art.dataset.step = step;
@@ -270,7 +273,7 @@ export function createTutorial(container, { onStep, onFinish, onClose, onSound }
       const next = explorerRoute()[trail.length];
       feedback.textContent = next === undefined ? '最後まで探検できたね！' : '線に沿ってジョイスティックを動かそう';
       if (wallNotice) feedback.textContent = '壁が現れた！';
-      const show = next !== undefined && (explorerWrong || performance.now() - cursorMovedAt >= 2000);
+      const show = next !== undefined;
       pad.classList.toggle('is-cursor-guide', next !== undefined);
       pad.classList.toggle('is-cursor-hint', show);
       hint.hidden = !show;
@@ -317,7 +320,7 @@ export function createTutorial(container, { onStep, onFinish, onClose, onSound }
     const pad = find('.briefing-pad'), hint = find('.wall-guide-hint');
     pad.classList.toggle('is-cursor-guide', !reached);
     pad.querySelector('.ps-petal[data-angle="90"]')?.classList.toggle('is-press-target', reached);
-    const show = !reached && performance.now() - cursorMovedAt >= 2000;
+    const show = !reached;
     hint.hidden = !(show || reached);
     if (reached) {
       if (hint.textContent !== '▶ボタンを押してみよう') hint.textContent = '▶ボタンを押してみよう';
@@ -357,6 +360,12 @@ export function createTutorial(container, { onStep, onFinish, onClose, onSound }
       if (!detourSteps.length && elapsed >= stopAt + 1) placeWall();
       feedback.textContent = detourSteps.length ? elapsed >= detourSteps.at(-1).at + .4 ? 'ゴールに到着！守ってあげられたね。' : '壁をよけて、下の道からゴールへ向かうよ' : '時間内にゴールを目指そう';
     }
+    // Once this step's goal is reached, the next button lights up until the step changes (the
+    // navigator's demo loops back afterwards, so the highlight is kept rather than re-checked).
+    const goal = explorerStep() ? explorerRoute()[trail.length] === undefined
+      : (wallDemo() || timedDemo()) && detourSteps.length > 0 && elapsed >= detourSteps.at(-1).at + .4;
+    if (goal && goalStep !== step) goalStep = step;
+    for (const button of [find('.briefing-next'), find('.briefing-launch')]) button.classList.toggle('is-goal-reached', goalStep === step);
     const demoTime = collectionDemo() ? Math.min(elapsed, stopAt) : wallDemo() ? detourSteps.length ? elapsed : Math.min(elapsed, stopAt) : elapsed % DEMO_DURATION;
     const steps = wallDemo() || collectionDemo() ? [...DEMO_STEPS.filter(point => point.at <= stopAt), ...detourSteps] : DEMO_STEPS;
     const demoTrail = steps.filter(point => point.at <= demoTime).map(point => point.cell);

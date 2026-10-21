@@ -65,6 +65,15 @@ export function controllerDiagram(active = []) {
     <g class="ps-petal ps-center${on('cross')}" data-pad="cross"><circle cx="${CX}" cy="${CY}" r="38"/><g transform="translate(${CX - 14} ${CY - 14}) scale(.875)"><g class="ps-mark">${marks.cross}</g></g></g>
   </svg>`;
 }
+// One petal of the drawing above, cut out as a button icon: the ← / → petals that go to the
+// previous / next screen look the same in the tutorial footer as on the drawn controller.
+let petalIcons = 0;
+export function petalIcon(name) {
+  const angle = name === 'prev' ? 270 : 90, id = `ps-petal-icon-${++petalIcons}`;
+  const [x, y] = point(78, angle).split(' ').map(Number);
+  const box = name === 'prev' ? `${CX - 101} ${CY - 34} 49 68` : `${CX + 52} ${CY - 34} 49 68`;
+  return `<span class="ps-button ps-${name} ps-petal-icon" role="img" aria-label="${labels[name]}"><svg viewBox="${box}" aria-hidden="true"><defs><linearGradient id="${id}" x2=".3" y2="1"><stop stop-color="#ffffff"/><stop offset=".45" stop-color="#e3edf4"/><stop offset="1" stop-color="#8b9eaf"/></linearGradient></defs><path class="ps-petal-cap" d="${petal(angle - 19, angle + 19)}" fill="url(#${id})" stroke="#a3bdcf" stroke-width="1.5"/><g transform="translate(${x - 13} ${y - 13}) scale(.8125) rotate(${angle} 16 16)"><path class="ps-petal-arrow" d="M16 6 28 26H4Z"/></g></svg></span>`;
+}
 export function playGuide(role) {
   return (role === 'cpu' ? '' : padAction('left', role === 'parent' ? '位置を選択' : '移動')) +
     (role === 'parent' ? padAction('dpad', '壁の向き') + padAction('cross', '壁を設置') : '');

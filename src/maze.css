@@ -346,3 +346,17 @@ body.spectating dialog:not(#settings-dialog, #help), body.spectating .board-surf
 #settings-dialog .preset-options button:disabled{opacity:.45;cursor:default}
 #settings-dialog #net-room-mount:not(:has(#net-room:not([hidden]))){display:none}
 #settings-dialog .preset-options button{justify-content:center;min-height:52px}
+.briefing-top>.briefing-count{grid-column:1;grid-row:1;justify-self:start}
+#solo-navigator svg{width:40px;height:40px}
+/* Tutorial: once the step's goal is reached, the way forward lights up. */
+.briefing-footer :is(.briefing-next,.briefing-launch).is-goal-reached{border-color:#ffe45c;color:#ffe45c;box-shadow:0 0 0 2px #ffe45c88,0 0 18px #ffd94a99;animation:goal-next-glow 1.4s ease-in-out infinite}
+@keyframes goal-next-glow{50%{box-shadow:0 0 0 3px #ffe45ccc,0 0 28px #ffd94acc}}
+@media(prefers-reduced-motion:reduce){.briefing-footer :is(.briefing-next,.briefing-launch).is-goal-reached{animation:none}}
+/* Watch-only tutorial steps look like a video: a playing badge on the board. */
+.briefing-maze{position:relative}
+.demo-badge{position:absolute;z-index:3;top:10px;left:10px;display:flex;align-items:center;gap:7px;padding:5px 12px 5px 10px;border-radius:999px;background:#000000b3;color:#fff;font-size:calc(14px * var(--text-scale,1));font-weight:700;letter-spacing:.04em;pointer-events:none}
+.demo-badge i{width:9px;height:9px;border-radius:50%;background:#ff4d4d;box-shadow:0 0 8px #ff4d4d;animation:demo-live 1.2s ease-in-out infinite}
+@keyframes demo-live{50%{opacity:.25}}
+.briefing-art.is-demo .briefing-maze{cursor:default}
+.briefing-practice-notice:not(.is-interactive){border-style:dashed}
+@media(prefers-reduced-motion:reduce){.demo-badge i{animation:none}}

@@ -326,7 +326,11 @@ function readyPrompt() {
   $('ready-back').disabled = !network.connected;
   if (!backWasUsable && !$('ready-back').hidden && !$('ready-back').disabled && !$('settings-dialog').open && !$('help').open) $('ready-back').focus({ preventScroll: true });
   // Once the button becomes usable it takes focus, so a controller's × confirms without hunting for it.
-  if (!startWasUsable && !$('ready-start').hidden && !$('ready-start').disabled && !$('settings-dialog').open && !$('help').open) $('ready-start').focus({ preventScroll: true });
+  // ゲームスタート is the default choice: with a controller it is also shown as selected, so the
+  // stick starts from it and × presses it straight away.
+  if (!startWasUsable && !$('ready-start').hidden && !$('ready-start').disabled && !$('settings-dialog').open && !$('help').open) {
+    if (padSeen) controllerUI.select($('ready-start')); else $('ready-start').focus({ preventScroll: true });
+  }
 }
 // The room code sits small in the top-right corner. As a popover it stays above the modal
 // dialogs, and is lifted again whenever the set of open dialogs changes.
@@ -477,16 +481,39 @@ document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => setMode(
 document.querySelectorAll('[data-dir]').forEach(b => b.onclick = () => control(+b.dataset.dir));
 // Immersive mode keeps only the boards, timer and start button. The class works on its own
 // (e.g. iPhone Safari has no element fullscreen); the Fullscreen API is used where available.
-function setImmersive(on) {
-  document.body.classList.toggle('immersive', on); $('fullscreen').setAttribute('aria-pressed', on); $('fullscreen').textContent = on ? '✕' : '⛶';
-  $('fullscreen').setAttribute('aria-label', on ? '全画面を終了' : '全画面');
-  if (on && !document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {});
-  if (!on && document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+// Browsers grant fullscreen only during a click or key press. Screens that open on their own (the
+// ready prompt after the opening video, the game after the countdown) would be refused, so a refused
+// or premature request is retried at the next click or key press.
+const fullscreenElement = () => document.fullscreenElement || document.webkitFullscreenElement || null;
+let wantFullscreen = false;
+function enterFullscreen() {
+  const root = document.documentElement, request = root.requestFullscreen || root.webkitRequestFullscreen;
+  if (!request || fullscreenElement()) return;
+  if (navigator.userActivation && !navigator.userActivation.isActive) { wantFullscreen = true; return; }
+  try { request.call(root)?.catch?.(() => { wantFullscreen = true; }); } catch { wantFullscreen = true; }
 }
-const toggleImmersive = () => setImmersive(!document.body.classList.contains('immersive'));
+// The button shows the real state, not the wish: ✕ only while actually fullscreen.
+function syncFullscreenButton() {
+  const full = !!fullscreenElement();
+  $('fullscreen').setAttribute('aria-pressed', full); $('fullscreen').textContent = full ? '✕' : '⛶';
+  $('fullscreen').setAttribute('aria-label', full ? '全画面を終了' : '全画面');
+}
+function setImmersive(on) {
+  document.body.classList.toggle('immersive', on);
+  wantFullscreen = false;
+  if (on) enterFullscreen();
+  else if (fullscreenElement()) (document.exitFullscreen || document.webkitExitFullscreen)?.call(document)?.catch?.(() => {});
+  syncFullscreenButton();
+}
+for (const type of ['pointerup', 'keydown']) window.addEventListener(type, event => {
+  // Escape is how fullscreen is left; it must not bring it straight back.
+  if (wantFullscreen && document.body.classList.contains('immersive') && event.key !== 'Escape') { wantFullscreen = false; enterFullscreen(); }
+}, true);
+const toggleImmersive = () => setImmersive(!fullscreenElement());
 $('fullscreen').onclick = toggleImmersive;
-document.addEventListener('fullscreenchange', () => {
-  if (!document.fullscreenElement) { if (document.body.classList.contains('immersive')) setImmersive(false); return; }
+const onFullscreenChange = () => {
+  syncFullscreenButton();
+  if (!fullscreenElement()) { if (document.body.classList.contains('immersive')) setImmersive(false); return; }
   // Fullscreen promotes the root above modals opened while its promise was pending.
   // Reinsert open dialogs into the top layer, keeping the focused (nested) dialog last.
   const focused = document.activeElement, topDialog = focused?.closest('dialog');
@@ -496,7 +523,9 @@ document.addEventListener('fullscreenchange', () => {
   if (focused?.isConnected) focused.focus({ preventScroll: true });
   $('room-code').dataset.above = ''; roomCode();
   if (deadlineGlow.matches(':popover-open')) { deadlineGlow.hidePopover(); deadlineGlow.showPopover(); }
-});
+};
+document.addEventListener('fullscreenchange', onFullscreenChange);
+if (!('onfullscreenchange' in document)) document.addEventListener('webkitfullscreenchange', onFullscreenChange);
 $('rotate').onclick = rotate; $('place').onclick = wall;
 $('result').addEventListener('close', () => resultScene.stop());
 $('help-close').onclick = () => $('help').close();
@@ -517,9 +546,18 @@ navigatorSwitch.innerHTML = `<img src="${wallIcon}" alt="" aria-hidden="true">`;
 navigatorSwitch.setAttribute('aria-pressed', 'false');
 navigatorSwitch.onclick = () => network.send({ type: 'soloRole', role: game.mode === 'parent' ? 'child' : 'parent' });
 settingsDock.prepend(navigatorSwitch);
+// The switch's icon is the role the host plays this round: a diver (explorer) or a wall (navigator).
+const explorerIcon = '<svg viewBox="2 5 28 23" aria-hidden="true"><path d="M7 20c3-5 8-8 14-7" fill="none" stroke="#35546a" stroke-width="5" stroke-linecap="round"/><rect x="9" y="11" width="9" height="5" rx="2.5" fill="#c7d3d8" stroke="#5d737c"/><circle cx="22" cy="13" r="6" fill="#f2b21c" stroke="#8f6308" stroke-width="1.2"/><circle cx="23.5" cy="12.5" r="3" fill="#6fd4e6" stroke="#215765"/><path d="M5 22l-3 4 5-1z" fill="#213b3e"/></svg>';
 function syncNavigatorSwitch() {
   const available = network.active && !testRole && !spectating && !!network.state?.host && network.state.solo && network.state.chosen && game.phase === 'ready' && $('game-entry').open;
   navigatorSwitch.hidden = !available;
+  const role = game.mode === 'parent' ? 'navigator' : 'explorer';
+  if (navigatorSwitch.dataset.role !== role) {
+    navigatorSwitch.dataset.role = role;
+    navigatorSwitch.innerHTML = role === 'navigator' ? `<img src="${wallIcon}" alt="" aria-hidden="true">` : explorerIcon;
+    navigatorSwitch.title = role === 'navigator' ? 'いまはナビゲーター（押すとエクスプローラーに戻る）' : 'いまはエクスプローラー（押すとこのラウンドはナビゲーター）';
+    navigatorSwitch.setAttribute('aria-label', navigatorSwitch.title);
+  }
   setAttr(navigatorSwitch, 'aria-pressed', game.mode === 'parent');
 }
 const settingsModalStack = [...document.querySelectorAll('dialog[open]')];
