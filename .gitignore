@@ -6,3 +6,5 @@ playwright-report/
 .dev.vars*
 .env*
 *.cpuprofile
+.server.pid
+.server.log

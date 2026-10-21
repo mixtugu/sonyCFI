@@ -626,8 +626,9 @@ export function drawMaze(canvas, s, role, cursor, direction, options = {}) {
   if (role === 'parent' && s.mode === 'parent' && s.phase !== 'result' && options.cursor !== false) {
     const [x, y] = center(cursor), pulse = .5 + .5 * Math.sin(amb * 4);
     c.save(); c.globalCompositeOperation = 'lighter';
-    c.fillStyle = `rgba(255,210,150,${.12 + .28 * pulse})`; c.beginPath(); c.roundRect(x - 16, y - 16, 32, 32, 6); c.fill();
-    c.strokeStyle = `rgba(255,228,170,${.6 + .4 * pulse})`; c.lineWidth = 3.2; c.lineCap = 'round'; c.beginPath();
+    // A soft lantern-coloured glow and thin corner marks: easy to find without shouting over the sea.
+    c.fillStyle = `rgba(255,222,170,${.07 + .09 * pulse})`; c.beginPath(); c.roundRect(x - 16, y - 16, 32, 32, 7); c.fill();
+    c.strokeStyle = `rgba(255,236,200,${.55 + .25 * pulse})`; c.lineWidth = 1.8; c.lineCap = 'round'; c.beginPath();
     for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { c.moveTo(x + sx * 15, y + sy * 9); c.lineTo(x + sx * 15, y + sy * 15); c.lineTo(x + sx * 9, y + sy * 15); }
     c.stroke(); c.restore();
     const b = neighbor(s, cursor, direction);
@@ -636,12 +637,15 @@ export function drawMaze(canvas, s, role, cursor, direction, options = {}) {
       const valid = !onWall && s.walls.size < s.settings.wallLimit, coords = segment(cursor, b);
       const ghost = new Path2D(); ghost.moveTo(coords[0], coords[1]); ghost.lineTo(coords[2], coords[3]);
       c.save(); c.lineCap = 'round';
-      if (valid) { c.globalCompositeOperation = 'lighter'; c.strokeStyle = `rgba(255,200,140,${.18 + .12 * pulse})`; c.lineWidth = 14; c.stroke(ghost); c.globalCompositeOperation = 'source-over'; }
-      // The preview is drawn opaque over a dark outline, so it stays legible directly on a wall's
-      // bright top. A blocked edge is red rather than blue-gray, which used to read as the wall itself.
-      c.globalAlpha = 1; c.strokeStyle = 'rgba(4,10,18,.85)'; c.lineWidth = 10; c.stroke(ghost);
-      c.strokeStyle = valid ? '#ffe1a3' : '#ff6a58'; c.lineWidth = 6; c.stroke(ghost);
-      if (onWall) { c.setLineDash([3, 3]); c.lineDashOffset = -amb * 6; c.strokeStyle = '#fff3ef'; c.lineWidth = 1.6; c.stroke(ghost); c.setLineDash([]); }
+      // A light navy shadow keeps the preview readable on a wall's bright top without a hard black
+      // outline. A free edge glows sand-gold; a taken one is a quiet coral dash, not the wall's blue.
+      c.strokeStyle = 'rgba(6,24,52,.38)'; c.lineWidth = 7; c.stroke(ghost);
+      if (valid) {
+        c.globalCompositeOperation = 'lighter'; c.strokeStyle = `rgba(255,214,150,${.12 + .1 * pulse})`; c.lineWidth = 11; c.stroke(ghost); c.globalCompositeOperation = 'source-over';
+        c.strokeStyle = `rgba(255,232,188,${.78 + .14 * pulse})`; c.lineWidth = 3.6; c.stroke(ghost);
+      } else {
+        c.setLineDash([4, 4]); c.lineDashOffset = -amb * 6; c.strokeStyle = 'rgba(255,150,135,.82)'; c.lineWidth = 3.2; c.stroke(ghost); c.setLineDash([]);
+      }
       c.restore();
     }
   }
