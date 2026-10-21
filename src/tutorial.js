@@ -5,19 +5,20 @@ import { hearts, zukan } from './encyclopedia-ui.js';
 import { controllerDiagram, padIcon } from './controller-guide.js';
 import oceanTitle from './assets/you-see-i-see.png';
 import { createSoundObserver } from './sound-effects.js';
+import { FISH_ICON_PATH } from './fish-icon.js';
 
 // The pre-round briefing: three short steps per role (the navigator's run danger → walls → time), each a title, one line of description and one
 // line of controls. The first steps carry a 5×4 practice board to try the controls on.
 const GUIDES = {
   parent: [
     { title: '海の中には危険がたくさん', symbol: '!', tag: 'RISK',
-      description: () => 'エクスプローラーが自由に海を探索しているよ。\n魚に会うと💛が減っちゃうんだって。\n！が多いほど💛が多く減る可能性が高いみたい…',
+      description: () => 'エクスプローラーが自由に海を探索しているよ。\n魚に会うと💛が減っちゃうんだって。\n{danger-fish}は💛が多く減る可能性が高いみたい…',
       controls: () => '' },
     { title: 'エクスプローラーを守ろう', symbol: 'ナ', tag: 'NAVIGATOR',
       description: () => `ナビゲーターは壁を立てられるよ。\n壁でエクスプローラーを危険な魚から守ってあげよう。\nでも、壁を立てると💛が${WALL_DAMAGE}つ減っちゃうみたい…`,
       controls: () => '<kbd data-practice-key="Arrow">矢印キー</kbd>で位置を選択 · <kbd data-practice-key="Tab" role="button" tabindex="0">Tab</kbd> で向き · <kbd data-practice-key="Space" role="button" tabindex="0">Space</kbd> で設置' },
-    { title: '時間内にゴールを目指そう', symbol: 'O₂', tag: 'TIME LIMIT',
-      description: () => '制限時間は30秒だよ。\n💛がゼロにならないように壁を立てて守りながら、\nエクスプローラーを画面右上のゴールに導こう。',
+    { title: '時間内守ってあげよう', symbol: 'O₂', tag: 'TIME LIMIT',
+      description: () => '制限時間は30秒だよ。\n💛がゼロにならないように壁を立てて、\nエクスプローラーを危険な魚から守ろう。',
       controls: () => '' },
   ],
   child: [
@@ -40,6 +41,35 @@ const DIRECTIONS = [
 const KEY_DIRECTION = { ArrowUp: 0, w: 0, ArrowRight: 1, d: 1, ArrowDown: 2, s: 2, ArrowLeft: 3, a: 3 };
 const COLS = 5, ROWS = 4;
 const cursorIcon = '<svg class="cursor-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H4v4M16 3h4v4M20 16v4h-4M8 20H4v-4"/></svg>';
+function setGuideDescription(element, description) {
+  const fragments = description.split('{danger-fish}');
+  element.replaceChildren();
+  fragments.forEach((fragment, index) => {
+    element.append(document.createTextNode(fragment));
+    if (index === fragments.length - 1) return;
+    const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    icon.setAttribute('class', 'briefing-danger-fish');
+    icon.setAttribute('viewBox', '-10 -8 20 16');
+    icon.setAttribute('aria-label', '高危険度の魚');
+    icon.setAttribute('role', 'img');
+    const fish = document.createElementNS(icon.namespaceURI, 'path');
+    fish.setAttribute('d', FISH_ICON_PATH);
+    fish.setAttribute('fill', '#e83b43');
+    fish.setAttribute('stroke', '#ffaaa5');
+    fish.setAttribute('stroke-width', '.7');
+    const mark = document.createElementNS(icon.namespaceURI, 'text');
+    mark.setAttribute('x', '0');
+    mark.setAttribute('y', '0');
+    mark.setAttribute('fill', '#fff');
+    mark.setAttribute('font-size', '7');
+    mark.setAttribute('font-weight', '900');
+    mark.setAttribute('text-anchor', 'middle');
+    mark.setAttribute('dominant-baseline', 'central');
+    mark.textContent = '!';
+    icon.append(fish, mark);
+    element.append(icon);
+  });
+}
 const edgeKey = (ax, ay, bx, by) => { const a = `${ax},${ay}`, b = `${bx},${by}`; return a < b ? `${a}|${b}` : `${b}|${a}`; };
 const inBounds = (x, y) => x >= 0 && y >= 0 && x < COLS && y < ROWS;
 const coordinate = (x, y) => `${String.fromCharCode(65 + x)}-${String(ROWS - y).padStart(2, '0')}`;
@@ -178,7 +208,7 @@ export function createTutorial(container, { onStep, onFinish, onClose, onSound }
     practiceNotice.textContent = interactive ? '実際に操作してみてね' : '説明動画だよ';
     practiceNotice.classList.toggle('is-interactive', interactive);
     find('.briefing-title').textContent = guide.title;
-    find('.briefing-description').textContent = guide.description(settings);
+    setGuideDescription(find('.briefing-description'), guide.description(settings));
     controls.innerHTML = guide.controls(settings);
     // Left stick moves; directional taps aim walls and horizontal holds navigate the briefing.
     if (controller && (cursorStep() || moveStep())) {

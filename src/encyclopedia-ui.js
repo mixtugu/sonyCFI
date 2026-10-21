@@ -1,5 +1,6 @@
 import { CREATURES, HP_MAX, RISK_LABELS, SIZES, SIZE_LABELS, creature } from './creatures.js';
 import { creatureArt } from './creature-art.js';
+import { fishIconSvg } from './fish-icon.js';
 import wallIcon from './assets/wall-stock.svg';
 import { WALL_DAMAGE } from './maze.js';
 
@@ -12,7 +13,7 @@ export function navigatorPanel() {
   return `<div class="hp-panel"><span class="hp-label">HP</span><div class="hp-hearts" id="hp-hearts" role="meter" aria-label="エクスプローラーのHP" aria-valuemin="0" aria-valuemax="${HP_MAX}"></div></div>
 <div class="wall-stock"><div class="wall-stock-head"><b>残りの壁</b><span id="wall-stock-count"></span></div><div class="wall-stock-icons" id="wall-stock-icons" aria-hidden="true"></div></div>
 <div class="contact-card" id="contact-card" aria-live="polite"><p class="contact-empty">エクスプローラーが魚に触れると、<br>出会った生き物がここに出ます。</p></div>
-<div class="damage-guide"><ul class="risk-legend" aria-label="「!」の数とダメージ">${[3, 2, 1].map(r => `<li>${riskMarks(r)}<span>ダメージ ${['', '小', '中', '大'][r]}</span></li>`).join('')}</ul><p class="wall-damage-note">壁を置くと<br><strong>💛−${WALL_DAMAGE}</strong></p></div>`;
+<div class="damage-guide"><ul class="risk-legend" aria-label="魚の色とダメージ"><li>${fishIconSvg()}<span>ダメージ小</span></li><li>${fishIconSvg(true)}<span>ダメージ大</span></li></ul><p class="wall-damage-note">壁を置くと<br><strong>💛−${WALL_DAMAGE}</strong></p></div>`;
 }
 export function hearts(hp) {
   return Array.from({ length: HP_MAX }, (_, i) => `<i class="heart${i < hp ? '' : ' is-lost'}" aria-hidden="true"></i>`).join('');

@@ -12,7 +12,7 @@ test('seeded mazes are connected at every supported board size', () => {
     assert.deepEqual(s.items.map(i => i.size).sort(), [...SIZE_MIX].sort());
     // Each fish hides a creature of its own size, and its risk is that creature's.
     assert.ok(s.items.every(i => creature(i.creature).size === i.size && creature(i.creature).risk === i.risk));
-    // 「!」is the maximum risk: the creature is at that risk or below, and large fish are always「!!!」.
+    // The three maximum-risk values still constrain the hidden creature pool; large fish are always high-risk.
     assert.ok(s.items.every(i => i.risk <= i.maxRisk && i.maxRisk <= 3 && (i.size !== 'large' || i.maxRisk === 3)));
     assert.ok(s.items.every(i => i.cell !== s.avatar && i.cell !== s.goal));
   }
