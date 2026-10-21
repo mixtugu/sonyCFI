@@ -2,7 +2,7 @@ export function connectMaze({ settings, onState, onLeave, notice }) {
   // Joining a room is the opening screen; the room's own panel lives in the settings dialog,
   // which stays reachable while the game fills the screen.
   // Roles are fixed at the start: the host is the parent, the guest the child. They swap every round.
-  const lobbyMarkup = `<p id="net-status" role="status">接続中…</p><div id="net-lobby"><form id="maze-create"><button class="primary wide" disabled>部屋をつくる（ナビゲーターではじめる）</button></form><form id="maze-join"><input name="code" aria-label="迷路の部屋コード" value="A" maxlength="1" minlength="1" pattern="A" readonly required><button class="secondary" disabled>参加</button></form></div>`;
+  const lobbyMarkup = `<p id="net-status" role="status">接続中…</p><div id="net-lobby"><form id="maze-create"><button class="primary wide" disabled>部屋をつくる（ナビゲーターではじめる）</button></form><form id="maze-join"><input name="code" aria-label="迷路の部屋コード" value="A" maxlength="6" minlength="1" pattern="[A-Za-z0-9]{1,6}" autocomplete="off" autocapitalize="characters" spellcheck="false" required><button class="secondary" disabled>参加</button></form></div>`;
   const roomMarkup = `<div id="net-room" hidden><p><strong id="maze-code"></strong> <b id="maze-role"></b> <span id="maze-partner"></span></p><div class="invite-row"><button type="button" id="maze-leave" class="secondary home-icon-button" aria-label="退出" title="退出"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M10 4H4v16h6M14 8l4 4-4 4M8 12h12"/></svg><span>退出</span></button></div></div>`;
   const lobbyMount = document.getElementById('net-lobby-mount'), roomMount = document.getElementById('net-room-mount');
   if (lobbyMount && roomMount) { lobbyMount.innerHTML = lobbyMarkup; roomMount.innerHTML = roomMarkup; }
@@ -12,8 +12,9 @@ export function connectMaze({ settings, onState, onLeave, notice }) {
   let socket, ticket = null, stopped = false, durable = false, pending = null, targetCode = '', retry;
   const invited = new URLSearchParams(location.search).get('maze');
   try { ticket = JSON.parse(sessionStorage.getItem('maze-session') || 'null'); } catch {}
-  // Discard tickets from the previous six-character room scheme.
-  if (ticket && ticket.code !== 'A') { ticket = null; try { sessionStorage.removeItem('maze-session'); } catch {} }
+  const validCode = code => /^[A-Z0-9]{1,6}$/.test(code || '');
+  const roomInput = () => document.querySelector('#maze-join [name=code]').value.trim().toUpperCase();
+  if (ticket && !validCode(ticket.code)) { ticket = null; try { sessionStorage.removeItem('maze-session'); } catch {} }
   if (ticket && invited && ticket.code !== invited.toUpperCase()) ticket = null;
   function persist() { try { if (ticket) sessionStorage.setItem('maze-session', JSON.stringify(ticket)); else sessionStorage.removeItem('maze-session'); } catch {} }
   function connection() { $('net-status').textContent = client.connected ? client.active ? '接続済み' : '' : stopped ? '別の画面で接続されました。再読み込みしてください。' : '接続中…'; $('net-status').hidden = client.connected && !client.active; document.querySelectorAll('#net-lobby button').forEach(b => b.disabled = !client.connected); }
@@ -41,7 +42,8 @@ export function connectMaze({ settings, onState, onLeave, notice }) {
   }
   function leave() { if (durable) { const previous = socket; socket = null; previous?.close(); clearTimeout(retry); pending = null; client.connected = true; } ticket = null; persist(); client.active = false; client.state = null; $('net-lobby').hidden = false; $('net-room').hidden = true; history.replaceState(null, '', '/'); connection(); onLeave(); }
   $('maze-create').onsubmit = async event => {
-    event.preventDefault(); const data = { type: 'create', role: 'parent', settings: settings() };
+    event.preventDefault(); const code = roomInput(); if (!validCode(code)) { notice('部屋コードは英数字1〜6文字で入力してください。'); return; }
+    const data = { type: 'create', code, role: 'parent', settings: settings() };
     if (!durable) { client.send(data); return; }
     client.connected = false; connection();
     try {
@@ -50,7 +52,7 @@ export function connectMaze({ settings, onState, onLeave, notice }) {
       ticket = result; persist(); connect();
     } catch (error) { client.connected = true; connection(); notice(error.message); }
   };
-  $('maze-join').onsubmit = event => { event.preventDefault(); const data = { type: 'join', code: 'A' }; if (!durable) { client.send(data); return; } ticket = null; persist(); targetCode = data.code; pending = data; client.connected = false; connection(); connect(); };
+  $('maze-join').onsubmit = event => { event.preventDefault(); const code = roomInput(); if (!validCode(code)) { notice('部屋コードは英数字1〜6文字で入力してください。'); return; } const data = { type: 'join', code }; if (!durable) { client.send(data); return; } ticket = null; persist(); targetCode = data.code; pending = data; client.connected = false; connection(); connect(); };
   $('maze-leave').onclick = () => client.send({ type: 'leave' });
   fetch('/connection-info').then(r => r.json()).then(data => {
     durable = !!data.durable;

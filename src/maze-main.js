@@ -9,7 +9,7 @@ import explorerOpeningVideo from './assets/explorer-opening.mp4';
 import navigatorOpeningVideo from './assets/navigator-opening.mp4';
 import './controller.css';
 import './encyclopedia.css';
-import { controllerDiagram, padAction, playGuide } from './controller-guide.js';
+import { controllerDiagram, padAction, playGuide, startPressFeedback } from './controller-guide.js';
 import { createControllerUI } from './controller-ui.js';
 import { createSoundEffects, createSoundObserver, deadlineRhythm } from './sound-effects.js';
 import { DEFAULTS, LIMITS, createMaze, start, tick, move, placeWall, neighbor } from './maze.js';
@@ -17,7 +17,7 @@ import { drawFishIcon, drawMaze, pointerCell, setTextScale, setWallStyle, WALL_S
 import { connectMaze } from './maze-network.js';
 import { connectSoloMaze } from './maze-solo.js';
 import { createPadReader, firstPad, rumble } from './gamepad.js';
-import { accessConnected, accessSupported, onAccessChange, reconnectAccess, requestAccess } from './access-controller.js';
+import { ACCESS_LAYOUT, accessConnected, accessRaw, accessState, accessSupported, onAccessChange, reconnectAccess, requestAccess } from './access-controller.js';
 import { createTutorial } from './tutorial.js';
 import { createEndingExplorerScene, createResultScene } from './result-scene.js';
 import { CREATURES, HP_MAX } from './creatures.js';
@@ -104,7 +104,7 @@ ${['parent', 'child'].map(role => `<section class="board-card ${role}"><div clas
 </div>
 <div class="interaction-panel"><div class="touch-controls"><div class="dpad"><button data-dir="3" aria-label="上">↑</button><button data-dir="2" aria-label="左">←</button><button data-dir="1" aria-label="下">↓</button><button data-dir="0" aria-label="右">→</button></div><button id="rotate" class="secondary">↻ <span id="direction">右</span></button><button id="place" class="primary">壁を置く</button></div><p id="control-hint" class="hint"></p></div>
 </main>
-<dialog id="settings-dialog" class="settings-dialog"><div class="dialog-head"><h2>設定</h2><button id="settings-close" class="text-button" aria-label="閉じる">✕</button></div><button type="button" class="secondary access-connect" hidden>🎮 Access コントローラーを接続（USB）</button><div id="net-room-mount">${sandboxHome}</div><div class="wall-style" role="radiogroup" aria-label="壁のデザイン"><span>壁のデザイン</span><label><input type="radio" name="wall-style" value="ridge">岩の壁</label><label><input type="radio" name="wall-style" value="reef">サンゴと岩</label><small>この画面だけに反映されます</small></div><form id="settings"><div class="fields">${fields.map(([key, label]) => `<label class="field">${label}${input(key, label)}</label>`).join('')}</div><div class="form-actions"><button type="button" id="defaults" class="text-button">初期値</button><button class="primary" type="submit">適用</button></div></form><section class="ending-preview" aria-labelledby="ending-preview-title"><h3 id="ending-preview-title">エンディングを試す</h3><label class="ending-preview-hp">残りHP <input id="preview-hp" type="number" min="1" max="${HP_MAX}" value="${HP_MAX}" required> / ${HP_MAX}</label><fieldset class="ending-preview-fish"><legend>集まった魚</legend><div>${CREATURES.map(c => `<label><input type="checkbox" name="preview-creature" value="${c.id}">${c.name}</label>`).join('')}</div></fieldset><button type="button" id="preview-ending" class="primary">エンディングを見る</button></section></dialog>
+<dialog id="settings-dialog" class="settings-dialog"><div class="dialog-head"><h2>設定</h2><button id="settings-close" class="text-button" aria-label="閉じる">✕</button></div><section class="access-check" aria-labelledby="access-check-title"><div class="access-check-head"><h3 id="access-check-title">Access コントローラー</h3><b id="access-check-status"></b><button type="button" class="secondary access-connect" hidden>🎮 接続（USB）</button></div><div class="access-check-body"><div class="access-ring" aria-hidden="true">${[1, 2, 3, 4, 5, 6, 7, 8].map(n => `<i data-access="${n}" style="--a:${(n - 1) * 45}deg">${n}</i>`).join('')}<i data-access="centre" class="centre">●</i><i class="access-stick"><i id="access-stick-dot"></i></i></div><ul class="access-map">${[['centre', '中央', '×'], [ACCESS_LAYOUT.up, ACCESS_LAYOUT.up, '↑'], [ACCESS_LAYOUT.right, ACCESS_LAYOUT.right, '→'], [ACCESS_LAYOUT.down, ACCESS_LAYOUT.down, '↓'], [ACCESS_LAYOUT.left, ACCESS_LAYOUT.left, '←'], ['stick', 'スティック押し込み', '—']].map(([key, label, action]) => `<li data-access="${key}"><span>ボタン ${label}</span><b>${action}</b></li>`).join('')}</ul><p id="access-check-raw" class="access-raw"></p><p id="access-check-dump" class="access-dump"></p></div><small>ボタンを押すと光ります。番号の位置が実機と違う場合はお知らせください。</small></section><div id="net-room-mount">${sandboxHome}</div><div class="wall-style" role="radiogroup" aria-label="壁のデザイン"><span>壁のデザイン</span><label><input type="radio" name="wall-style" value="ridge">岩の壁</label><label><input type="radio" name="wall-style" value="reef">サンゴと岩</label><small>この画面だけに反映されます</small></div><form id="settings"><div class="fields">${fields.map(([key, label]) => `<label class="field">${label}${input(key, label)}</label>`).join('')}</div><div class="form-actions"><button type="button" id="defaults" class="text-button">初期値</button><button class="primary" type="submit">適用</button></div></form><section class="ending-preview" aria-labelledby="ending-preview-title"><h3 id="ending-preview-title">エンディングを試す</h3><label class="ending-preview-hp">残りHP <input id="preview-hp" type="number" min="1" max="${HP_MAX}" value="${HP_MAX}" required> / ${HP_MAX}</label><fieldset class="ending-preview-fish"><legend>集まった魚</legend><div>${CREATURES.map(c => `<label><input type="checkbox" name="preview-creature" value="${c.id}">${c.name}</label>`).join('')}</div></fieldset><button type="button" id="preview-ending" class="primary">エンディングを見る</button></section></dialog>
 <div id="notice" role="status"></div>
 <dialog id="result">${waterLight}<div class="return-art" aria-hidden="true"><canvas id="result-scene"></canvas></div><h2 id="result-title">～ 冒険が終わりました ～</h2><p class="result-count"><span id="result-count-label">出会った生き物</span><strong id="result-count"></strong></p><div class="zukan result-zukan" id="result-zukan" role="list" aria-label="図鑑"></div><p id="final-stats"></p><div class="dialog-actions"><button id="close-result" class="primary">次へ</button></div></dialog>
 <dialog id="game-entry" aria-label="ゲームを開始する"><img class="game-entry-logo" src="${oceanTitle}" alt="YOU SEE / I SEE"><p class="game-entry-tagline">ー 同じ世界、異なる視点が生むバイアス ー</p><button id="game-entry-start" class="primary">ゲームを開始する</button></dialog>
@@ -163,7 +163,30 @@ function accessButtons() { document.querySelectorAll('.access-connect').forEach(
 document.querySelectorAll('.access-connect').forEach(button => button.onclick = async () => {
   notice(await requestAccess() ? 'Access コントローラーを接続しました。' : 'Access コントローラーに接続できませんでした。USB-Cで接続し、ほかのタブやアプリで開いていないか確認してください。');
 });
-onAccessChange(accessButtons); accessButtons();
+// Every report byte; bytes that changed since the dialog opened stay highlighted, and the one changing now
+// is bold, so a stick on undocumented bytes can be found on real hardware (6 is the sequence counter).
+let rawBase = null;
+function rawDump() {
+  const raw = accessRaw(), out = $('access-check-dump');
+  if (!raw) { out.textContent = ''; rawBase = null; return; }
+  rawBase ??= { first: raw, last: raw };
+  out.innerHTML = raw.map((v, i) => `<span class="${i === 6 ? '' : (v !== rawBase.last[i] ? 'now ' : '') + (v !== rawBase.first[i] ? 'moved' : '')}">${i}:${v}</span>`).join(' ');
+  rawBase.last = raw;
+}
+// Settings → live check of the physical buttons and the game action each one becomes.
+function accessCheck() {
+  const status = $('access-check-status'), state = accessState();
+  status.textContent = !accessSupported() ? 'このブラウザは非対応（Chrome / Edge が必要）' : accessConnected() ? '接続済み' : '未接続';
+  status.dataset.on = accessConnected() ? '1' : '';
+  $('settings-dialog').querySelectorAll('[data-access]').forEach(el => { const key = el.dataset.access; el.classList.toggle('on', !!state?.buttons.has(isNaN(key) ? key : +key)); });
+  const [x, y] = state?.stick ?? [0, 0];
+  $('access-stick-dot').style.transform = `translate(${x * 14}px, ${y * 14}px)`;
+  $('access-check-raw').textContent = accessConnected() ? `スティック X ${x.toFixed(2)} / Y ${y.toFixed(2)}` + (state ? '' : '（入力待ち）') : '';
+  rawDump();
+  if ($('settings-dialog').open) requestAnimationFrame(accessCheck);
+}
+new MutationObserver(() => { rawBase = null; if ($('settings-dialog').open) accessCheck(); }).observe($('settings-dialog'), { attributes: true, attributeFilter: ['open'] });
+onAccessChange(() => { accessButtons(); accessCheck(); }); accessButtons(); accessCheck();
 // Connect by default: reuse a granted controller silently; otherwise the first click or key press of
 // the session opens the browser's device chooser (it cannot open without such a gesture).
 reconnectAccess().then(found => {
@@ -806,6 +829,7 @@ function step(now) {
   else { network.advance?.(dt); networkClock += dt; if (networkClock >= .06) { networkClock = 0; if (held !== undefined && game.mode === 'child' && game.phase === 'playing') network.send({ type: 'move', direction: held }); } }
   uiClock += dt; if (uiClock >= .08 || game.phase === 'result' && !resultShown) { update(); uiClock = 0; }
 }
+startPressFeedback(firstPad);
 const readPad = createPadReader(); let feltWalls = 0, feltItems = 0, feltPhase = '', padScreen = '';
 function controllerHints() {
   let scope = document.querySelector('.workspace'), hint = '';

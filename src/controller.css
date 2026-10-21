@@ -55,3 +55,12 @@
 @keyframes wall-button-glow{50%{filter:drop-shadow(0 0 14px #ffd94a)}}
 @media(prefers-reduced-motion:reduce){.ps-controller .ps-petal.is-press-target>path{animation:none}}
 @media(prefers-reduced-motion:reduce){.wall-guide-hint,.is-cursor-hint .joystick-direction-arrow,.is-cursor-hint .ps-stick .ps-ball{animation:none}.is-cursor-hint .ps-stick .ps-ball{transform:translate(var(--stick-x),var(--stick-y))}}
+/* Live press feedback (controller-guide.js startPressFeedback). */
+.ps-controller .ps-petal.is-pressed>path,.ps-controller .ps-center.is-pressed>circle{fill:#ffb347;stroke:#ff8a00;stroke-width:4;filter:drop-shadow(0 0 8px #ffa500)}
+.ps-controller .ps-petal.is-pressed .ps-mark,.ps-controller .ps-petal.is-pressed .ps-direction-mark{stroke:#7a3d00;fill:#7a3d00}
+.ps-controller .ps-petal,.ps-controller .ps-center{transition:transform .06s}
+.ps-controller .ps-petal.is-pressed,.ps-controller .ps-center.is-pressed{transform:translateY(3px)}
+.ps-controller .ps-ball{transition:transform .05s linear}
+.ps-controller .ps-stick.is-pressed .ps-ball{filter:drop-shadow(0 0 8px #ffa500)}
+.ps-button{transition:transform .06s,box-shadow .06s,background .06s}
+.ps-button.is-pressed{transform:translateY(2px);background:linear-gradient(#ffd9a0,#ffb347);box-shadow:0 0 0 #9aa3ad,0 0 10px #ffa500cc}

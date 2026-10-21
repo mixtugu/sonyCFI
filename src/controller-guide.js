@@ -1,3 +1,4 @@
+import { heldButtons as heldButtonsOf } from './gamepad.js';
 // Shared PlayStation (Access controller) artwork and vocabulary for the briefing, help and live hints.
 const marks = {
   cross: '<path d="m8 8 16 16M24 8 8 24"/>',
@@ -67,4 +68,26 @@ export function controllerDiagram(active = []) {
 export function playGuide(role) {
   return (role === 'cpu' ? '' : padAction('left', role === 'parent' ? '位置を選択' : '移動')) +
     (role === 'parent' ? padAction('dpad', '壁の向き') + padAction('cross', '壁を設置') : '');
+}
+// Live press feedback: every controller drawing and button icon on screen lights up while its
+// button is held, and the drawn stick leans with the real one.
+const ANGLE = { up: 0, right: 90, down: 180, left: 270 };
+export function startPressFeedback(readPad) {
+  let last = '';
+  const frame = () => {
+    const pad = readPad(), held = pad ? heldButtonsOf(pad) : new Set();
+    const [x = 0, y = 0] = pad?.axes ?? [];
+    const key = [...held].sort().join() + x.toFixed(2) + y.toFixed(2);
+    if (key !== last) {
+      last = key;
+      const lit = { cross: held.has('cross'), prev: held.has('left'), next: held.has('right'), dpad: ['up', 'down', 'left', 'right'].some(n => held.has(n)), left: Math.hypot(x, y) > .3 };
+      document.querySelectorAll('.ps-controller .ps-petal[data-angle]').forEach(el => el.classList.toggle('is-pressed', Object.entries(ANGLE).some(([n, a]) => held.has(n) && +el.dataset.angle === a)));
+      document.querySelectorAll('.ps-controller .ps-center').forEach(el => el.classList.toggle('is-pressed', lit.cross));
+      document.querySelectorAll('.ps-controller .ps-ball').forEach(el => el.setAttribute('transform', `translate(${(x * 12).toFixed(1)} ${(y * 9).toFixed(1)})`));
+      document.querySelectorAll('.ps-controller .ps-stick').forEach(el => el.classList.toggle('is-pressed', lit.left));
+      document.querySelectorAll('.ps-button').forEach(el => { const name = [...el.classList].find(c => c.startsWith('ps-') && c !== 'ps-button')?.slice(3); el.classList.toggle('is-pressed', !!lit[name]); });
+    }
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
 }

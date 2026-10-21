@@ -8,7 +8,7 @@ The layout targets a PlayStation Access controller profile: stick, centre ×, an
 | --- | --- |
 | Menus, lobby, results | Stick selects, × activates the focused control; hold ← (or press ○) goes back / closes |
 | Settings | Stick up/down selects fields, left/right adjusts numbers; × selects or applies; hold ← (or ○) closes |
-| Room entry | The join key is fixed to `A`; select Join and press × |
+| Room entry | Type a 1–6 character code (default `A`), then Create or Join |
 | Navigator practice and play | Left stick selects a cell; tap ↑ → ↓ ← (or the right stick) to aim the wall; × places |
 | Explorer practice and play | Left stick moves |
 | Tutorial | Hold → to advance or confirm the final step; hold ← to go back (650 ms). Short ← / → taps aim walls on release; ↑ / ↓ aim immediately. Movement stays on the left stick. × and ○ holds do not change tutorial steps |
@@ -29,9 +29,9 @@ On a PC the browser's Gamepad API only sees the Access controller's *mapped* act
 | --- | --- |
 | Centre button | × |
 | Perimeter buttons 7 / 3 / 1 / 5 (top / bottom / left / right with the stick in its default place) | ↑ / ↓ / ← → (tap aims the wall; hold ← / → goes back / on) |
-| Stick | left stick |
+| Stick (report bytes 17 / 18, measured on hardware) | left stick |
 
-Requirements: Chrome or Edge, controller on **USB-C**. Press **🎮 Access コントローラーを接続（USB）** once (lobby card or ⚙ settings) and allow the device; afterwards it reconnects on every visit and after replugging. Close other tabs or apps that hold the controller (for example the ps-access web tool) first. While connected over WebHID, the Gamepad API's view of the same controller is ignored. Verified with a simulated device: `node scripts/check-access-hid.mjs`.
+Requirements: Chrome or Edge, controller on **USB-C**. Press **🎮 Access コントローラーを接続（USB）** once (lobby card or ⚙ settings) and allow the device; afterwards it reconnects on every visit and after replugging. Close other tabs or apps that hold the controller (for example the ps-access web tool) first. Controller input is read **only** over WebHID; the Gamepad API (DualSense, other pads) is ignored. Settings (⚙) shows a live check: the physical ring 1–8, centre, stick, and the game action each button becomes. Verified with a simulated device: `node scripts/check-access-hid.mjs`.
 
 ## Troubleshooting
 

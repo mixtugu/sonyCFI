@@ -70,15 +70,3 @@ test('a controller without a standard layout steers with its hat-switch D-pad', 
   const hold = createPadReader(); hold(raw(5 / 7), 0);
   assert.equal(hold(raw(5 / 7), HOLD_MS).long.has('left'), true);
 });
-test('several connected controllers are read as one', async () => {
-  const { firstPad } = await import('./gamepad.js');
-  const standard = { id: 'DualSense', connected: true, mapping: 'standard', axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false })) };
-  const access = { id: 'Access', connected: true, mapping: '', axes: [.9, 0, 0, -1, -1, 0, 0, 0, 0, -3 / 7], buttons: Array.from({ length: 14 }, () => ({ pressed: false })) };
-  globalThis.navigator ??= {};
-  const saved = navigator.getGamepads; navigator.getGamepads = () => [standard, null, access];
-  try {
-    const pad = firstPad(), read = createPadReader(), input = read(pad, 0);
-    assert.equal(input.dir, 0);                                // the tilted stick wins
-    assert.equal(input.aim, 0);                                // the other pad's hat still counts
-  } finally { navigator.getGamepads = saved; }
-});

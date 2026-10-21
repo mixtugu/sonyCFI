@@ -159,7 +159,6 @@ html:has(#game-entry[open],#players-choice[open]),body:has(#game-entry[open],#pl
   #settings-dialog #net-room-mount #net-room{display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:12px;flex-wrap:nowrap;padding:6px 12px;margin-bottom:8px}
   #settings-dialog #net-room p{font-size:calc(16px * var(--text-scale,1));flex:1;white-space:nowrap}
   #settings-dialog #net-room .invite-row{width:auto;flex:none}
-  #settings-dialog>.access-connect{padding:6px 12px;font-size:calc(16px * var(--text-scale,1))}
   #settings-dialog .maze-zoom-control{padding:8px 0;gap:4px}
   #settings-dialog .font-size-control{margin-bottom:8px;padding:6px 10px}
   #settings-dialog .wall-style{margin-bottom:8px;padding:8px 12px;gap:6px 10px}
@@ -284,3 +283,24 @@ body.spectating dialog:not(#settings-dialog, #help), body.spectating .board-surf
 .maze-zoom-control span{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .maze-zoom-control output{color:var(--sea);font-variant-numeric:tabular-nums;font-weight:700}
 .maze-zoom-control input{width:100%;accent-color:var(--sea)}
+
+.access-check{margin-bottom:8px;padding:8px 12px;border:1px solid color-mix(in srgb,currentColor 20%,transparent);border-radius:12px}
+.access-check-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.access-check-head h3{margin:0;font-size:calc(17px * var(--text-scale,1))}
+.access-check-head b{font-size:calc(14px * var(--text-scale,1));opacity:.75}
+.access-check-head b[data-on="1"]{color:#2e9d5b;opacity:1}
+.access-check-head .access-connect{margin-left:auto;padding:6px 12px;font-size:calc(15px * var(--text-scale,1))}
+.access-check-body{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:8px 0 4px}
+.access-ring{position:relative;width:128px;height:128px;flex:none;border-radius:50%;background:color-mix(in srgb,currentColor 8%,transparent)}
+.access-ring>i{position:absolute;left:50%;top:50%;width:26px;height:26px;margin:-13px;display:grid;place-items:center;border-radius:50%;font-style:normal;font-size:12px;font-weight:700;background:color-mix(in srgb,currentColor 15%,transparent);transform:rotate(var(--a)) translateY(-50px) rotate(calc(-1 * var(--a)));transition:background .08s}
+.access-ring>i.centre{transform:none;width:34px;height:34px;margin:-17px}
+.access-ring>i.access-stick{transform:translate(34px,34px);background:none;border:2px solid color-mix(in srgb,currentColor 30%,transparent)}
+#access-stick-dot{display:block;width:8px;height:8px;border-radius:50%;background:currentColor}
+.access-ring>i.on,.access-map li.on{background:#f5a623;color:#111}
+.access-map{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 12px;flex:1;min-width:220px}
+.access-map li{display:flex;justify-content:space-between;gap:8px;padding:3px 8px;border-radius:6px;font-size:calc(14px * var(--text-scale,1))}
+.access-raw{margin:0;width:100%;font-size:12px;opacity:.7;font-variant-numeric:tabular-nums}
+.access-check>small{font-size:12px;opacity:.7}
+.access-dump{margin:0;width:100%;font:11px/1.5 ui-monospace,monospace;opacity:.8;word-break:break-word}
+.access-dump .moved{background:#f5a62366;border-radius:3px}
+.access-dump .now{font-weight:800;background:#f5a623;color:#111}

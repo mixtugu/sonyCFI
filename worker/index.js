@@ -135,15 +135,16 @@ export default {
       const text = new TextDecoder().decode(bytes);
       let data; try { data = JSON.parse(text); } catch { return json({ error: 'Invalid JSON' }, 400); }
       if (!data || !data.settings || typeof data.settings !== 'object') return json({ error: '設定を確認してください。' }, 400);
-      const code = 'A';
+      const code = typeof data.code === 'string' ? data.code.trim().toUpperCase() : 'A';
+      if (!/^[A-Z0-9]{1,6}$/.test(code)) return json({ error: '部屋コードは英数字1〜6文字で入力してください。' }, 400);
       // The host always takes the parent seat; roles swap after every round.
       const ticket = await env.MAZE_ROOMS.getByName(code).initialize(code, data.settings, 'parent');
-      return ticket ? json(ticket, 201) : json({ error: '部屋「A」はすでに使用中です。' }, 409);
+      return ticket ? json(ticket, 201) : json({ error: `部屋「${code}」はすでに使用中です。` }, 409);
     }
     if (url.pathname === '/maze-socket') {
       if (request.headers.get('Origin') !== url.origin) return json({ error: 'Forbidden' }, 403);
       const code = url.searchParams.get('code')?.toUpperCase();
-      if (code !== 'A') return json({ error: 'Invalid room code' }, 400);
+      if (!/^[A-Z0-9]{1,6}$/.test(code || '')) return json({ error: 'Invalid room code' }, 400);
       return env.MAZE_ROOMS.getByName(code).fetch(request);
     }
     return env.ASSETS.fetch(request);

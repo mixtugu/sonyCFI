@@ -65,8 +65,9 @@ export class MazeRooms {
     if (!binding) {
       if (data.type === 'create') {
         if (this.rooms.size >= 200) return this.error(socket, '部屋を作れません。少し待ってからお試しください。');
-        const code = 'A';
-        if (this.rooms.has(code)) return this.error(socket, '部屋「A」はすでに使用中です。', 'full');
+        const code = typeof data.code === 'string' ? data.code.trim().toUpperCase() : 'A';
+        if (!/^[A-Z0-9]{1,6}$/.test(code)) return this.error(socket, '部屋コードは英数字1〜6文字で入力してください。');
+        if (this.rooms.has(code)) return this.error(socket, `部屋「${code}」はすでに使用中です。`, 'full');
         // The host always starts as the parent and the guest as the child; they swap each round.
         const room = { code, members: [], round: 0, touched: Date.now() }; this.reset(room, data.settings); this.rooms.set(code, room); this.add(room, 'parent', socket); return;
       }

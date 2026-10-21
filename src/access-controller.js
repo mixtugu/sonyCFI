@@ -4,7 +4,7 @@
 // reliably follow the profile set up on a PS5. The controller's own input report also carries the
 // *physical* buttons, independent of any profile, so the game reads those instead and applies its
 // own fixed layout. Report layout from ps-access (MIT, PROTOCOL.md "Input report"):
-//   data byte 0 / 1  stick X / Y (0x80 centred)
+//   data byte 17 / 18 physical stick X / Y (0x80 centred; found on hardware, 0 / 1 per ps-access)
 //   data byte 15     perimeter buttons 1–8, bit n−1 for button n
 //   data byte 16     bit 0 centre button, bit 1 stick click
 const FILTER = { vendorId: 0x054c, productId: 0x0e5f };
@@ -57,13 +57,17 @@ if (accessSupported()) {
 
 // Physical state: the set of pressed physical buttons (1–8, 'centre', 'stick') and the stick.
 export function accessState() {
-  if (!device || !report || report.length < 17) return null;
+  if (!device || !report || report.length < 19) return null;
   const buttons = new Set();
   for (let bit = 0; bit < 8; bit++) if (report[15] & 1 << bit) buttons.add(bit + 1);
   if (report[16] & 1) buttons.add('centre');
   if (report[16] & 2) buttons.add('stick');
   const axis = value => { const v = (value - 128) / 128; return Math.abs(v) < DEAD_ZONE ? 0 : Math.max(-1, Math.min(1, v)); };
-  return { buttons, stick: [axis(report[0]), axis(report[1])] };
+  // On real hardware the physical stick arrives on bytes 17 / 18 (X / Y); ps-access documents 0 / 1,
+  // which carry the mapped stick. Read whichever pair is tilted further.
+  const pairs = [[axis(report[17]), axis(report[18])], [axis(report[0]), axis(report[1])]];
+  const stick = pairs.reduce((best, pair) => Math.hypot(...pair) > Math.hypot(...best) ? pair : best);
+  return { buttons, stick };
 }
 // The controller as a standard-layout gamepad, so the rest of the game reads it like any other.
 export function accessPad() {
@@ -74,3 +78,5 @@ export function accessPad() {
 }
 // The Gamepad API's view of the same controller, which the WebHID reading replaces while it is open.
 export const isAccessGamepad = pad => /054c/i.test(pad.id) && /0e5f/i.test(pad.id) || /Access Controller/i.test(pad.id);
+// Raw bytes for the settings check, so a stick on unexpected bytes can be spotted on real hardware.
+export const accessRaw = () => report ? [...report] : null;

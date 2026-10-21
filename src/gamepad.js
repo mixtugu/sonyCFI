@@ -1,4 +1,4 @@
-import { accessPad, isAccessGamepad } from './access-controller.js';
+import { accessPad } from './access-controller.js';
 
 // DualSense / Access controller and others through the Gamepad API "standard" mapping, plus the
 // hat-switch D-pad of controllers the browser reports without one.
@@ -81,18 +81,9 @@ export function createPadReader() {
   }
 }
 
-// All connected controllers act as one, so an extra pad (say a DualSense next to an Access
-// controller) never hides the other's input. Sticks come from whichever pad is being tilted.
-export function firstPad() {
-  // An Access controller opened over WebHID is read physically (access-controller.js) and replaces
-  // the Gamepad API's view of it.
-  const access = accessPad();
-  const pads = [...(navigator.getGamepads?.() ?? [])].filter(pad => pad?.connected && !(access && isAccessGamepad(pad)));
-  if (access) pads.push(access);
-  if (pads.length < 2) return pads[0] || null;
-  const tilted = pads.find(pad => pad.axes.slice(0, 4).some(value => Math.abs(value) >= DEAD_ZONE && Math.abs(value) <= 1)) || pads[0];
-  return { id: pads.map(pad => pad.id).join(' + '), connected: true, mapping: tilted.mapping, pads, axes: tilted.axes, buttons: [], vibrationActuator: pads.find(pad => pad.vibrationActuator)?.vibrationActuator };
-}
+// Only the PlayStation Access controller opened over WebHID is read (access-controller.js); the
+// Gamepad API is ignored so a profile set up on a PS5 can never change the layout.
+export const firstPad = () => accessPad();
 
 export function rumble(pad, strong = .5, weak = .5, duration = 80) {
   pad?.vibrationActuator?.playEffect?.('dual-rumble', { duration, strongMagnitude: strong, weakMagnitude: weak }).catch?.(() => {});
