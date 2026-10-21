@@ -26,9 +26,10 @@
   .sandbox-mode .hp-hearts{gap:3px}
   .sandbox-mode .wall-stock{padding:8px}
   .sandbox-mode .wall-stock-head b{font-size:9px}
-  .sandbox-mode .damage-guide{padding-right:8px;gap:4px}
-  .sandbox-mode .damage-guide .risk-legend{padding:8px 0 8px 4px}
-  .sandbox-mode .risk-legend li{font-size:7.5px;grid-template-columns:3em 1fr}
+  .sandbox-mode .damage-guide{padding:8px 4px;gap:0}
+  .sandbox-mode .damage-guide .risk-legend{padding:0 4px 0 8px}
+  .sandbox-mode .risk-legend li{font-size:7.5px;grid-template-columns:2.8em 1fr}
+  .sandbox-mode .wall-damage-note{padding-left:5px}
   .sandbox-mode .wall-damage-note{font-size:7.5px}
   .sandbox-mode .wall-damage-note strong{font-size:10px}
   .sandbox-mode .parent-side .contact-card{flex:none;min-height:0;grid-template-rows:auto}
@@ -63,17 +64,16 @@
 .contact-name{margin:6px 0 0;display:flex;justify-content:center;align-items:center;gap:8px;font-weight:700;font-size:calc(16px * var(--text-scale,1));line-height:1.5;color:#f2f6ff}
 .contact-damage{margin:2px 0 0;font-weight:800;font-size:calc(18px * var(--text-scale,1));line-height:1.5;color:#9ff0c8}.contact-hit.is-hurt .contact-damage{color:#ff8c78}
 @keyframes contact-in{from{opacity:0;transform:scale(.8) translateY(8px)}}
-.risk-legend{list-style:none;margin:0;padding:10px 14px;display:grid;gap:4px}.risk-legend li{display:grid;grid-template-columns:3em 1fr;align-items:center;font-size:calc(15px * var(--text-scale,1));color:#e8f0ff}.risk-legend .risk-marks{font-size:calc(20px * var(--text-scale,1))}
-.damage-guide{display:flex;align-items:center;justify-content:space-between;gap:8px;padding-right:62px}
-.damage-guide .risk-legend{padding-left:46px;padding-right:0}
-.damage-guide .risk-marks{text-align:center}
+.risk-legend{list-style:none;margin:0;padding:0;display:grid;gap:4px}.risk-legend li{display:grid;grid-template-columns:2.8em 1fr;align-items:center;font-size:calc(15px * var(--text-scale,1));color:#e8f0ff}.damage-fish-icon{display:block;width:2.8em;height:2.2em;overflow:visible;filter:drop-shadow(0 0 3px #39bfff)}.damage-fish-icon.is-dangerous{filter:drop-shadow(0 0 3px #ff302f)}
+.damage-guide{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:stretch;gap:0;padding:10px 12px}
+.damage-guide .risk-legend{padding:0 8px 0 12px}
 @container (min-width:721px){
   .parent-side{height:100%;min-height:0}
   .parent-side .contact-card{flex:1;min-height:201px;grid-template-rows:minmax(0,1fr)}
   .parent-side .contact-hit{height:100%;min-height:0;display:flex;flex-direction:column;align-items:center}
   .parent-side .contact-hit .creature-art{flex:1;min-height:0;height:0;width:100%;max-width:none;aspect-ratio:auto}
 }
-.wall-damage-note{margin:0;text-align:center;font-size:calc(15px * var(--text-scale,1));line-height:1.6;color:#e8f0ff}
+.wall-damage-note{display:grid;align-content:center;margin:0;padding-left:12px;border-left:1px solid #fff;text-align:center;font-size:calc(15px * var(--text-scale,1));line-height:1.6;color:#e8f0ff}
 .wall-damage-note strong{font-size:calc(20px * var(--text-scale,1));color:#ffe45c}
 
 /* 図鑑: one row per size; undiscovered entries are pale silhouettes. */

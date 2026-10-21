@@ -20,7 +20,7 @@ The lobby, preparation, exploration, pause, and return screens share a procedura
 
 Maze coordinates remain 36 pixels per cell with 14 pixels of padding. Pointer hit testing, collision, movement intervals, scoring, networking, and server-side role filtering are unchanged. The drawn diver interpolates only between adjacent cell centers; interrupted turns finish the preceding cell rather than cutting a corner. Reconnect jumps and resets do not produce long wakes.
 
-The navigator retains its destination, public fish size, high-risk warning colors and revealed item risks. Before collection, exact risk values, rewards and fish kinds stay hidden. Secret passages remain dashed and child-only. The presentation only reads the state already provided to each role.
+The navigator retains its destination, public fish size, binary high-risk warning (a red glowing fish with a white `!`), and revealed item risks. Maximum risk still has three internal levels for creature selection and damage; only high-risk fish receive the warning. Before collection, exact risk values, rewards and fish kinds stay hidden. Secret passages remain dashed and child-only. The presentation only reads the state already provided to each role.
 
 In the maze, gameplay effects (movement, wakes, pickups, wall rises) follow a clock that advances only while playing; ambient water, fish and kelp also move before the round and during the countdown. Pausing freezes the board and the WebGL ocean. Tutorial boards have no game clock: movement applies immediately and only their ambient water animates. The exploration light uses only the visited trail, and fish, kelp and seabed decorations are seeded from cell indices and the visible walls, so neither view reveals hidden item data.
 

@@ -1,6 +1,7 @@
 import { neighbor, edge } from './maze.js';
 import { creatureBitmap } from './creature-art.js';
 import { drawDiverHD, drawRipple, disc, motionPreference, causticTile } from './ocean-art.js';
+import { FISH_ICON_PATH } from './fish-icon.js';
 
 // Presentation-only: reads the role's state, never mutates it. Each canvas keeps its own visual
 // state (clocks, caches, particles) in a WeakMap, including the tutorial boards.
@@ -211,34 +212,26 @@ function paintReef(s, role, cols, rows, segment, res) {
 const FISH_SCALE = { small: 1, medium: 1.4, large: 1.8 };
 // Width of a met creature's picture on its cell, by the fish's size (a cell is 36 units).
 const CREATURE_WIDTH = { small: 28, medium: 33, large: 38 };
-const RISK_MARK_COLORS = { 1: '#7cff9b', 2: '#ffe45c', 3: '#ff5b55' };
-const fishPath = (() => {
-  const p = new Path2D();
-  p.moveTo(-4.5, -1.2);
-  p.bezierCurveTo(-1, -5, 3.3, -3.4, 5, 0);
-  p.bezierCurveTo(3.3, 3.4, -1, 5, -4.5, 1.2);
-  p.quadraticCurveTo(-8.6, 4.5, -6.8, 0);
-  p.quadraticCurveTo(-8.6, -4.5, -4.5, -1.2);
-  p.closePath();
-  return p;
-})();
+const fishPath = new Path2D(FISH_ICON_PATH);
 export function drawFishIcon(c, x, y, size, light = 1, alpha = 1, risk = 0, markScale = 1) {
   const scale = FISH_SCALE[size] || 1;
   c.save(); c.translate(x, y); c.scale(scale * 1.15, scale * 1.1); c.globalAlpha = alpha;
-  if (risk) {
-    const markScaleY = scale * 1.1;
-    const glow = risk - 1;
+  const dangerous = risk === 3;
+  c.fillStyle = dangerous ? '#e83b43' : 'rgba(67,177,235,.12)'; c.fill(fishPath);
+  c.lineJoin = 'round';
+  c.strokeStyle = dangerous ? '#ff5b61' : '#62d8ff';
+  c.shadowColor = dangerous ? '#ff302f' : '#39bfff';
+  c.shadowBlur = 11 * scale * markScale;
+  c.lineWidth = 2.2; c.stroke(fishPath);
+  c.shadowBlur = 0; c.strokeStyle = dangerous ? '#ffaaa5' : '#d4f8ff'; c.lineWidth = .55; c.stroke(fishPath);
+  if (dangerous) {
     c.save();
-    c.globalAlpha *= Math.min(1, (.05 + .75 * light) * (1 + .25 * glow));
-    c.font = `900 ${(12 + 2 * glow) / markScaleY * markScale}px sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
-    c.fillStyle = RISK_MARK_COLORS[risk]; c.shadowColor = RISK_MARK_COLORS[risk]; c.shadowBlur = (4 + 2.5 * glow) * markScale;
-    c.save(); c.translate(-.3, .2); c.scale(1, 1.5); c.fillText('!'.repeat(risk), 0, 0); c.restore();
+    c.globalAlpha *= Math.min(1, .45 + .5 * light);
+    c.font = `900 ${9 / (scale * 1.1) * markScale}px sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillStyle = '#fff'; c.shadowColor = '#fff'; c.shadowBlur = 4 * markScale;
+    c.save(); c.translate(0, .15); c.scale(1, 1.4); c.fillText('!', 0, 0); c.restore();
     c.restore();
   }
-  c.fillStyle = 'rgba(67,177,235,.12)'; c.fill(fishPath);
-  c.lineJoin = 'round'; c.strokeStyle = '#62d8ff'; c.shadowColor = '#39bfff'; c.shadowBlur = 7 * scale;
-  c.lineWidth = 1.4; c.stroke(fishPath);
-  c.shadowBlur = 0; c.strokeStyle = '#d4f8ff'; c.lineWidth = .55; c.stroke(fishPath);
   c.restore();
 }
 
@@ -544,18 +537,6 @@ export function drawMaze(canvas, s, role, cursor, direction, options = {}) {
     const [x, y] = center(item.cell), risk = role === 'parent' ? item.maxRisk ?? item.risk : 0;
     const light = .4 + .6 * (.5 + .5 * Math.sin(amb * (risk === 3 ? 3.4 : 1.6) + item.cell * 1.3));
     drawFishIcon(c, x, y, item.size, light, 1, risk, options.markScale || 1);
-  }
-  if (role === 'parent') {
-    // The exit is a column of daylight from an opening in the surface.
-    const [x, y] = center(s.goal), sway = Math.sin(amb * 1.3) * .06;
-    c.save(); c.globalCompositeOperation = 'lighter';
-    const glow = c.createRadialGradient(x, y, 2, x, y, 28); glow.addColorStop(0, 'rgba(255,222,160,.45)'); glow.addColorStop(1, 'rgba(255,222,160,0)'); disc(c, x, y, 28, glow);
-    c.translate(x, y); c.rotate(sway);
-    const column = c.createLinearGradient(0, -y - pad, 0, 6); column.addColorStop(0, 'rgba(255,236,190,0)'); column.addColorStop(1, 'rgba(255,236,190,.28)');
-    c.fillStyle = column; c.beginPath(); c.moveTo(-6, -y - pad); c.lineTo(6, -y - pad); c.lineTo(12, 4); c.lineTo(-12, 4); c.closePath(); c.fill(); c.restore();
-    c.save(); c.translate(x, y); c.rotate(amb * .6); c.strokeStyle = 'rgba(255,225,170,.8)'; c.lineWidth = 1.4; c.setLineDash([3, 4]); c.beginPath(); c.arc(0, 0, 12, 0, TAU); c.stroke(); c.restore();
-    c.strokeStyle = '#fff1c9'; c.lineWidth = 1.4; c.beginPath(); c.moveTo(x - 2, y + 7); c.lineTo(x - 2, y - 7); c.stroke();
-    c.fillStyle = '#ffcf7a'; c.beginPath(); c.moveTo(x - 2, y - 7); c.quadraticCurveTo(x + 3, y - 6 + Math.sin(amb * 4) * 1, x + 6, y - 4); c.lineTo(x - 2, y - 1.5); c.closePath(); c.fill();
   }
   if (role === 'child') for (const e of s.secrets) {
     const [a, b] = e.split(':').map(Number), coords = segment(a, b), passage = new Path2D(); passage.moveTo(coords[0], coords[1]); passage.lineTo(coords[2], coords[3]);

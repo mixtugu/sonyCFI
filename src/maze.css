@@ -92,6 +92,7 @@ button:focus-visible,a:focus-visible,canvas:focus-visible,input:focus-visible,su
 .briefing-count{color:var(--coral);font-size:calc(16.5px * var(--text-scale, 1));letter-spacing:.08em}
 .briefing-title{margin:8px 0 9px;font-size:calc(33px * var(--text-scale, 1));font-weight:700;line-height:1.4}
 .briefing-description{margin:0;color:var(--muted);font-size:calc(19.5px * var(--text-scale, 1));line-height:1.8;white-space:pre-line}
+.briefing-danger-fish{display:inline-block;width:calc(1.4em + 12px);height:calc(1em + 12px);vertical-align:middle;filter:drop-shadow(0 0 3px #ff302f)}
 .briefing-controls{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-height:28px;margin-top:14px;font-size:calc(16.5px * var(--text-scale, 1))}
 .briefing-controls kbd{font:inherit;font-size:calc(15px * var(--text-scale, 1));background:#fff;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:2px 6px}
 .briefing-controls kbd[role=button]{cursor:pointer}
