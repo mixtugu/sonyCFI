@@ -1,4 +1,7 @@
 import http from 'node:http';
+import https from 'node:https';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,13 +12,29 @@ import { MazeRooms } from './maze-rooms.js';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json' };
 
-export async function createApp({ dev = false, port = 5173, host = '0.0.0.0' } = {}) {
+const lanAddresses = () => Object.values(networkInterfaces()).flat().filter(i => i?.family === 'IPv4' && !i.internal).map(i => i.address);
+// WebHID (the Access controller) only works on https:// or localhost, so Wi-Fi devices need https.
+// A self-signed certificate for localhost and the current LAN addresses is made with openssl and
+// regenerated when those addresses change.
+function localCertificate() {
+  const dir = path.join(root, '.certs'), key = path.join(dir, 'key.pem'), cert = path.join(dir, 'cert.pem'), names = path.join(dir, 'names.txt');
+  const san = ['DNS:localhost', 'IP:127.0.0.1', ...lanAddresses().map(a => `IP:${a}`)].join(',');
+  if (!existsSync(cert) || !existsSync(key) || (existsSync(names) && readFileSync(names, 'utf8')) !== san) {
+    mkdirSync(dir, { recursive: true });
+    execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', key, '-out', cert, '-days', '825', '-subj', '/CN=Between Tides (local)', '-addext', `subjectAltName=${san}`], { stdio: 'ignore' });
+    writeFileSync(names, san);
+  }
+  return { key: readFileSync(key), cert: readFileSync(cert) };
+}
+
+export async function createApp({ dev = false, port = 5173, host = '0.0.0.0', secure = false } = {}) {
   let vite;
-  const server = http.createServer(async (req, res) => {
+  const scheme = secure ? 'https' : 'http';
+  const handler = async (req, res) => {
     if (req.url === '/health') { res.writeHead(200, { 'content-type': 'application/json' }); res.end('{"ok":true}'); return; }
     if (req.url === '/connection-info') {
       const lan = [];
-      for (const entries of Object.values(networkInterfaces())) for (const i of entries || []) if (i.family === 'IPv4' && !i.internal) lan.push(`http://${i.address}:${server.address().port}`);
+      for (const address of lanAddresses()) lan.push(`${scheme}://${address}:${server.address().port}`);
       res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }); res.end(JSON.stringify({ lan })); return;
     }
     if (vite) return vite.middlewares(req, res, () => { res.writeHead(404); res.end(); });
@@ -29,7 +48,8 @@ export async function createApp({ dev = false, port = 5173, host = '0.0.0.0' } =
       if (!(await stat(file)).isFile()) throw new Error('not file');
       res.writeHead(200, { 'content-type': mime[path.extname(file)] || 'application/octet-stream' }); res.end(await readFile(file));
     } catch { res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' }); res.end('ページが見つかりません。先に npm run build を実行してください。'); }
-  });
+  };
+  const server = secure ? https.createServer(localCertificate(), handler) : http.createServer(handler);
   if (dev) {
     const { createServer } = await import('vite');
     vite = await createServer({ root, server: { middlewareMode: true, hmr: { server } }, appType: 'spa' });
@@ -60,9 +80,11 @@ export async function createApp({ dev = false, port = 5173, host = '0.0.0.0' } =
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const app = await createApp({ dev: process.argv.includes('--dev'), port: Number(process.env.PORT) || 5173 });
-  console.log(`Between Tides: http://localhost:${app.port}`);
-  for (const interfaces of Object.values(networkInterfaces())) for (const i of interfaces || []) if (i.family === 'IPv4' && !i.internal) console.log(`同じWi-Fiの端末: http://${i.address}:${app.port}`);
+  const secure = process.argv.includes('--https') || process.env.HTTPS === '1', scheme = secure ? 'https' : 'http';
+  const app = await createApp({ dev: process.argv.includes('--dev'), port: Number(process.env.PORT) || 5173, secure });
+  console.log(`Between Tides: ${scheme}://localhost:${app.port}`);
+  for (const address of lanAddresses()) console.log(`同じWi-Fiの端末: ${scheme}://${address}:${app.port}`);
+  if (!secure) console.log('※ Wi-Fi の端末で Access コントローラーを使うには --https で起動してください（npm run dev:https / start:https）。');
   let stopping = false;
   const stop = async () => { if (stopping) return; stopping = true; await app.close(); process.exit(0); };
   process.on('SIGINT', stop); process.on('SIGTERM', stop);

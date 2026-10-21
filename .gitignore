@@ -8,3 +8,4 @@ playwright-report/
 *.cpuprofile
 .server.pid
 .server.log
+.certs/

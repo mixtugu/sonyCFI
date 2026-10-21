@@ -6,7 +6,9 @@
     "scripts": {
         "dev": "node --watch server/index.js --dev",
         "build": "vite build",
+        "dev:https": "node --watch server/index.js --dev --https",
         "preview": "node server/index.js",
+        "start:https": "node server/index.js --https",
         "test": "node --test src/*.test.js server/*.test.js",
         "start": "node server/index.js",
         "worker:dev": "npm run build && wrangler dev --port 8787",

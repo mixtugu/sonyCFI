@@ -176,7 +176,7 @@ function rawDump() {
 // Settings → live check of the physical buttons and the game action each one becomes.
 function accessCheck() {
   const status = $('access-check-status'), state = accessState();
-  status.textContent = !accessSupported() ? 'このブラウザは非対応（Chrome / Edge が必要）' : accessConnected() ? '接続済み' : '未接続';
+  status.textContent = !window.isSecureContext ? 'この接続では使えません（https:// のアドレスで開いてください）' : !accessSupported() ? 'このブラウザは非対応（Chrome / Edge が必要）' : accessConnected() ? '接続済み' : '未接続';
   status.dataset.on = accessConnected() ? '1' : '';
   $('settings-dialog').querySelectorAll('[data-access]').forEach(el => { const key = el.dataset.access; el.classList.toggle('on', !!state?.buttons.has(isNaN(key) ? key : +key)); });
   const [x, y] = state?.stick ?? [0, 0];
