@@ -467,7 +467,7 @@ export function createTutorial(container, { onStep, onFinish, onClose, onSound }
         resetMazeScene(find('.briefing-canvas')); demoCycle = cycle;
         soundObserver.reset(); soundPosition = null;
       }
-      const met = demoItems.filter(fish => fish.taken), hp = applyDamage(met.reduce((value, fish) => applyDamage(value, fish.damage), HP_MAX), 0);   // walls built in the tutorial never cost HP
+      const met = demoItems.filter(fish => fish.taken), hp = applyDamage(met.reduce((value, fish) => applyDamage(value, fish.damage), HP_MAX), wallDemo() ? practice.placed.size * WALL_DAMAGE : 0);   // walls cost HP in both wall steps, as in a round
       if (hp !== demoHp) {
         const meter = find('.briefing-hp .hp-hearts'), panel = find('.briefing-hp');
         meter.innerHTML = hearts(hp); meter.setAttribute('aria-valuenow', hp);
@@ -511,7 +511,7 @@ export function createTutorial(container, { onStep, onFinish, onClose, onSound }
       if (position.avatar === scene.goal && soundPosition.avatar !== scene.goal) onSound?.('finish');
     }
     soundPosition = position;
-    drawMaze(canvas, scene, role, practice.cursor.y * COLS + practice.cursor.x, (practice.direction + 3) % 4, { cursor: wallDemo(), cursorSpotlight: cursorIntro(), resolution, markScale: .65, guideRoute: guideRoute() });
+    drawMaze(canvas, scene, role, practice.cursor.y * COLS + practice.cursor.x, (practice.direction + 3) % 4, { cursor: wallDemo(), cursorSpotlight: cursorIntro(), resolution, markScale: .65, wallDamage: wallDemo() ? WALL_DAMAGE : undefined, guideRoute: guideRoute() });
   }
   function drawBoard() {
     const interactive = placingStep() || moveStep();
