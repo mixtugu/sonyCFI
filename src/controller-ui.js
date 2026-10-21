@@ -1,7 +1,8 @@
 import { padAction } from './controller-guide.js';
 
 const visible = element => !element.disabled && !element.closest('[hidden], [inert]') && element.getClientRects().length > 0 && getComputedStyle(element).visibility !== 'hidden';
-const controls = scope => [...scope.querySelectorAll('button, a[href], input:not([readonly]), select, summary')].filter(visible);
+// The settings gear stays a mouse/keyboard control: controller selection never lands on it.
+const controls = scope => [...scope.querySelectorAll('button, a[href], input:not([readonly]), select, summary')].filter(element => visible(element) && element.id !== 'settings-open');
 
 // Modal-scoped navigation. Up/down selects controls; left/right edits numeric fields.
 // Room codes use a local hex keypad, so joining never requires a hardware keyboard.

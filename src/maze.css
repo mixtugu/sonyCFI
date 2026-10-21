@@ -213,15 +213,9 @@ body.immersive{height:100dvh;overflow:hidden}.immersive .top,.immersive .hint,.i
 .ocean-coordinate{position:absolute;bottom:8px;left:0;right:0;border-top:1px solid #93d6c83b;display:flex;justify-content:space-between;gap:12px;padding-top:15px;color:#93babf;font-size:calc(13.5px * var(--text-scale, 1));letter-spacing:.1em}
 .lobby-card{width:100%;padding:34px;background:linear-gradient(145deg,#173b79ed,#092454ed);border:1px solid #9abaff45;border-radius:22px;box-shadow:0 30px 70px #000b2640;backdrop-filter:blur(16px)}
 .lobby-panels{display:grid;gap:10px;min-width:0}
-.lobby .lobby-solo{padding:10px 26px}
-.lobby .lobby-solo h1{margin:0 0 10px}
 .lobby .lobby-access{padding:12px 16px;text-align:center}
 .lobby-access:not(:has(.access-connect:not([hidden]))){display:none}
 .lobby-access .access-connect{font-size:calc(16px * var(--text-scale,1))}
-.lobby-solo-actions{display:grid;gap:6px}
-.lobby-solo-actions a{display:block;text-align:center;border-radius:10px;padding:9px 18px}
-.lobby-solo-actions .secondary{background:#99afd6;color:#102750;border:0}
-.lobby-solo-actions .secondary:hover{background:#afc3e6}
 .lobby .eyebrow{font-size:calc(13.5px * var(--text-scale, 1));letter-spacing:.1em;color:#b9ceff}.lobby-card h1{font-size:calc(37.5px * var(--text-scale, 1));line-height:1.7;font-weight:500;margin:12px 0 25px}
 .lobby #maze-create select,.lobby #maze-join input{background:#071b43;border:1px solid #a9c3ff3b;color:#e0eaff;border-radius:10px;padding:12px}.lobby #maze-join input::placeholder{color:#afc4ed}
 .lobby #net-status{font-size:calc(18px * var(--text-scale, 1));line-height:1.8}.lobby #net-lobby{gap:15px}.lobby #net-lobby form>button{border-radius:10px;padding:12px 18px}
@@ -242,8 +236,6 @@ body.immersive{height:100dvh;overflow:hidden}.immersive .top,.immersive .hint,.i
   .lobby-card h1{font-size:calc(26px * var(--text-scale,1));margin:6px 0 10px}
   .lobby #net-status{margin-bottom:6px;font-size:calc(16px * var(--text-scale,1))}
   .lobby #net-lobby form>button{font-size:calc(16px * var(--text-scale,1));padding:10px 12px}
-  .lobby-solo-actions{gap:6px}
-  .lobby-solo-actions a{font-size:calc(16px * var(--text-scale,1));padding:8px 12px}
   .lobby-note,.lobby-foot{font-size:calc(14px * var(--text-scale,1));margin-top:8px}
   .lobby-settings{margin-top:10px;padding-top:8px}
   .lobby-foot .access-connect{font-size:calc(14px * var(--text-scale,1));padding:8px}
@@ -304,3 +296,53 @@ body.spectating dialog:not(#settings-dialog, #help), body.spectating .board-surf
 .access-dump{margin:0;width:100%;font:11px/1.5 ui-monospace,monospace;opacity:.8;word-break:break-word}
 .access-dump .moved{background:#f5a62366;border-radius:3px}
 .access-dump .now{font-weight:800;background:#f5a623;color:#111}
+
+/* Settings — always: sound and text size; folded: 詳細設定. One card, one slider, one choice-button style. */
+#settings-dialog .settings-basic,#settings-dialog .settings-advanced-body{display:grid;gap:12px}
+#settings-dialog .settings-basic{margin-bottom:12px}
+#settings-dialog :where(.settings-basic,.settings-advanced-body)>:where(:not(#net-room-mount)),#settings-dialog :where(#net-room-mount>#net-room){display:grid;gap:10px}
+#settings-dialog :is(.settings-basic,.settings-advanced-body)>:not(#net-room-mount),#settings-dialog #net-room-mount>#net-room{margin:0;padding:14px 16px;min-width:0;border:1px solid #9dc9c333;border-radius:14px;background:#ffffff0a;box-shadow:none}
+#settings-dialog :where(fieldset>legend,.wall-style>span:first-child,.maze-zoom-control>span,.settings-title,.ending-preview h3,.access-check-head h3){float:left;width:100%;margin:0;padding:0;font-size:calc(17px * var(--text-scale,1));font-weight:700;color:#eafcff}
+#settings-dialog fieldset>legend+*{clear:both}
+#settings-dialog .maze-zoom-control>span{display:flex;justify-content:space-between;align-items:baseline}
+#settings-dialog .maze-zoom-control output,#sound-volume-value{font-weight:700;color:#ffe45c;font-variant-numeric:tabular-nums}
+#settings-dialog label[for=sound-volume]{display:flex;justify-content:space-between;font-size:calc(16px * var(--text-scale,1))}
+#settings-dialog small{display:block;font-size:calc(13px * var(--text-scale,1));line-height:1.6;opacity:.7}
+#settings-dialog input[type=checkbox]{accent-color:#ffe45c;width:18px;height:18px}
+/* Sliders */
+#settings-dialog input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:8px;margin:6px 0;border-radius:999px;background:linear-gradient(to right,#ffe45c var(--fill,0%),#ffffff26 var(--fill,0%));cursor:pointer}
+#settings-dialog input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#fff;border:3px solid #ffe45c;box-shadow:0 2px 6px #0006}
+#settings-dialog input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:#fff;border:3px solid #ffe45c;box-shadow:0 2px 6px #0006}
+#settings-dialog input[type=range]::-moz-range-track{background:transparent}
+/* Choice buttons: text size and wall design */
+#settings-dialog .font-size-options,#settings-dialog .wall-style{display:flex;flex-wrap:wrap;gap:8px}
+#settings-dialog .wall-style>:is(span:first-child,small){flex-basis:100%}
+#settings-dialog :is(.font-size-options button,.wall-style label){position:relative;flex:1;min-width:0;margin:0;padding:10px 12px;border:1px solid #9dc9c340;border-radius:10px;background:#ffffff0d;color:#eafcff;font:inherit;font-size:calc(16px * var(--text-scale,1));font-weight:700;text-align:center;cursor:pointer;box-shadow:none}
+#settings-dialog :is(.font-size-options button[aria-pressed=true],.wall-style label:has(input:checked)){background:#ffe45c;border-color:#ffe45c;color:#0b2457}
+#settings-dialog .wall-style input{position:absolute;inset:0;margin:0;opacity:0;cursor:pointer}
+#settings-dialog .wall-style label:has(input:focus-visible){outline:3px solid #f2b56b;outline-offset:2px}
+/* Number boxes */
+#settings-dialog input[type=number]{width:96px;padding:8px 10px;border:1px solid #9dc9c340;border-radius:10px;background:#06283b;color:#eafcff;font:inherit;text-align:right}
+#settings-dialog #settings .fields{display:grid;grid-template-columns:1fr 1fr;gap:10px 20px}
+#settings-dialog #settings .field{display:flex;align-items:center;justify-content:space-between;gap:10px}
+/* The fold */
+#settings-dialog .settings-advanced>summary{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border:1px solid #9dc9c333;border-radius:14px;background:#ffffff0a;font-size:calc(17px * var(--text-scale,1));font-weight:700;color:#eafcff;cursor:pointer;list-style:none}
+#settings-dialog .settings-advanced>summary::-webkit-details-marker{display:none}
+#settings-dialog .settings-advanced>summary::after{content:'';width:9px;height:9px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg);transition:transform .15s}
+#settings-dialog .settings-advanced[open]>summary::after{transform:rotate(-135deg)}
+#settings-dialog .settings-advanced-body{margin-top:12px}
+@media(max-width:620px){#settings-dialog #settings .fields{grid-template-columns:1fr}}
+#settings-dialog .wall-style label{display:flex;align-items:center;justify-content:center;flex:1 1 0;width:auto}
+#settings-dialog .maze-zoom-control{grid-template-columns:1fr}
+#settings-dialog .access-check-head h3{float:none;width:auto}
+#settings-dialog #settings .field input[type=number]{flex:none;width:96px;min-width:96px}
+/* Amounts of walls and fish: the same choice buttons as text size, one row each. */
+#settings-dialog .amount-row{display:grid;grid-template-columns:3em 1fr;align-items:center;gap:10px}
+#settings-dialog .amount-row>span{font-weight:700;color:#eafcff}
+#settings-dialog .preset-options{display:flex;gap:8px}
+#settings-dialog .preset-options button{display:flex;flex-direction:column;align-items:center;gap:2px;flex:1;min-width:0;margin:0;padding:8px 10px;border:1px solid #9dc9c340;border-radius:10px;background:#ffffff0d;color:#eafcff;font:inherit;font-size:calc(16px * var(--text-scale,1));font-weight:700;box-shadow:none;cursor:pointer}
+#settings-dialog .preset-options button small{font-size:calc(12px * var(--text-scale,1));font-weight:500;opacity:.75}
+#settings-dialog .preset-options button[aria-pressed=true]{background:#ffe45c;border-color:#ffe45c;color:#0b2457}
+#settings-dialog .preset-options button:disabled{opacity:.45;cursor:default}
+#settings-dialog #net-room-mount:not(:has(#net-room:not([hidden]))){display:none}
+#settings-dialog .preset-options button{justify-content:center;min-height:52px}

@@ -12,6 +12,8 @@ try {
   await page.addInitScript(() => { navigator.getGamepads = () => []; });
   await page.goto(`http://127.0.0.1:${app.port}/test`);
   await page.locator('#settings-open').click();
+  // Zoom lives in the folded 詳細設定; text size is always shown.
+  await page.locator('.settings-advanced > summary').click();
   await page.locator('#maze-zoom').fill('1.8');
   await expect(page.locator('#maze-zoom-value')).toHaveText('180%');
   for (const scale of ['1', '1.5', '2']) {
@@ -25,6 +27,7 @@ try {
   assert.ok(board.width > board.viewport && board.scroll >= board.width, 'zoomed maze can be scrolled');
   await page.reload();
   await page.locator('#settings-open').click();
+  await page.locator('.settings-advanced > summary').click();
   await expect(page.locator('#maze-zoom')).toHaveValue('1.8');
   await expect(page.locator('[data-text-scale="2"]')).toHaveAttribute('aria-pressed', 'true');
   await page.locator('#maze-zoom').fill('1');

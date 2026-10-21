@@ -12,7 +12,7 @@ import './encyclopedia.css';
 import { controllerDiagram, padAction, playGuide, startPressFeedback } from './controller-guide.js';
 import { createControllerUI } from './controller-ui.js';
 import { createSoundEffects, createSoundObserver, deadlineRhythm } from './sound-effects.js';
-import { DEFAULTS, LIMITS, createMaze, start, tick, move, placeWall, neighbor } from './maze.js';
+import { DEFAULTS, LIMITS, PRESETS, createMaze, start, tick, move, placeWall, neighbor } from './maze.js';
 import { drawFishIcon, drawMaze, pointerCell, setTextScale, setWallStyle, WALL_STYLES } from './maze-renderer.js';
 import { connectMaze } from './maze-network.js';
 import { connectSoloMaze } from './maze-solo.js';
@@ -26,7 +26,7 @@ import { createCreatureVideoMatte } from './creature-video-matte.js';
 import { endingCreatureLayout } from './ending-creature-layout.js';
 import { contactCard, explorerPanel, hearts, navigatorPanel, wallStock, zukan } from './encyclopedia-ui.js';
 
-const fields = [['cols', '横のマス数'], ['rows', '縦のマス数'], ['duration', '制限時間（秒）'], ['wallLimit', '壁の枚数'], ['moveMs', '移動間隔（ms）']];
+const fields = [['cols', '横のマス数'], ['rows', '縦のマス数'], ['duration', '制限時間（秒）'], ['wallLimit', '壁の枚数'], ['fishCount', '魚の数'], ['moveMs', '移動間隔（ms）']];
 const input = (key, label) => `<input type="number" name="${key}" aria-label="${label}" min="${LIMITS[key][0]}" max="${LIMITS[key][1]}" step="${key === 'moveMs' ? 50 : 1}" value="${DEFAULTS[key]}" required>`;
 // Decorative particles for the in-game dialogs, laid out deterministically and animated by CSS.
 const seeded = (i, k) => { const x = Math.sin(i * 127.1 + k * 311.7) * 43758.5453; return x - Math.floor(x); };
@@ -94,7 +94,7 @@ document.querySelector('#app').innerHTML = `
 <h1>2人で遊ぶ</h1>
 <div id="net-lobby-mount"></div>
 <p class="lobby-note lobby-role-note">作った人：ナビゲーター　　参加する人：エクスプローラー</p>
-</div><section class="lobby-card lobby-solo" aria-label="1人で遊ぶ"><h1>1人で遊ぶ</h1><div class="lobby-solo-actions"><a class="primary" href="/test/1">ナビゲーターではじめる</a><a class="primary" href="/test/2">エクスプローラーではじめる</a><a class="secondary" href="/test">自由テスト</a></div></section>
+</div>
 <div class="lobby-card lobby-access"><button type="button" class="text-button access-connect" hidden>🎮 Access コントローラーを接続（USB）</button></div></div></section>
 <main class="workspace"${testMode ? '' : ' hidden'}>
 <section class="toolbar" aria-label="ゲーム操作"><div class="mode-group" aria-label="プレイモード"><button data-mode="parent" class="selected" aria-pressed="true">ナビゲーター</button><button data-mode="child" aria-pressed="false">エクスプローラー</button><button data-mode="cpu" aria-pressed="false">CPU</button></div><span id="room-chip" class="room-chip" hidden><b id="room-chip-code"></b><i id="room-chip-partner"></i></span><div class="status"><i id="phase-dot"></i><b id="phase">開始前</b><div class="oxygen" id="oxygen" role="meter" aria-label="残りの酸素" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span class="oxygen-bubbles" aria-hidden="true"><i></i><i></i><i></i></span><span class="oxygen-valve" aria-hidden="true"><i class="oxygen-knob"></i><i class="oxygen-neck"></i></span><span class="oxygen-body"><span class="oxygen-track"><span class="oxygen-fill" id="oxygen-fill"></span><span class="oxygen-ticks" aria-hidden="true"></span></span><span class="oxygen-band" aria-hidden="true"></span><span class="oxygen-band" aria-hidden="true"></span><strong id="timer">00:30</strong><span class="oxygen-label" aria-hidden="true">O₂</span></span></div></div><div class="run-controls"><button id="reset" class="secondary" aria-label="リセット">↺</button><button id="start" class="primary">スタート</button><button id="settings-open" class="secondary" aria-label="設定と部屋コード" title="設定と部屋コード (□)">⚙</button><button id="fullscreen" class="secondary" aria-label="全画面" aria-pressed="false" title="全画面 (F)">⛶</button></div></section>
@@ -207,6 +207,29 @@ helpHeading.tabIndex = -1;
 helpHeading.autofocus = true;
 document.querySelector('.wall-style').insertAdjacentHTML('beforebegin', '<label class="maze-zoom-control"><span>迷路の表示倍率 <output id="maze-zoom-value">100%</output></span><input id="maze-zoom" type="range" min="1" max="1.8" step="0.1" value="1" aria-label="迷路の表示倍率"></label>');
 document.querySelector('.wall-style').insertAdjacentHTML('beforebegin', '<fieldset class="font-size-control"><legend>文字サイズ</legend><div class="font-size-options" role="group" aria-label="文字サイズ"><button type="button" data-text-scale="1" aria-pressed="true">標準</button><button type="button" data-text-scale="1.5" aria-pressed="false">1.5倍</button><button type="button" data-text-scale="2" aria-pressed="false">2倍</button></div></fieldset>');
+// Settings: sound and text size are always shown; everything else folds into 詳細設定. Nodes are
+// moved, not rebuilt, so their listeners and ids stay as they are.
+{
+  const dialog = $('settings-dialog'), pick = selector => dialog.querySelector(selector);
+  const basic = document.createElement('div'); basic.className = 'settings-basic';
+  // Space, walls, fish and movement, three steps each, written into the maze settings form below.
+  const amounts = document.createElement('fieldset'); amounts.className = 'amount-presets';
+  amounts.innerHTML = '<legend>迷路</legend>' + PRESETS.map(({ key, label, options }) =>
+    `<div class="amount-row"><span>${label}</span><div class="preset-options" role="group" aria-label="${label}">${options.map(([name, detail], i) =>
+      `<button type="button" data-preset="${key}" data-index="${i}" aria-pressed="false">${name}${detail ? `<small>${detail}</small>` : ''}</button>`).join('')}</div></div>`).join('');
+  basic.append(pick('#net-room-mount'), pick('.sound-settings'), pick('.font-size-control'), amounts);
+  const advanced = document.createElement('details'); advanced.className = 'settings-advanced';
+  advanced.innerHTML = '<summary>詳細設定</summary><div class="settings-advanced-body"></div>';
+  advanced.lastElementChild.append(...['.access-check', '.maze-zoom-control', '.wall-style', '#settings', '.ending-preview'].map(pick).filter(Boolean));
+  dialog.querySelector('.dialog-head').after(basic, advanced);
+  pick('#settings').insertAdjacentHTML('afterbegin', '<h3 class="settings-title">迷路の設定</h3>');
+  // Sliders share one look: the filled part of the track follows the value.
+  const paint = range => range.style.setProperty('--fill', `${(range.value - range.min) / ((range.max - range.min) || 1) * 100}%`);
+  const paintAll = () => dialog.querySelectorAll('input[type=range]').forEach(paint);
+  dialog.addEventListener('input', event => { if (event.target.matches('input[type=range]')) paint(event.target); });
+  new MutationObserver(paintAll).observe(dialog, { attributes: true, attributeFilter: ['open'] });
+  paintAll();
+}
 let game = createMaze(), cursor = game.avatar, direction = 0, seed = 260830, keys = new Set(), last = 0, uiClock = 0, resultShown = false, lastPhase = null, sentOxygen = -1, diveTimer = 0;
 const resultScene = createResultScene($('result-scene'));
 const endingExplorerScene = createEndingExplorerScene($('ending-explorer'));
@@ -676,7 +699,15 @@ $('preview-ending').onclick = () => {
   $('lobby').hidden = true;
   showResult(found, hp, 0, game.settings.wallLimit);
 };
-$('settings').onsubmit = event => { event.preventDefault(); const values = Object.fromEntries(new FormData(event.target)); $('settings-dialog').close(); if (network.active) { network.send({ type: 'settings', settings: values }); return; } reset(values, seed + 1); if (!$('lobby').hidden) return; notice('新しい設定で迷路を作りました。'); };
+const presetValues = button => PRESETS.find(p => p.key === button.dataset.preset).options[button.dataset.index][2];
+function applySettings(values) { if (network.active) { network.send({ type: 'settings', settings: values }); return; } reset(values, seed + 1); if (!$('lobby').hidden) return; notice('新しい設定で迷路を作りました。'); }
+$('settings').onsubmit = event => { event.preventDefault(); const values = Object.fromEntries(new FormData(event.target)); $('settings-dialog').close(); applySettings(values); };
+// The amount buttons write into the same form and apply at once, keeping the settings open.
+$('settings-dialog').addEventListener('click', event => {
+  const button = event.target.closest('[data-preset]'); if (!button || button.disabled) return;
+  for (const [key, value] of Object.entries(presetValues(button))) $('settings').elements[key].value = value;
+  applySettings(Object.fromEntries(new FormData($('settings'))));
+});
 $('defaults').onclick = () => { for (const [key, value] of Object.entries(DEFAULTS)) $('settings').elements[key].value = value; reset(DEFAULTS, 260830); notice('初期設定に戻しました。'); };
 $('board-parent').onpointermove = event => { if (game.mode !== 'parent') return; const hit = pointerCell(event.currentTarget, game, event); if (hit) { setCursor(hit.cell); direction = hit.direction; } };
 $('board-parent').onclick = event => { if (game.mode !== 'parent') return; const hit = pointerCell(event.currentTarget, game, event); if (hit) { setCursor(hit.cell); direction = hit.direction; event.currentTarget.focus(); wall(); } };
@@ -709,7 +740,9 @@ function update() {
   lastPhase = game.phase;
   document.querySelector('.mode-group').hidden = network.active; $('reset').hidden = network.active;
   const editable = !network.active || network.state?.host && game.phase === 'ready' && network.state.match.leg === 1;
-  if (editable !== shownEditable) { shownEditable = editable; document.querySelectorAll('#settings input, #settings button').forEach(b => b.disabled = !editable); }
+  if (editable !== shownEditable) { shownEditable = editable; document.querySelectorAll('#settings input, #settings button, [data-preset]').forEach(b => b.disabled = !editable); }
+  // The amount buttons show which amount the current maze uses (none, for a custom number).
+  for (const button of document.querySelectorAll('[data-preset]')) setAttr(button, 'aria-pressed', Object.entries(presetValues(button)).every(([key, value]) => Number(game.settings[key]) === value));
   $('defaults').hidden = network.active;
   $('room-chip').hidden = !network.active;
   roomCode();

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CREATURES, HP_MAX, SIZE_MIX, applyDamage, creature, pickCreature } from './creatures.js';
-import { createMaze, reachable, start, tick, move, placeWall, neighbor, neighbors, canMove, edge, autoDirection, rng, DEFAULTS } from './maze.js';
+import { createMaze, reachable, start, tick, move, placeWall, neighbor, neighbors, canMove, edge, autoDirection, rng, DEFAULTS, PRESETS } from './maze.js';
 
 test('seeded mazes are connected at every supported board size', () => {
   for (const [cols, rows] of [[10, 8], [14, 10], [20, 12], [28, 18]]) {
@@ -108,4 +108,15 @@ test('a maximum risk only ever hides creatures at or below it', () => {
     const maxRisk = 1 + (i % 3), found = pickCreature(size, random, maxRisk);
     assert.ok(found.size === size && found.risk <= maxRisk);
   }
+});
+
+test('the fish count setting places that many fish, spread over distinct cells, at every maze size', () => {
+  const presetFish = PRESETS.find(p => p.key === 'fishCount').options.map(([, , values]) => values.fishCount);
+  for (const fishCount of [...presetFish, 4, 8, 16, 24]) for (const [cols, rows] of [[10, 8], [12, 9], [14, 10], [16, 11], [28, 18]]) for (let seed = 1; seed <= 20; seed++) {
+    const s = createMaze({ cols, rows, fishCount }, seed), cells = s.items.map(i => i.cell);
+    assert.equal(s.items.length, fishCount, `${fishCount} fish on ${cols}×${rows}`);
+    assert.equal(new Set(cells).size, cells.length); assert.ok(cells.every(c => c !== s.goal && c !== s.avatar && c >= 0 && c < cols * rows));
+    assert.ok(s.items.some(i => i.size === 'large'));
+  }
+  assert.equal(createMaze().items.length, 12, 'twelve by default, as before');
 });

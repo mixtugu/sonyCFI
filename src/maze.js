@@ -1,5 +1,12 @@
-export const DEFAULTS = Object.freeze({ cols: 14, rows: 10, duration: 30, wallLimit: 8, moveMs: 500 });
-export const LIMITS = { cols: [10, 28], rows: [8, 18], duration: [5, 120], wallLimit: [0, 30], moveMs: [100, 1200] };
+export const DEFAULTS = Object.freeze({ cols: 14, rows: 10, duration: 30, wallLimit: 8, fishCount: 12, moveMs: 500 });
+export const LIMITS = { cols: [10, 28], rows: [8, 18], duration: [5, 120], wallLimit: [0, 30], fishCount: [4, 24], moveMs: [100, 1200] };
+// One-tap choices for the settings screen: three steps each, the middle one being the default.
+export const PRESETS = [
+  { key: 'size', label: '広さ', options: [['狭め', '12×9', { cols: 12, rows: 9 }], ['ふつう', '14×10', { cols: 14, rows: 10 }], ['広め', '16×11', { cols: 16, rows: 11 }]] },
+  { key: 'wallLimit', label: '壁', options: [['少なめ', '6', { wallLimit: 6 }], ['ふつう', '8', { wallLimit: 8 }], ['多め', '10', { wallLimit: 10 }]] },
+  { key: 'fishCount', label: '魚', options: [['少なめ', '9', { fishCount: 9 }], ['ふつう', '12', { fishCount: 12 }], ['多め', '15', { fishCount: 15 }]] },
+  { key: 'moveMs', label: '移動', options: [['ゆっくり', '', { moveMs: 650 }], ['ふつう', '', { moveMs: 500 }], ['はやい', '', { moveMs: 380 }]] },
+];
 export const WALL_DAMAGE = 2;
 import { HP_MAX, SIZE_MIX, applyDamage, maxRiskFor, pickCreature, rollDamage } from './creatures.js';
 
@@ -41,20 +48,32 @@ export function createMaze(settings = {}, seed = 260830) {
   // A few loops offer choices without losing the character of a carved maze.
   const closed = [...s.base];
   for (let i = 0; i < Math.floor(count / 32); i++) s.base.delete(closed.splice(Math.floor(random() * closed.length), 1)[0]);
-  const sizes = [...SIZE_MIX];
+  // The size mix keeps the twelve-fish proportions (3 large : 4 medium : 5 small) at any count.
+  const fish = config.fishCount, large = Math.max(1, Math.round(fish * 3 / 12)), medium = Math.round(fish * 4 / 12);
+  const sizes = fish === SIZE_MIX.length ? [...SIZE_MIX] : Array.from({ length: fish }, (_, i) => i < large ? 'large' : i < large + medium ? 'medium' : 'small');
   for (let i = sizes.length - 1; i > 0; i--) { const j = Math.floor(random() * (i + 1)); [sizes[i], sizes[j]] = [sizes[j], sizes[i]]; }
-  if (sizes[3] !== 'large') {
+  // One fish per zone of a grid keeps them spread evenly, so no item is far from the next: 4×3 for
+  // twelve, 3 rows when the count divides by three (3×3, 5×3), otherwise 4 wide. None sits within
+  // two steps of the start, where the child would grab it instantly.
+  const zoneRows = fish % 3 === 0 ? 3 : Math.ceil(fish / 4), zoneCols = Math.ceil(fish / zoneRows);
+  // The top-right zone, by the goal, always holds a large fish.
+  const corner = zoneCols - 1;
+  if (sizes.length > corner && sizes[corner] !== 'large') {
     const largeZones = sizes.map((size, i) => size === 'large' ? i : -1).filter(i => i >= 0);
     const zone = largeZones[Math.floor(random() * largeZones.length)];
-    [sizes[3], sizes[zone]] = [sizes[zone], sizes[3]];
+    [sizes[corner], sizes[zone]] = [sizes[zone], sizes[corner]];
   }
-  // One fish per zone of a 4×3 grid keeps them spread evenly, so no item is far from the next;
-  // none sits within two steps of the start, where the child would grab it instantly.
-  for (let i = 0; i < 12; i++) {
-    const zx = i % 4, zy = Math.floor(i / 4), cells = [];
-    for (let y = Math.floor(zy * config.rows / 3); y < Math.floor((zy + 1) * config.rows / 3); y++)
-      for (let x = Math.floor(zx * config.cols / 4); x < Math.floor((zx + 1) * config.cols / 4); x++) { const n = y * config.cols + x; if (n !== s.goal && x + (config.rows - 1 - y) > 2) cells.push(n); }
-    const cell = cells[Math.floor(random() * cells.length)];
+  for (let i = 0; i < fish; i++) {
+    const zx = i % zoneCols, zy = Math.floor(i / zoneCols), cells = [], fallback = [];
+    for (let y = Math.floor(zy * config.rows / zoneRows); y < Math.floor((zy + 1) * config.rows / zoneRows); y++)
+      for (let x = Math.floor(zx * config.cols / zoneCols); x < Math.floor((zx + 1) * config.cols / zoneCols); x++) {
+        const n = y * config.cols + x; if (n === s.goal || n === s.avatar) continue;
+        fallback.push(n); if (x + (config.rows - 1 - y) > 2) cells.push(n);
+      }
+    // A small zone right by the start may have no distant cell; then any free cell in it will do.
+    const options = cells.length ? cells : fallback;
+    if (!options.length) continue;
+    const cell = options[Math.floor(random() * options.length)];
     // The navigator sees maxRisk; the creature (and its own risk, which sets the damage) stays hidden.
     const maxRisk = maxRiskFor(sizes[i], random), found = pickCreature(sizes[i], random, maxRisk);
     s.items.push({ cell, size: sizes[i], maxRisk, creature: found.id, risk: found.risk, taken: false });
