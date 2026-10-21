@@ -445,7 +445,9 @@ export function drawMaze(canvas, s, role, cursor, direction, options = {}) {
     c.restore();
   }
   drawKelp(c, cols, rows, amb, variant);
-  drawAnchor(c, ...center((rows - 1) * cols));
+  // `empty`: a bare practice board (the navigator's first wall lesson) — no start marker, murk or diver.
+  const empty = !!options.empty;
+  if (!empty) drawAnchor(c, ...center((rows - 1) * cols));
   const hpLabels = [];
   for (const item of s.items) {
     const [x, y] = center(item.cell);
@@ -497,7 +499,7 @@ export function drawMaze(canvas, s, role, cursor, direction, options = {}) {
   const fogGoal = onDemand ? .22 : s.phase === 'result' ? 0 : .32;
   v.fogLevel = v.fogLevel === null || !animate ? fogGoal : v.fogLevel + (fogGoal - v.fogLevel) * (1 - Math.exp(-dt / .8));
   const dx = v.x + pad, dy = v.y + pad;
-  if (v.fogLevel > .005) {
+  if (!empty && v.fogLevel > .005) {
     const f = v.fog.getContext('2d'); f.setTransform(res, 0, 0, res, 0, 0);
     f.globalCompositeOperation = 'source-over'; f.clearRect(0, 0, width, height);
     f.fillStyle = `rgba(1,9,20,${v.fogLevel})`; f.fillRect(0, 0, width, height);
@@ -576,7 +578,7 @@ export function drawMaze(canvas, s, role, cursor, direction, options = {}) {
   v.sparks = v.sparks.filter(p => t - p.at < 1.1).slice(-8);
   // The regulator breathes out a cluster of bubbles every couple of seconds.
   const beat = Math.floor(amb / 1.8);
-  if (!still && beat !== v.beat) {
+  if (!empty && !still && beat !== v.beat) {
     if (v.beat >= 0) { const hx = v.x + Math.cos(v.angle) * 7, hy = v.y + Math.sin(v.angle) * 7; for (let i = 0; i < 4; i++) v.bubbles.push({ x: hx + (i - 1.5) * 1.5, y: hy, at: amb + i * .07, seed: i + beat, clock: 'ambient' }); }
     v.beat = beat;
   }
@@ -589,6 +591,7 @@ export function drawMaze(canvas, s, role, cursor, direction, options = {}) {
   }
 
   // Torch beam, halo and the diver on top.
+  if (!empty) {
   c.save(); c.globalCompositeOperation = 'lighter';
   c.save(); c.translate(v.x, v.y); c.rotate(v.angle);
   const torch = c.createLinearGradient(10, 0, cell * 2.9, 0); torch.addColorStop(0, 'rgba(255,240,190,.22)'); torch.addColorStop(1, 'rgba(255,240,190,0)');
@@ -603,9 +606,18 @@ export function drawMaze(canvas, s, role, cursor, direction, options = {}) {
     v.kickSpeed = targetSpeed + (v.kickSpeed - targetSpeed) * decay;
   }
   drawDiverHD(c, v.x, v.y, v.angle, amb + t, swimming ? 1 : 0, .7, 1, v.kickPhase);
+  }
 
   if (role === 'parent' && s.mode === 'parent' && s.phase !== 'result' && options.cursor !== false) {
     const [x, y] = center(cursor), pulse = .5 + .5 * Math.sin(amb * 4);
+    // Spotlight (tutorial intro): everything but the cursor dims, and a ring pulses around it.
+    if (options.cursorSpotlight) {
+      const glow = (.5 + .5 * Math.sin(now * 5));
+      c.save(); c.fillStyle = 'rgba(2,10,22,.62)';
+      c.beginPath(); c.rect(-pad, -pad, width, height); c.roundRect(x - 22, y - 22, 44, 44, 10); c.fill('evenodd');
+      c.strokeStyle = `rgba(255,228,92,${.55 + .45 * glow})`; c.lineWidth = 2.5 + 2 * glow; c.shadowColor = '#ffd94a'; c.shadowBlur = 10 + 12 * glow;
+      c.beginPath(); c.roundRect(x - 22 - 3 * glow, y - 22 - 3 * glow, 44 + 6 * glow, 44 + 6 * glow, 12); c.stroke(); c.restore();
+    }
     c.save(); c.globalCompositeOperation = 'lighter';
     // A soft lantern-coloured glow and thin corner marks: easy to find without shouting over the sea.
     c.fillStyle = `rgba(255,222,170,${.07 + .09 * pulse})`; c.beginPath(); c.roundRect(x - 16, y - 16, 32, 32, 7); c.fill();

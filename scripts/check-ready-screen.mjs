@@ -18,8 +18,8 @@ try {
   };
   const finishTutorial = async (pageToFinish = page) => {
     const page = pageToFinish;
-    await page.locator('.briefing-next').click();
-    await page.locator('.briefing-next').click();
+    // Step through however many steps the role has (the navigator has four).
+    while (await page.locator('.briefing-next').isVisible()) await page.locator('.briefing-next').click();
     await page.locator('.briefing-launch').click();
     await expect(page.locator('#ready-note')).toBeHidden();
     await expect(page.locator('#ready-note')).toBeEmpty();
@@ -34,7 +34,7 @@ try {
     await finishTutorial();
     await expect(page.locator('#ready-title')).toContainText(role);
     await page.locator('#ready-review').click();
-    await expect(page.locator('.briefing-count')).toHaveText('01 / 03');
+    await expect(page.locator('.briefing-count')).toHaveText(/^01 \/ 0[34]$/);
     await finishTutorial();
     await page.locator('#ready-start').click();
     await expect(page.locator('#countdown')).toBeVisible();

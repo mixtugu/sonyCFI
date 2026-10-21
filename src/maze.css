@@ -360,3 +360,15 @@ body.spectating dialog:not(#settings-dialog, #help), body.spectating .board-surf
 .briefing-art.is-demo .briefing-maze{cursor:default}
 .briefing-practice-notice:not(.is-interactive){border-style:dashed}
 @media(prefers-reduced-motion:reduce){.demo-badge i{animation:none}}
+/* As many progress segments as the role has steps. */
+.briefing-progress{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:1fr}
+/* First wall lesson: the × centre button can be the one to press. */
+.ps-controller .ps-petal.ps-center.is-press-target>circle{fill:#ffe889;stroke:#fff7cc;stroke-width:4;filter:drop-shadow(0 0 7px #ffd94a);animation:wall-button-glow 1.2s ease-in-out infinite}
+.ps-controller .ps-petal.ps-center.is-press-target .ps-mark{stroke:#76500b}
+@media(prefers-reduced-motion:reduce){.ps-controller .ps-petal.ps-center.is-press-target>circle{animation:none}}
+/* First wall lesson: where the wall goes — the top side of the target cell. */
+.practice-cell.is-wall-target-up{position:relative;overflow:visible}
+.practice-cell.is-wall-target-up::before{content:'';position:absolute;left:6%;right:6%;top:-4px;height:8px;border-radius:4px;background:repeating-linear-gradient(90deg,#ffe45c 0 8px,transparent 8px 13px);box-shadow:0 0 10px #ffd94acc;animation:wall-target-pulse 1s ease-in-out infinite;pointer-events:none}
+.practice-cell.is-wall-target-up::after{content:'ここに壁';position:absolute;left:50%;bottom:100%;transform:translate(-50%,-8px);padding:2px 8px;border-radius:6px;background:#ffe45c;color:#0b2457;font-size:calc(12px * var(--text-scale,1));font-weight:800;white-space:nowrap;pointer-events:none}
+@keyframes wall-target-pulse{50%{opacity:.45}}
+@media(prefers-reduced-motion:reduce){.practice-cell.is-wall-target-up::before{animation:none}}
