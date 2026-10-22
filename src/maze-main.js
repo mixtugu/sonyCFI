@@ -9,7 +9,7 @@ import explorerOpeningVideo from './assets/explorer-opening.mp4';
 import navigatorOpeningVideo from './assets/navigator-opening.mp4';
 import './controller.css';
 import './encyclopedia.css';
-import { controllerDiagram, padAction, playGuide, startPressFeedback } from './controller-guide.js';
+import { controllerDiagram, padAction, padIcon, playGuide, startPressFeedback } from './controller-guide.js';
 import { createControllerUI } from './controller-ui.js';
 import { createSoundEffects, createSoundObserver, deadlineRhythm } from './sound-effects.js';
 import { DEFAULTS, LIMITS, PRESETS, createMaze, start, tick, move, placeWall, neighbor } from './maze.js';
@@ -111,7 +111,7 @@ ${['parent', 'child'].map(role => `<section class="board-card ${role}"><div clas
 <dialog id="players-choice" class="entry-screen" aria-label="遊ぶ人数"><img class="game-entry-logo" src="${oceanTitle}" alt="YOU SEE / I SEE"><p class="game-entry-tagline">ー 同じ世界、異なる視点が生むバイアス ー</p><div id="players-host" class="players-host"><p class="players-question">何人で遊びますか？</p><div class="players-buttons" role="group" aria-label="遊ぶ人数"><button type="button" class="primary" data-players="duo">ふたりで</button><button type="button" class="primary" data-players="solo">ひとりで</button></div></div><p id="players-guest" class="players-wait" role="status" hidden>相手が人数を選ぶと、次へ進めます。<br>しばらくお待ちください。</p></dialog>
 <dialog id="game-opening" aria-label="オープニング"><video id="game-opening-video" preload="none" playsinline disablepictureinpicture disableremoteplayback aria-label="オープニング動画"></video><div id="game-opening-error" hidden><p role="alert"></p><button type="button" id="game-opening-retry" class="primary">動画を再生する</button></div></dialog>
 <dialog id="ready" class="ready-dialog">${waterLight}${bubbles(12)}<p class="eyebrow" id="ready-eyebrow"></p><h2 id="ready-title"></h2><p id="ready-note"></p><div id="ready-tutorial" class="tutorial"></div><button type="button" id="ready-review" class="secondary wide">チュートリアルを確認</button><button type="button" id="ready-start" class="primary wide">準備完了</button><button type="button" id="ready-back" class="secondary wide" hidden>戻る</button><p class="ready-foot"><button type="button" id="ready-settings" class="text-button">⚙ 設定</button></p></dialog>
-<dialog id="countdown" class="countdown-dialog" aria-label="開始カウントダウン">${bubbles(14, 720)}<h2>まもなく探検が始まります</h2><div class="countdown-core"><span class="countdown-rings" aria-hidden="true"><i></i><i></i><i></i></span><strong id="countdown-number" aria-live="assertive" aria-atomic="true">3</strong></div><div class="depth-gauge" aria-hidden="true"><span>水面</span><i><b></b></i><span>海の底</span></div><button id="countdown-pause" class="secondary">待機に戻る</button></dialog>
+<dialog id="countdown" class="countdown-dialog" aria-label="開始カウントダウン">${bubbles(14, 720)}<h2>まもなく探検が始まります</h2><div class="countdown-core"><span class="countdown-rings" aria-hidden="true"><i></i><i></i><i></i></span><strong id="countdown-number" aria-live="assertive" aria-atomic="true">3</strong></div><div class="depth-gauge" aria-hidden="true"><span>水面</span><i><b></b></i><span>海の底</span></div><button id="countdown-pause" class="secondary" hidden>待機に戻る</button></dialog>
 <dialog id="ending" class="ending-dialog"><canvas id="ending-explorer" aria-hidden="true"></canvas><div class="ending-flash" aria-hidden="true"></div>${drops(24)}${sparkles(18)}<p class="eyebrow">THANK YOU FOR DIVING</p><h2>この海で様々な<span class="ending-highlight">出会い</span> や <span class="ending-highlight">危険</span> がありました<br>出口から出て、動画をご覧ください</h2><p id="ending-wait" class="ending-wait" hidden>相手が探検を終えるのを待っています…</p><button id="ending-finish" class="primary" hidden>はじめに戻る</button></dialog>
 <dialog id="help">${waterLight}<h2>遊び方</h2><p>目標は、ふたりで海の生き物の図鑑を埋めること。迷路の魚のシルエットにエクスプローラーが触れると、正体の生き物が図鑑に登録されます。大きい魚ほどレアな生き物に出会えます。</p><p>ナビゲーターには、高危険度の魚だけ赤く光り、白い「!」が表示されます。ほかの魚は通常の青い表示です。魚から現れる生き物の危険度は内部で3段階に設定され、実際の生き物はその危険度以下から選ばれます。触れるとエクスプローラーのHPが生き物の危険度に応じて減ります。HPはナビゲーターにしか見えず、0にはなりません。大きい魚ほど危険なことが多いので、壁で道をふさぐかどうかはナビゲーター次第です。道がふさがると、エクスプローラーだけの秘密の通路が開きます。</p><p id="keyboard-help">矢印キー/WASDで操作。ナビゲーターはTabで向き、Spaceで設置。Escで一時停止。Fで全画面。</p><div class="pad-help" hidden><b>PlayStation コントローラー</b>${controllerDiagram()}<p>左スティックで移動、上下左右の方向キーを押すとその向きに壁を設置、×で決定。</p><p>ナビゲーター：位置を選んで壁を設置</p><div class="controller-actions">${playGuide('parent')}</div><p>エクスプローラー：移動してアイテムを探す</p><div class="controller-actions">${playGuide('child')}</div><p>共通の操作</p><div class="controller-actions">${padAction('prev', '長押しで一時停止')}</div><p>メニュー：左スティックで項目を選択、×で決定、← 長押しで戻る。設定の数値はスティックの左右で変更。設定と遊び方は一時停止中の画面から開けます。</p><p>チュートリアル：練習はふだんと同じ操作。→ 長押しで次へ・確認、← 長押しで戻る。</p>${sandboxMode ? '<p>テストモード：L1 / R1で役割切替、CREATEでリセット。</p>' : ''}</div><button id="help-close" class="primary">OK</button></dialog>
 <div id="room-code" class="room-code" popover="manual" role="status" aria-label="部屋コード" hidden></div>`;
@@ -322,6 +322,8 @@ function readyPrompt() {
   $('ready-review').textContent = tutorialComplete ? 'もう一度チュートリアルを見る' : 'チュートリアルを確認';
   $('ready-start').disabled = !network.connected || ready || !tutorialComplete;
   $('ready-start').textContent = ready ? paused ? '相手の準備を待っています' : 'ゲームがもう少しで始まります…' : paused ? '再開する' : !tutorialComplete ? 'チュートリアルを確認してください' : 'ゲームスタート！';
+  // Paused, with a controller: the resume button carries the × mark (there is no footer legend).
+  if (!ready && paused && padSeen) $('ready-start').innerHTML = `${padIcon('cross')} 再開する`;
   $('ready-back').hidden = briefing || paused || !ready;
   $('ready-back').disabled = !network.connected;
   if (!backWasUsable && !$('ready-back').hidden && !$('ready-back').disabled && !$('settings-dialog').open && !$('help').open) $('ready-back').focus({ preventScroll: true });
@@ -439,7 +441,8 @@ window.addEventListener('keydown', event => {
 }, true);
 window.addEventListener('keyup', event => { if (['ArrowUp', 'KeyW'].includes(event.code)) { clearTimeout(endingSpaceTimer); endingSpaceTimer = null; } }, true);
 $('result').addEventListener('cancel', event => { if (endingPreview || network.active) { event.preventDefault(); $('close-result').click(); } });
-$('countdown').addEventListener('cancel', event => { event.preventDefault(); suspend(); });
+// The countdown cannot be stopped once it runs (no Esc, no hold, no button).
+$('countdown').addEventListener('cancel', event => event.preventDefault());
 $('game-entry').addEventListener('cancel', event => event.preventDefault());
 $('game-entry-start').onclick = () => {
   entryStarted = true;
@@ -920,12 +923,12 @@ function controllerHints() {
   else if (spectating) hint = '';
   else if ($('players-choice').open) { scope = $('players-choice'); hint = $('players-host').hidden ? '' : padAction('left', '項目を選択') + padAction('cross', '決定'); }
   else if ($('ending').open) { scope = $('ending'); hint = ''; }   // no on-screen hint: a hold of ↑ (or W) still returns
-  else if ($('countdown').open) { scope = $('countdown'); hint = padAction('prev', '長押しで待機に戻る'); }
-  else if ($('result').open) { scope = $('result'); hint = padAction('left', '項目を選択') + padAction('cross', '決定'); }
+  else if ($('countdown').open) { scope = $('countdown'); hint = ''; }
+  else if ($('result').open) { scope = $('result'); hint = ''; }
   else if ($('ready').open) {
     scope = $('ready');
     // During the briefing its footer already explains the horizontal direction holds.
-    hint = !$('ready-tutorial').hidden ? '' : padAction('left', '項目を選択') + padAction('cross', '決定');
+    hint = !$('ready-tutorial').hidden || game.phase === 'paused' ? '' : padAction('left', '項目を選択') + padAction('cross', '決定');
   } else if (!$('lobby').hidden) { scope = document.querySelector('.lobby-card'); hint = padAction('left', '項目を選択') + padAction('cross', '決定'); }
   else hint = playGuide(game.mode) + padAction('prev', game.phase === 'playing' ? '長押しで一時停止' : '長押しで開始') + (sandboxMode ? padAction('l1', '前の役割') + padAction('r1', '次の役割') + padAction('create', 'リセット') : '');
   controllerUI.hint(scope, hint, padSeen);
@@ -934,6 +937,8 @@ function pollPad(now) {
   const pad = firstPad(), input = readPad(pad, now);
   if (!!pad !== padSeen) {
     padSeen = !!pad; $('pad-status').hidden = !pad;
+    // Like the tutorial's footer: with a controller the results button reads "× 次へ".
+    $('close-result').innerHTML = padSeen ? `${padIcon('cross')} 次へ` : '次へ';
     document.body.classList.toggle('controller-connected', padSeen);
     $('keyboard-help').hidden = padSeen; document.querySelector('.pad-help').hidden = !padSeen;
     tutorial.setController(padSeen);
@@ -976,10 +981,10 @@ function pollPad(now) {
     return -1;
   }
   if ($('ending').open) { if (input.long.has('up')) finishEnding(); return -1; }
-  if ($('countdown').open) { if (on('circle') || on('cross')) suspend(); return -1; }
+  if ($('countdown').open) return -1;
   if ($('result').open) {
-    // Only × on 次へ leaves the results; holding ← (or ○) does nothing here.
-    controllerUI.navigate($('result'), input);
+    // × goes on (次へ is the only control); holding ← (or ○) does nothing here.
+    if (input.tapped.has('cross')) $('close-result').click();
     return -1;
   }
   if ($('ready').open) {

@@ -386,3 +386,5 @@ body.spectating dialog:not(#settings-dialog, #help), body.spectating .board-surf
    (the canvas' own pixel size depends on the screen's pixel density and must not decide its size). */
 .immersive .board-surface{container-type:size}
 .immersive .board-surface canvas{width:min(100cqw,100cqh * var(--maze-ratio,1.4));height:auto;max-width:none;max-height:none}
+#close-result .ps-button{margin-right:8px}
+#ready-start .ps-button{margin-right:8px}

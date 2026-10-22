@@ -22,7 +22,8 @@ export function endingCreatureLayout(creatures, found) {
         if (size === 'large') {
           largeCounts[side]++;
           x = left ? -2 : 73;
-          y = -8 + slot * 48;
+          // The top large creatures sit lower than before (was -8; now 24) so they do not crowd the title.
+          y = 24 + slot * 34;
         } else {
           const lower = largeCounts[side] > 1;
           if (size === 'medium') {

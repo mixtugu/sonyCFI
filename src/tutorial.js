@@ -94,6 +94,8 @@ const DEMO_FISH = [
 ];
 // With the wall up, the explorer detours to the fish on the bottom row (there is no goal any more).
 const DETOUR_FISH = 17;
+// The wall lesson (page 3) stops the detour short of that fish, at column 1, row 3 (cell 10).
+const DETOUR_STOP = 10;
 const DEMO_STEPS = [];
 let arrival = 1;
 for (const cell of DEMO_ROUTE) {
@@ -380,7 +382,7 @@ export function createTutorial(container, { onStep, onFinish, onClose, onSound }
       return;
     }
     if (detourSteps.length) {
-      feedback.textContent = (performance.now() - startedAt) / 1000 >= detourSteps.at(-1).at + .4 ? '魚に出会えた！守ってあげられたね。' : '壁をよけて、別の道へ進もう';
+      feedback.textContent = (performance.now() - startedAt) / 1000 >= detourSteps.at(-1).at + .4 ? '危ない魚から守ってあげられたね！' : '壁をよけて、別の道へ進むよ';
       const pad = find('.briefing-pad');
       find('.wall-guide-hint').hidden = true;
       pad.classList.remove('is-cursor-hint');
@@ -388,7 +390,7 @@ export function createTutorial(container, { onStep, onFinish, onClose, onSound }
       pad.querySelector('.is-press-target')?.classList.remove('is-press-target');
       return;
     }
-    const instruction = reached ? '右に壁を立てよう' : '■のマスへカーソルを動かそう';
+    const instruction = reached ? (controller ? '▶ボタンで右に壁を立てよう' : '右に壁を立てよう') : '■のマスへカーソルを動かそう';
     // Before the first move only the cursor is introduced; the target appears once it moves.
     if (cursorIntro()) {
       if (!feedback.querySelector('.cursor-intro')) feedback.innerHTML = `<span class="cursor-intro">光っているのがカーソル${cursorIcon}！ 動かしてみよう</span>`;
@@ -461,7 +463,7 @@ export function createTutorial(container, { onStep, onFinish, onClose, onSound }
       const moves = Math.max(0, Math.min(5, Math.floor((elapsed - 2) / .7)));
       practice.cursor = { x: Math.max(0, moves - 3), y: Math.max(0, ROWS - 1 - moves) };
       if (!detourSteps.length && elapsed >= stopAt + 1) placeWall();
-      feedback.textContent = detourSteps.length ? elapsed >= detourSteps.at(-1).at + .4 ? '魚に出会えた！守ってあげられたね。' : '壁をよけて、別の道へ進もう' : '時間内に魚を探しに行こう';
+      feedback.textContent = detourSteps.length ? elapsed >= detourSteps.at(-1).at + .4 ? '魚に出会えた！守ってあげられたね。' : '壁をよけて、別の道へ進むよ' : '時間内に魚を探しに行こう';
     }
     // Once this step's goal is reached, the next button lights up until the step changes (the
     // navigator's demo loops back afterwards, so the highlight is kept rather than re-checked).
@@ -661,6 +663,7 @@ export function createTutorial(container, { onStep, onFinish, onClose, onSound }
           if (came.has(DETOUR_FISH)) {
             const path = [];
             for (let cell = DETOUR_FISH; cell !== 2; cell = came.get(cell)) path.unshift(cell);
+            if (cursorStep() && path.includes(DETOUR_STOP)) path.length = path.indexOf(DETOUR_STOP) + 1;
             let at = Math.max((performance.now() - startedAt) / 1000, DEMO_STEPS.find(point => point.cell === 2).at) + 1;
             detourSteps = path.map(cell => {
               const point = { cell, at };
