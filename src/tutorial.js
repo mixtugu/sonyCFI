@@ -23,7 +23,7 @@ const GUIDES = {
     { kind: 'wall', title: 'エクスプローラーを守ろう', symbol: 'ナ', tag: 'NAVIGATOR',
       description: () => `ナビゲーターは壁を立てられるよ。\n壁でエクスプローラーを危険な魚から守ってあげよう。\nでも、壁を立てると💛が${WALL_DAMAGE}つ減っちゃうみたい…`,
       controls: PLACE_CONTROLS },
-    { kind: 'timed', title: '時間内守ってあげよう', symbol: 'O₂', tag: 'TIME LIMIT',
+    { kind: 'timed', title: '時間内に守ってあげよう', symbol: 'O₂', tag: 'TIME LIMIT',
       description: () => '制限時間は30秒だよ。\n💛がゼロにならないように壁を立てて、\nエクスプローラーを危険な魚から守ろう。',
       controls: () => '' },
   ],

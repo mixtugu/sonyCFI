@@ -16,7 +16,7 @@ import { DEFAULTS, LIMITS, PRESETS, createMaze, start, tick, move, placeWall, ne
 import { drawFishIcon, drawMaze, pointerCell, setTextScale, setWallStyle, WALL_STYLES } from './maze-renderer.js';
 import { connectMaze } from './maze-network.js';
 import { connectSoloMaze } from './maze-solo.js';
-import { createPadReader, firstPad, rumble } from './gamepad.js';
+import { createPadReader, firstPad, HOLD_MS, rumble } from './gamepad.js';
 import { ACCESS_LAYOUT, accessConnected, accessRaw, accessState, accessSupported, onAccessChange, reconnectAccess, requestAccess } from './access-controller.js';
 import { createTutorial } from './tutorial.js';
 import { createEndingExplorerScene, createResultScene } from './result-scene.js';
@@ -112,7 +112,7 @@ ${['parent', 'child'].map(role => `<section class="board-card ${role}"><div clas
 <dialog id="game-opening" aria-label="オープニング"><video id="game-opening-video" preload="none" playsinline disablepictureinpicture disableremoteplayback aria-label="オープニング動画"></video><div id="game-opening-error" hidden><p role="alert"></p><button type="button" id="game-opening-retry" class="primary">動画を再生する</button></div></dialog>
 <dialog id="ready" class="ready-dialog">${waterLight}${bubbles(12)}<p class="eyebrow" id="ready-eyebrow"></p><h2 id="ready-title"></h2><p id="ready-note"></p><div id="ready-tutorial" class="tutorial"></div><button type="button" id="ready-review" class="secondary wide">チュートリアルを確認</button><button type="button" id="ready-start" class="primary wide">準備完了</button><button type="button" id="ready-back" class="secondary wide" hidden>戻る</button><p class="ready-foot"><button type="button" id="ready-settings" class="text-button">⚙ 設定</button></p></dialog>
 <dialog id="countdown" class="countdown-dialog" aria-label="開始カウントダウン">${bubbles(14, 720)}<h2>まもなく探検が始まります</h2><div class="countdown-core"><span class="countdown-rings" aria-hidden="true"><i></i><i></i><i></i></span><strong id="countdown-number" aria-live="assertive" aria-atomic="true">3</strong></div><div class="depth-gauge" aria-hidden="true"><span>水面</span><i><b></b></i><span>海の底</span></div><button id="countdown-pause" class="secondary">待機に戻る</button></dialog>
-<dialog id="ending" class="ending-dialog"><canvas id="ending-explorer" aria-hidden="true"></canvas><div class="ending-flash" aria-hidden="true"></div>${drops(24)}${sparkles(18)}<p class="eyebrow">THANK YOU FOR DIVING</p><h2>この海で様々な<br><span class="ending-highlight">出会い</span> や <span class="ending-highlight">危険</span> がありました</h2><p id="ending-wait" class="ending-wait" hidden>相手が探検を終えるのを待っています…</p><button id="ending-finish" class="primary">はじめに戻る</button></dialog>
+<dialog id="ending" class="ending-dialog"><canvas id="ending-explorer" aria-hidden="true"></canvas><div class="ending-flash" aria-hidden="true"></div>${drops(24)}${sparkles(18)}<p class="eyebrow">THANK YOU FOR DIVING</p><h2>この海で様々な<span class="ending-highlight">出会い</span> や <span class="ending-highlight">危険</span> がありました<br>出口から出て、動画をご覧ください</h2><p id="ending-wait" class="ending-wait" hidden>相手が探検を終えるのを待っています…</p><button id="ending-finish" class="primary" hidden>はじめに戻る</button></dialog>
 <dialog id="help">${waterLight}<h2>遊び方</h2><p>目標は、ふたりで海の生き物の図鑑を埋めること。迷路の魚のシルエットにエクスプローラーが触れると、正体の生き物が図鑑に登録されます。大きい魚ほどレアな生き物に出会えます。</p><p>ナビゲーターには、高危険度の魚だけ赤く光り、白い「!」が表示されます。ほかの魚は通常の青い表示です。魚から現れる生き物の危険度は内部で3段階に設定され、実際の生き物はその危険度以下から選ばれます。触れるとエクスプローラーのHPが生き物の危険度に応じて減ります。HPはナビゲーターにしか見えず、0にはなりません。大きい魚ほど危険なことが多いので、壁で道をふさぐかどうかはナビゲーター次第です。道がふさがると、エクスプローラーだけの秘密の通路が開きます。</p><p id="keyboard-help">矢印キー/WASDで操作。ナビゲーターはTabで向き、Spaceで設置。Escで一時停止。Fで全画面。</p><div class="pad-help" hidden><b>PlayStation コントローラー</b>${controllerDiagram()}<p>左スティックで移動、上下左右の方向キーで壁の向き、×で決定・壁の設置。</p><p>ナビゲーター：位置を選んで壁を設置</p><div class="controller-actions">${playGuide('parent')}</div><p>エクスプローラー：移動してアイテムを探す</p><div class="controller-actions">${playGuide('child')}</div><p>共通の操作</p><div class="controller-actions">${padAction('prev', '長押しで一時停止')}</div><p>メニュー：左スティックで項目を選択、×で決定、← 長押しで戻る。設定の数値はスティックの左右で変更。設定と遊び方は一時停止中の画面から開けます。</p><p>チュートリアル：練習はふだんと同じ操作。→ 長押しで次へ・確認、← 長押しで戻る。</p>${sandboxMode ? '<p>テストモード：L1 / R1で役割切替、CREATEでリセット。</p>' : ''}</div><button id="help-close" class="primary">OK</button></dialog>
 <div id="room-code" class="room-code" popover="manual" role="status" aria-label="部屋コード" hidden></div>`;
 
@@ -382,7 +382,7 @@ function endGame() {
       ? `<canvas class="creature-art" width="256" height="144" data-creature-preview="${c.id}" role="img" aria-label="${c.name}"></canvas>`
       : creatureArt(c.id, { hidden: !found.has(c.id), label: found.has(c.id) ? c.name : '未発見の生き物' });
     const facing = c.id === 'jellyfish' ? 1 : i % 2 ? -1 : 1;
-    return `<div role="listitem" data-size="${c.size}" data-side="${side}"${videoPreview ? ` class="ending-video-creature ending-video-creature-${c.id}"` : ''}${facing < 0 ? ' data-swims-left' : ''}${c.id === 'jellyfish' ? ' data-fixed-facing' : ''} style="--fish-x:${x}%;--fish-y:${y}%;--fish-width:${width}px;--fish-max-width:${width / 9.6}%;--swim-time:${4 + seeded(i, 12) * 5}s;--swim-delay:${-seeded(i, 13) * 18}s;--bob-time:${1.8 + seeded(i, 14) * 2}s;--facing:${facing}"><div class="ending-creature-facing">${picture}</div></div>`;
+    return `<div role="listitem" data-size="${c.size}" data-side="${side}"${found.has(c.id) ? ' data-found' : ''}${videoPreview ? ` class="ending-video-creature ending-video-creature-${c.id}"` : ''}${facing < 0 ? ' data-swims-left' : ''}${c.id === 'jellyfish' ? ' data-fixed-facing' : ''} style="--fish-x:${x}%;--fish-y:${y}%;--fish-width:${width}px;--fish-max-width:${width / 9.6}%;--swim-time:${4 + seeded(i, 12) * 5}s;--swim-delay:${-seeded(i, 13) * 18}s;--bob-time:${1.8 + seeded(i, 14) * 2}s;--facing:${facing}"><div class="ending-creature-facing">${picture}</div></div>`;
   }).join('');
   $('result').close(); resultScene.stop?.();
   // A solo host ends the game only on leaving the ending, so the spectating guest sees the ending too.
@@ -429,7 +429,15 @@ $('ending').addEventListener('close', () => {
   endingCreaturePreviews.forEach(stop => stop());
   endingCreaturePreviews = [];
 });
-$('ending').addEventListener('cancel', event => { event.preventDefault(); finishEnding(); });
+// The ending closes only on a deliberate hold: ↑ on the controller (see the pad routing), or ↑ / W here.
+$('ending').addEventListener('cancel', event => event.preventDefault());
+let endingSpaceTimer = null;
+window.addEventListener('keydown', event => {
+  if (!$('ending').open || !['ArrowUp', 'KeyW'].includes(event.code)) return;
+  event.preventDefault();
+  if (!event.repeat && !endingSpaceTimer) endingSpaceTimer = setTimeout(() => { endingSpaceTimer = null; if ($('ending').open) finishEnding(); }, HOLD_MS);
+}, true);
+window.addEventListener('keyup', event => { if (['ArrowUp', 'KeyW'].includes(event.code)) { clearTimeout(endingSpaceTimer); endingSpaceTimer = null; } }, true);
 $('result').addEventListener('cancel', event => { if (endingPreview || network.active) { event.preventDefault(); $('close-result').click(); } });
 $('countdown').addEventListener('cancel', event => { event.preventDefault(); suspend(); });
 $('game-entry').addEventListener('cancel', event => event.preventDefault());
@@ -911,9 +919,9 @@ function controllerHints() {
   else if ($('settings-dialog').open) { scope = $('settings-dialog'); hint = menu + padAction('left', '数値は左右で変更'); }
   else if (spectating) hint = '';
   else if ($('players-choice').open) { scope = $('players-choice'); hint = $('players-host').hidden ? '' : padAction('left', '項目を選択') + padAction('cross', '決定'); }
-  else if ($('ending').open) { scope = $('ending'); hint = padAction('cross', 'はじめに戻る'); }
+  else if ($('ending').open) { scope = $('ending'); hint = padAction('dpad', '↑ 長押しではじめに戻る'); }
   else if ($('countdown').open) { scope = $('countdown'); hint = padAction('prev', '長押しで待機に戻る'); }
-  else if ($('result').open) { scope = $('result'); hint = padAction('left', '項目を選択') + padAction('cross', '決定') + padAction('prev', network.active ? '長押しで終了' : '長押しで閉じる'); }
+  else if ($('result').open) { scope = $('result'); hint = padAction('left', '項目を選択') + padAction('cross', '決定'); }
   else if ($('ready').open) {
     scope = $('ready');
     // During the briefing its footer already explains the horizontal direction holds.
@@ -967,10 +975,11 @@ function pollPad(now) {
     if (!navigatorSwitch.hidden) controllerUI.navigate($('game-entry'), input); else if (on('cross')) $('game-entry-start').click();
     return -1;
   }
-  if ($('ending').open) { if (on('cross') || on('circle')) finishEnding(); return -1; }
+  if ($('ending').open) { if (input.long.has('up')) finishEnding(); return -1; }
   if ($('countdown').open) { if (on('circle') || on('cross')) suspend(); return -1; }
   if ($('result').open) {
-    if (on('circle')) $('close-result').click(); else controllerUI.navigate($('result'), input);
+    // Only × on 次へ leaves the results; holding ← (or ○) does nothing here.
+    controllerUI.navigate($('result'), input);
     return -1;
   }
   if ($('ready').open) {

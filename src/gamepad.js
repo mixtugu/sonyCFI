@@ -6,7 +6,7 @@ export const BUTTONS = { cross: 0, circle: 1, square: 2, triangle: 3, l1: 4, r1:
 const REPEAT_DELAY = 280, REPEAT_EVERY = 110, DEAD_ZONE = .5;
 // Directional holds are independent of × / ○ so only ← / → navigate the tutorial.
 export const HOLD_MS = 650;
-const HOLDABLE = ['cross', 'circle', 'left', 'right'];
+const HOLDABLE = ['cross', 'circle', 'left', 'right', 'up'];
 const DPAD = ['right', 'down', 'left', 'up'];
 
 // Controllers the browser has no layout for (mapping "") report the D-pad as one "hat switch" axis
@@ -51,7 +51,7 @@ function stickDirection(x = 0, y = 0) {
 export function createPadReader() {
   let previous = new Set(), dir = -1, since = 0, lastStep = 0, aim = -1;
   const downAt = {}, fired = {};
-  const idle = () => ({ dir: -1, step: -1, aim: -1, pressed: new Set(), tapped: new Set(), long: new Set(), hold: { cross: 0, circle: 0, left: 0, right: 0 } });
+  const idle = () => ({ dir: -1, step: -1, aim: -1, pressed: new Set(), tapped: new Set(), long: new Set(), hold: { cross: 0, circle: 0, left: 0, right: 0, up: 0 } });
   // A press that began on another screen must not finish as a tap or hold on this one.
   read.consume = () => { for (const name of HOLDABLE) if (downAt[name] !== undefined) fired[name] = true; };
   return read;
@@ -59,7 +59,7 @@ export function createPadReader() {
     if (!pad) { previous = new Set(); dir = aim = -1; for (const name of HOLDABLE) downAt[name] = fired[name] = undefined; return idle(); }
     const held = heldButtons(pad);
     const pressed = new Set([...held].filter(name => !previous.has(name)));
-    const tapped = new Set(), long = new Set(), hold = { cross: 0, circle: 0, left: 0, right: 0 };
+    const tapped = new Set(), long = new Set(), hold = { cross: 0, circle: 0, left: 0, right: 0, up: 0 };
     for (const name of HOLDABLE) {
       if (pressed.has(name)) { downAt[name] = now; fired[name] = false; }
       if (held.has(name) && downAt[name] !== undefined) {
