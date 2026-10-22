@@ -223,6 +223,26 @@ export function createTutorial(container, { onStep, onFinish, onClose, onSound }
   // The briefing shows no role / status line above the steps.
   function setKicker() { find('.briefing-kicker').textContent = ''; }
 
+  // There is no going back. The next (or final) button stays hidden until this step's goal is reached
+  // or its demo has played through once, then rises in (CSS); × / Enter / → advance only after that.
+  function syncNav() {
+    const ready = goalStep === step;
+    find('.briefing-previous').hidden = true;
+    find('.briefing-next').hidden = last() || !ready;
+    find('.briefing-launch').hidden = !last() || !ready;
+    for (const button of [find('.briefing-next'), find('.briefing-launch')]) button.classList.toggle('is-goal-reached', ready);
+  }
+  function advance() { if (!running || goalStep !== step) return; if (last()) onFinish?.(); else go(step + 1); }
+  // Titles stay on one line: a title wider than its column is scaled down to fit.
+  function fitTitle() {
+    const title = find('.briefing-title');
+    title.style.fontSize = '';
+    requestAnimationFrame(() => {
+      const room = title.parentElement.clientWidth, wide = title.scrollWidth;
+      if (room > 0 && wide > room) title.style.fontSize = `${parseFloat(getComputedStyle(title).fontSize) * room / wide * .98}px`;
+    });
+  }
+  addEventListener('resize', () => { if (running) fitTitle(); });
   function update() {
     if (!running) return;
     const guide = steps()[step];
@@ -235,15 +255,17 @@ export function createTutorial(container, { onStep, onFinish, onClose, onSound }
     find('.demo-badge').hidden = interactive;
     practiceNotice.classList.toggle('is-interactive', interactive);
     find('.briefing-title').textContent = guide.title;
+    fitTitle();
     setGuideDescription(find('.briefing-description'), guide.description(settings));
     controls.innerHTML = guide.controls(settings);
     // Left stick moves; directional taps aim walls and horizontal holds navigate the briefing.
     if (controller && (placingStep() || moveStep())) {
-      controls.innerHTML = `<kbd data-practice-key="Arrow">${padIcon('left')} ${parent() ? '位置' : '移動'}</kbd>` + (parent() ? `<kbd data-practice-key="Tab">${padIcon('dpad')} 向き</kbd><kbd data-practice-key="Space">${padIcon('cross')} 設置</kbd>` : '点線は秘密の通路');
+      controls.innerHTML = `<kbd data-practice-key="Arrow">${padIcon('left')} ${parent() ? '位置' : '移動'}</kbd>` + (parent() ? `<kbd data-practice-key="Tab">${padIcon('dpad')} 押した向きに設置</kbd>` : '点線は秘密の通路');
     }
     if (placingStep() || explorerStep()) find('.briefing-footer').insertBefore(controls, find('.briefing-nav'));
     else find('.briefing-copy').insertBefore(controls, find('.briefing-pad'));
-    controls.hidden = !controls.innerHTML || ((placingStep() || explorerStep()) && controller);
+    // The key / button legend is no longer shown; the centred next button is the only footer item.
+    controls.hidden = true;
     // The controller drawing lights up the buttons this step uses.
     const explorerGuide = explorerStep();
     const showController = !collectionDemo() && (controller || placingStep() || explorerGuide);
@@ -253,14 +275,14 @@ export function createTutorial(container, { onStep, onFinish, onClose, onSound }
     find('.briefing-pad').classList.toggle('is-explorer-guide', explorerGuide);
     find('.briefing-pad').hidden = !showController;
     if (showController) {
-      const diagram = controllerDiagram(placingStep() ? ['left', 'dpad', 'cross'] : moveStep() ? ['left', 'dpad'] : ['dpad']);
+      const diagram = controllerDiagram(placingStep() ? ['left', 'dpad'] : moveStep() ? ['left', 'dpad'] : ['dpad']);
       find('.briefing-pad').innerHTML = placingStep()
         ? `<span class="wall-guide-note">ジョイスティックで<br>カーソル${cursorIcon}を移動</span>${diagram}<span class="wall-guide-note">ボタンの向きに<br>壁を置く</span><span class="wall-guide-hint" hidden></span>`
         : explorerGuide ? `<span class="wall-guide-note explorer-comment-space">ジョイスティックで<br>エクスプローラーを移動</span>${diagram}<span class="wall-guide-note explorer-comment-space" aria-hidden="true"></span><span class="wall-guide-hint" hidden></span>` : diagram;
     }
     find('.briefing-previous').innerHTML = controller ? `${petalIcon('prev')} 長押しで戻る` : '戻る';
-    find('.briefing-next').innerHTML = controller ? `${petalIcon('next')} 長押しで次へ` : '次へ';
-    find('.briefing-launch').innerHTML = controller ? `${petalIcon('next')} 長押しで準備完了` : '確認して準備完了';
+    find('.briefing-next').innerHTML = controller ? `${padIcon('cross')} 次へ` : '次へ';
+    find('.briefing-launch').innerHTML = controller ? `${padIcon('cross')} 準備完了` : '確認して準備完了';
     container.classList.toggle('pad-briefing', controller);
     find('.briefing-count').textContent = `${String(step + 1).padStart(2, '0')} / ${String(steps().length).padStart(2, '0')}`;
     art.dataset.step = step;
@@ -269,9 +291,7 @@ export function createTutorial(container, { onStep, onFinish, onClose, onSound }
     const progress = find('.briefing-progress');
     if (progress.children.length !== steps().length) progress.replaceChildren(...steps().map(() => document.createElement('span')));
     container.querySelectorAll('.briefing-progress span').forEach((bar, i) => { bar.classList.toggle('is-active', i === step); bar.classList.toggle('is-done', i < step); });
-    find('.briefing-previous').disabled = step === 0;
-    find('.briefing-next').hidden = last();
-    find('.briefing-launch').hidden = !last();
+    syncNav();
     if (shownStep !== step) {
       if (interactive) {
         practiceNotice.classList.remove('is-interactive');
@@ -329,7 +349,7 @@ export function createTutorial(container, { onStep, onFinish, onClose, onSound }
       }
       if (performance.now() < wrongWallUntil) say('そこじゃないよ！ ■のマスの上に立てよう');
       else if (!at) { if (!feedback.querySelector('.cursor-target-symbol')) feedback.innerHTML = `<span class="cursor-target-symbol">■</span>のマスへカーソル${cursorIcon}を動かそう`; }
-      else say(up ? `${controller ? '×ボタン' : 'Space'}で壁を立てよう` : `${controller ? '▲ボタン' : 'Tab'}で向きを上にしよう`);
+      else say(controller ? '▲ボタンで上に壁を立てよう' : up ? 'Spaceで壁を立てよう' : 'Tabで向きを上にしよう');
       pad.classList.toggle('is-cursor-guide', !at); pad.classList.toggle('is-cursor-hint', !at);
       hint.hidden = false;
       if (!at) {
@@ -339,9 +359,9 @@ export function createTutorial(container, { onStep, onFinish, onClose, onSound }
         pad.querySelector('.joystick-direction-arrow path')?.setAttribute('transform', `rotate(${direction.angle} 16 16)`);
         pad.style.setProperty('--stick-x', `${direction.x}px`); pad.style.setProperty('--stick-y', `${direction.y}px`);
       } else {
-        const text = up ? '×ボタンを押してみよう' : '▲ボタンを押してみよう';
+        const text = '▲ボタンを押してみよう';
         if (hint.textContent !== text) hint.textContent = text;
-        pad.querySelector(up ? '.ps-center' : '.ps-petal[data-angle="0"]')?.classList.add('is-press-target');
+        pad.querySelector('.ps-petal[data-angle="0"]')?.classList.add('is-press-target');
       }
       return;
     }
@@ -394,7 +414,7 @@ export function createTutorial(container, { onStep, onFinish, onClose, onSound }
   function paintBasics() {
     updateCursorGuide();
     if (basicsDone && goalStep !== step) goalStep = step;
-    for (const button of [find('.briefing-next'), find('.briefing-launch')]) button.classList.toggle('is-goal-reached', goalStep === step);
+    syncNav();
     const toCell = point => { const [x, y] = point.split(',').map(Number); return y * BASIC_COLS + x; };
     const walls = new Set([...basicsPlaced].map(value => { const [a, b] = value.split('|').map(toCell); return edge(a, b); }));
     const width = BASIC_COLS * 36 + 28, canvas = find('.briefing-canvas'), shown = (canvas.clientWidth || width) * (devicePixelRatio || 1);
@@ -443,9 +463,11 @@ export function createTutorial(container, { onStep, onFinish, onClose, onSound }
     // Once this step's goal is reached, the next button lights up until the step changes (the
     // navigator's demo loops back afterwards, so the highlight is kept rather than re-checked).
     const goal = explorerStep() ? explorerRoute()[trail.length] === undefined
+      : riskStep() ? elapsed >= DEMO_DURATION
+      : collectionDemo() ? elapsed >= stopAt + 2.5
       : (wallDemo() || timedDemo()) && detourSteps.length > 0 && elapsed >= detourSteps.at(-1).at + .4;
     if (goal && goalStep !== step) goalStep = step;
-    for (const button of [find('.briefing-next'), find('.briefing-launch')]) button.classList.toggle('is-goal-reached', goalStep === step);
+    syncNav();
     const demoTime = collectionDemo() ? Math.min(elapsed, stopAt) : wallDemo() ? detourSteps.length ? elapsed : Math.min(elapsed, stopAt) : elapsed % DEMO_DURATION;
     const steps = wallDemo() || collectionDemo() ? [...DEMO_STEPS.filter(point => point.at <= stopAt), ...detourSteps] : DEMO_STEPS;
     const demoTrail = steps.filter(point => point.at <= demoTime).map(point => point.cell);
@@ -665,29 +687,21 @@ export function createTutorial(container, { onStep, onFinish, onClose, onSound }
     else if ((placingStep() || moveStep()) && index !== undefined) { event.preventDefault(); arrow(index); }
     else if (placingStep() && event.key === 'Tab') { event.preventDefault(); highlight('Tab'); rotate(); }
     else if (placingStep() && event.code === 'Space') { event.preventDefault(); highlight('Space'); if (!event.repeat) placeWall(); }
-    else if (event.key === 'ArrowLeft') { event.preventDefault(); go(step - 1); }
-    else if (event.key === 'ArrowRight') { event.preventDefault(); go(step + 1); }
-    else if (event.key === 'Enter' && event.target.tagName !== 'BUTTON' && !event.repeat) { event.preventDefault(); if (last()) onFinish?.(); else go(step + 1); }
+    else if (event.key === 'ArrowLeft') event.preventDefault();
+    else if (event.key === 'ArrowRight') { event.preventDefault(); advance(); }
+    else if (event.key === 'Enter' && event.target.tagName !== 'BUTTON' && !event.repeat) { event.preventDefault(); advance(); }
   }
-  // Horizontal D-pad taps aim on release, so navigation holds never change the practice wall.
-  // The left stick moves exactly as in a round; × places walls.
+  // ← / → place on a tap (release), like in a round; × moves on once the step's goal is reached.
+  // The left stick moves exactly as in a round; a D-pad press turns the wall and places it (no ×).
   function pad(input) {
     if (!running) return;
-    showHold(input.hold);
-    if (input.long.has('right')) { if (last()) onFinish?.(); else go(step + 1); return; }
-    if (input.long.has('left')) { go(step - 1); return; }
+    if (input.tapped.has('cross')) { advance(); return; }
     // The game's directions run right, down, left, up; the board's run north, east, south, west.
     if (input.step >= 0 && (placingStep() || moveStep())) arrow((input.step + 1) % 4);
-    const aim = input.tapped.has('right') ? 0 : input.tapped.has('left') ? 2
-      : input.pressed.has('right') || input.pressed.has('left') ? -1 : input.aim;
+    const dpad = input.tapped.has('right') ? 0 : input.tapped.has('left') ? 2 : input.pressed.has('up') ? 3 : input.pressed.has('down') ? 1 : -1;
+    const aim = dpad >= 0 ? dpad : ['right', 'left', 'up', 'down'].some(name => input.pressed.has(name)) ? -1 : input.aim;
     if (placingStep() && aim >= 0) { practice.direction = (aim + 1) % 4; practice.feedback = `設置方向: ${DIRECTIONS[practice.direction].name}`; highlight('Tab'); drawBoard(); }
-    if (placingStep() && input.tapped.has('cross')) { highlight('Space'); placeWall(); }
-  }
-  // The footer buttons fill up while their button is held, so the hold reads as deliberate.
-  function showHold(hold) {
-    find('.briefing-next').style.setProperty('--hold', hold.right);
-    find('.briefing-launch').style.setProperty('--hold', hold.right);
-    find('.briefing-previous').style.setProperty('--hold', step > 0 ? hold.left : 0);
+    if (placingStep() && dpad >= 0) { highlight('Space'); placeWall(); }
   }
 
   // Touch: tap a cell to put the cursor there, or to step the child toward it; the key hints are tappable.
@@ -706,9 +720,8 @@ export function createTutorial(container, { onStep, onFinish, onClose, onSound }
     if (kbd.dataset.practiceKey === 'Tab') { highlight('Tab'); rotate(); }
     if (kbd.dataset.practiceKey === 'Space') { highlight('Space'); placeWall(); }
   };
-  find('.briefing-previous').onclick = () => go(step - 1);
-  find('.briefing-next').onclick = () => go(step + 1);
-  find('.briefing-launch').onclick = () => onFinish?.();
+  find('.briefing-next').onclick = advance;
+  find('.briefing-launch').onclick = advance;
   // goTo lets a spectating guest follow the host's current step.
   return { start, stop, key, pad, setKicker, setController: value => { if (controller !== value) { controller = value; update(); } }, next: () => go(step + 1), goTo: go,
     get step() { return step; }, get last() { return last(); }, get running() { return running; } };

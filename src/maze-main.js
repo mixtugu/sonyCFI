@@ -113,7 +113,7 @@ ${['parent', 'child'].map(role => `<section class="board-card ${role}"><div clas
 <dialog id="ready" class="ready-dialog">${waterLight}${bubbles(12)}<p class="eyebrow" id="ready-eyebrow"></p><h2 id="ready-title"></h2><p id="ready-note"></p><div id="ready-tutorial" class="tutorial"></div><button type="button" id="ready-review" class="secondary wide">チュートリアルを確認</button><button type="button" id="ready-start" class="primary wide">準備完了</button><button type="button" id="ready-back" class="secondary wide" hidden>戻る</button><p class="ready-foot"><button type="button" id="ready-settings" class="text-button">⚙ 設定</button></p></dialog>
 <dialog id="countdown" class="countdown-dialog" aria-label="開始カウントダウン">${bubbles(14, 720)}<h2>まもなく探検が始まります</h2><div class="countdown-core"><span class="countdown-rings" aria-hidden="true"><i></i><i></i><i></i></span><strong id="countdown-number" aria-live="assertive" aria-atomic="true">3</strong></div><div class="depth-gauge" aria-hidden="true"><span>水面</span><i><b></b></i><span>海の底</span></div><button id="countdown-pause" class="secondary">待機に戻る</button></dialog>
 <dialog id="ending" class="ending-dialog"><canvas id="ending-explorer" aria-hidden="true"></canvas><div class="ending-flash" aria-hidden="true"></div>${drops(24)}${sparkles(18)}<p class="eyebrow">THANK YOU FOR DIVING</p><h2>この海で様々な<span class="ending-highlight">出会い</span> や <span class="ending-highlight">危険</span> がありました<br>出口から出て、動画をご覧ください</h2><p id="ending-wait" class="ending-wait" hidden>相手が探検を終えるのを待っています…</p><button id="ending-finish" class="primary" hidden>はじめに戻る</button></dialog>
-<dialog id="help">${waterLight}<h2>遊び方</h2><p>目標は、ふたりで海の生き物の図鑑を埋めること。迷路の魚のシルエットにエクスプローラーが触れると、正体の生き物が図鑑に登録されます。大きい魚ほどレアな生き物に出会えます。</p><p>ナビゲーターには、高危険度の魚だけ赤く光り、白い「!」が表示されます。ほかの魚は通常の青い表示です。魚から現れる生き物の危険度は内部で3段階に設定され、実際の生き物はその危険度以下から選ばれます。触れるとエクスプローラーのHPが生き物の危険度に応じて減ります。HPはナビゲーターにしか見えず、0にはなりません。大きい魚ほど危険なことが多いので、壁で道をふさぐかどうかはナビゲーター次第です。道がふさがると、エクスプローラーだけの秘密の通路が開きます。</p><p id="keyboard-help">矢印キー/WASDで操作。ナビゲーターはTabで向き、Spaceで設置。Escで一時停止。Fで全画面。</p><div class="pad-help" hidden><b>PlayStation コントローラー</b>${controllerDiagram()}<p>左スティックで移動、上下左右の方向キーで壁の向き、×で決定・壁の設置。</p><p>ナビゲーター：位置を選んで壁を設置</p><div class="controller-actions">${playGuide('parent')}</div><p>エクスプローラー：移動してアイテムを探す</p><div class="controller-actions">${playGuide('child')}</div><p>共通の操作</p><div class="controller-actions">${padAction('prev', '長押しで一時停止')}</div><p>メニュー：左スティックで項目を選択、×で決定、← 長押しで戻る。設定の数値はスティックの左右で変更。設定と遊び方は一時停止中の画面から開けます。</p><p>チュートリアル：練習はふだんと同じ操作。→ 長押しで次へ・確認、← 長押しで戻る。</p>${sandboxMode ? '<p>テストモード：L1 / R1で役割切替、CREATEでリセット。</p>' : ''}</div><button id="help-close" class="primary">OK</button></dialog>
+<dialog id="help">${waterLight}<h2>遊び方</h2><p>目標は、ふたりで海の生き物の図鑑を埋めること。迷路の魚のシルエットにエクスプローラーが触れると、正体の生き物が図鑑に登録されます。大きい魚ほどレアな生き物に出会えます。</p><p>ナビゲーターには、高危険度の魚だけ赤く光り、白い「!」が表示されます。ほかの魚は通常の青い表示です。魚から現れる生き物の危険度は内部で3段階に設定され、実際の生き物はその危険度以下から選ばれます。触れるとエクスプローラーのHPが生き物の危険度に応じて減ります。HPはナビゲーターにしか見えず、0にはなりません。大きい魚ほど危険なことが多いので、壁で道をふさぐかどうかはナビゲーター次第です。道がふさがると、エクスプローラーだけの秘密の通路が開きます。</p><p id="keyboard-help">矢印キー/WASDで操作。ナビゲーターはTabで向き、Spaceで設置。Escで一時停止。Fで全画面。</p><div class="pad-help" hidden><b>PlayStation コントローラー</b>${controllerDiagram()}<p>左スティックで移動、上下左右の方向キーを押すとその向きに壁を設置、×で決定。</p><p>ナビゲーター：位置を選んで壁を設置</p><div class="controller-actions">${playGuide('parent')}</div><p>エクスプローラー：移動してアイテムを探す</p><div class="controller-actions">${playGuide('child')}</div><p>共通の操作</p><div class="controller-actions">${padAction('prev', '長押しで一時停止')}</div><p>メニュー：左スティックで項目を選択、×で決定、← 長押しで戻る。設定の数値はスティックの左右で変更。設定と遊び方は一時停止中の画面から開けます。</p><p>チュートリアル：練習はふだんと同じ操作。→ 長押しで次へ・確認、← 長押しで戻る。</p>${sandboxMode ? '<p>テストモード：L1 / R1で役割切替、CREATEでリセット。</p>' : ''}</div><button id="help-close" class="primary">OK</button></dialog>
 <div id="room-code" class="room-code" popover="manual" role="status" aria-label="部屋コード" hidden></div>`;
 
 const $ = id => document.getElementById(id);
@@ -937,7 +937,7 @@ function pollPad(now) {
     document.body.classList.toggle('controller-connected', padSeen);
     $('keyboard-help').hidden = padSeen; document.querySelector('.pad-help').hidden = !padSeen;
     tutorial.setController(padSeen);
-    $('board-parent').setAttribute('aria-label', padSeen ? 'ナビゲーターの迷路。左スティックで位置、上下左右の方向キーで向き、×で壁を設置' : 'ナビゲーターの迷路。マスの端をクリックして壁を設置');
+    $('board-parent').setAttribute('aria-label', padSeen ? 'ナビゲーターの迷路。左スティックで位置、上下左右の方向キーを押すとその向きに壁を設置' : 'ナビゲーターの迷路。マスの端をクリックして壁を設置');
     $('board-child').setAttribute('aria-label', padSeen ? 'エクスプローラーの迷路。左スティックで移動' : 'エクスプローラーの迷路。矢印キーで移動');
     if (pad) notice('コントローラーを接続しました。スティック・上下左右のボタン・× で操作できます。');
     else { suspend(); notice('コントローラーが切断されました。再接続するかキーボードで操作してください。'); }
@@ -998,8 +998,14 @@ function pollPad(now) {
     if (on('triangle')) { toggleImmersive(); return -1; }
     if (on('l1') || on('r1')) { const modes = ['parent', 'child', 'cpu']; setMode(modes[(modes.indexOf(game.mode) + (on('r1') ? 1 : 2)) % 3]); }
   }
-  // A D-pad tap aims the wall; holding ← pauses instead (handled above).
-  if (game.mode === 'parent') { if (input.step >= 0) control(input.step); if (input.aim >= 0) { direction = input.aim; update(); } if (on('cross')) wall(); }
+  // A D-pad press turns the wall that way and places it at once; × is not used. ← places on a tap
+  // (released before the hold), since holding ← pauses instead (handled above).
+  if (game.mode === 'parent') {
+    if (input.step >= 0) control(input.step);
+    const place = ['right', 'down', 'left', 'up'].findIndex(name => name === 'left' ? input.tapped.has('left') : input.pressed.has(name));
+    if (place >= 0) { direction = place; update(); wall(); }
+    else if (input.aim >= 0 && !input.pressed.has('left')) { direction = input.aim; update(); }
+  }
   // Haptics follow the game state, so they also fire for moves the server applied.
   if (game.walls.size > feltWalls) rumble(pad, .2, .6, 60);
   if (game.collected > feltItems) rumble(pad, .8, .4, 140);

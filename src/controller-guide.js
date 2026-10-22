@@ -21,7 +21,7 @@ export const padAction = (name, text) => `<span class="ps-action">${padIcon(name
 const CX = 250, CY = 122;
 const point = (r, a) => `${(CX + r * Math.sin(a * Math.PI / 180)).toFixed(1)} ${(CY - r * Math.cos(a * Math.PI / 180)).toFixed(1)}`;
 const petal = (a0, a1, r0 = 57, r1 = 99) => `M${point(r1, a0)}A${r1} ${r1} 0 0 1 ${point(r1, a1)}L${point(r0, a1)}A${r0} ${r0} 0 0 0 ${point(r0, a0)}Z`;
-// Only the stick, the centre × and the up/right/down/left petals (which aim the wall) are mapped;
+// Only the stick, the centre × (menus) and the up/right/down/left petals (which place a wall that way) are mapped;
 // the diagonal petals are switched off.
 const PETALS = { 0: 'dpad', 90: 'dpad', 180: 'dpad', 270: 'dpad' };
 const ARROW = '<path class="ps-direction-mark" d="M16 6 28 26H4Z"/>';
@@ -76,7 +76,7 @@ export function petalIcon(name) {
 }
 export function playGuide(role) {
   return (role === 'cpu' ? '' : padAction('left', role === 'parent' ? '位置を選択' : '移動')) +
-    (role === 'parent' ? padAction('dpad', '壁の向き') + padAction('cross', '壁を設置') : '');
+    (role === 'parent' ? padAction('dpad', '押した向きに壁を設置') : '');
 }
 // Live press feedback: every controller drawing and button icon on screen lights up while its
 // button is held, and the drawn stick leans with the real one.

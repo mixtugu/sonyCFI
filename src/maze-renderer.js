@@ -317,6 +317,8 @@ export function drawMaze(canvas, s, role, cursor, direction, options = {}) {
   // Pixels per maze unit: 2 by default; callers that show the board larger (the tutorial) ask for more.
   const res = options.resolution || 2;
   if (canvas.width !== Math.round(width * res) || canvas.height !== Math.round(height * res)) { canvas.width = Math.round(width * res); canvas.height = Math.round(height * res); }
+  // The layout scales the canvas to its box by this ratio, whatever the monitor's pixel density.
+  canvas.style.setProperty('--maze-ratio', width / height);
   const c = canvas.getContext('2d'); c.setTransform(res, 0, 0, res, 0, 0); c.globalCompositeOperation = 'source-over'; c.globalAlpha = 1;
   const center = n => [(n % cols + .5) * cell, (Math.floor(n / cols) + .5) * cell];
   const segment = (a, b) => {

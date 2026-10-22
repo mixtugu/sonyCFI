@@ -38,7 +38,7 @@ button:focus-visible,a:focus-visible,canvas:focus-visible,input:focus-visible,su
 .ready-dialog.briefing{width:min(1120px,calc(100% - 32px));padding:24px 28px 22px;text-align:left}
 .tutorial{margin-bottom:14px}
 .briefing-top{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:16px}
-.briefing-practice-notice{grid-column:2;grid-row:1;padding:8px 20px;border:2px solid #ffe45c;border-radius:12px;color:#ffe45c;font-size:calc(20px * var(--text-scale,1));font-weight:700;text-align:center}
+.briefing-practice-notice{grid-column:2;grid-row:1;padding:8px 20px;border:2px solid #ffe45c;border-radius:12px;color:#ffe45c;font-size:calc(40px * var(--text-scale,1));font-weight:700;text-align:center}
 .briefing-practice-notice:not(.is-interactive){border-color:#d5dbe5;color:#d5dbe5}
 .briefing-practice-notice.is-interactive{animation:practice-notice-glow calc(5s / 3) ease-in-out 3}
 @keyframes practice-notice-glow{
@@ -372,3 +372,17 @@ body.spectating dialog:not(#settings-dialog, #help), body.spectating .board-surf
 .practice-cell.is-wall-target-up::after{content:'ここに壁';position:absolute;left:50%;bottom:100%;transform:translate(-50%,-8px);padding:2px 8px;border-radius:6px;background:#ffe45c;color:#0b2457;font-size:calc(12px * var(--text-scale,1));font-weight:800;white-space:nowrap;pointer-events:none}
 @keyframes wall-target-pulse{50%{opacity:.45}}
 @media(prefers-reduced-motion:reduce){.practice-cell.is-wall-target-up::before{animation:none}}
+/* Tutorial: the next button rises in once the step's goal is reached (it is hidden before). */
+.briefing-footer{justify-content:center;min-height:calc(110px * var(--text-scale,1))}
+.briefing-nav{margin:0 auto;justify-content:center}
+.briefing-footer :is(.briefing-next,.briefing-launch){font-size:calc(42px * var(--text-scale,1));font-weight:700;padding:.35em 1.2em;min-width:0}
+.briefing-footer :is(.briefing-next,.briefing-launch) .ps-button{height:calc(50px * var(--text-scale,1));min-width:calc(50px * var(--text-scale,1));border-radius:14px;margin-right:12px}
+.briefing-footer :is(.briefing-next,.briefing-launch) .ps-button svg{width:calc(42px * var(--text-scale,1));height:calc(42px * var(--text-scale,1))}
+.briefing-footer :is(.briefing-next,.briefing-launch).is-goal-reached:not([hidden]){animation:briefing-next-in .55s cubic-bezier(.2,.9,.3,1.3) both,goal-next-glow 1.4s .55s ease-in-out infinite}
+@keyframes briefing-next-in{from{opacity:0;transform:translateY(24px) scale(.85)}60%{opacity:1}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.briefing-footer :is(.briefing-next,.briefing-launch).is-goal-reached:not([hidden]){animation:briefing-next-in .2s ease-out both}}
+.briefing-title{white-space:nowrap;max-width:100%}
+/* The maze fills its area on every monitor: as large as fits the width and height, keeping its ratio
+   (the canvas' own pixel size depends on the screen's pixel density and must not decide its size). */
+.immersive .board-surface{container-type:size}
+.immersive .board-surface canvas{width:min(100cqw,100cqh * var(--maze-ratio,1.4));height:auto;max-width:none;max-height:none}

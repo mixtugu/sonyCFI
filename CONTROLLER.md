@@ -9,12 +9,12 @@ The layout targets a PlayStation Access controller profile: stick, centre ×, an
 | Menus, lobby, results | Stick selects, × activates the focused control; hold ← (or press ○) goes back / closes |
 | Settings | Stick up/down selects fields, left/right adjusts numbers; × selects or applies; hold ← (or ○) closes |
 | Room entry | Type a 1–6 character code (default `A`), then Create or Join |
-| Navigator practice and play | Left stick selects a cell; tap ↑ → ↓ ← (or the right stick) to aim the wall; × places |
+| Navigator practice and play | Left stick selects a cell; pressing ↑ → ↓ turns the wall that way and places it at once (← places on a short tap, since holding ← pauses). × is not used. The right stick only aims |
 | Explorer practice and play | Left stick moves |
-| Tutorial | Hold → to advance or confirm the final step; hold ← to go back (650 ms). Short ← / → taps aim walls on release; ↑ / ↓ aim immediately. Movement stays on the left stick. × and ○ holds do not change tutorial steps |
+| Tutorial | Hold → to advance or confirm the final step; hold ← to go back (650 ms). Short ← / → taps place walls on release; ↑ / ↓ place immediately. Movement stays on the left stick. × and ○ holds do not change tutorial steps |
 | Playing / ready | Hold ← (or ○) to pause / start |
 | Countdown | Hold ← (or ○ / ×) to return to waiting |
-| Ending | × / ○ returns to the lobby |
+| Ending | Hold ↑ (keyboard: hold ↑ or W) returns to the lobby |
 | Test mode only | OPTIONS start/pause, □ settings, △ immersive, L1 / R1 switch roles, CREATE resets |
 
 Help is also reachable through Settings → 遊び方, including controllers that do not expose touchpad click. Actual browser fullscreen may require browser-granted user activation; the immersive layout still works when that request is denied.
