@@ -1,15 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CREATURES, HP_MAX, SIZE_MIX, applyDamage, creature, pickCreature } from './creatures.js';
-import { createMaze, reachable, start, tick, move, placeWall, neighbor, neighbors, canMove, edge, autoDirection, rng, DEFAULTS, PRESETS } from './maze.js';
+import { createMaze, reachable, start, tick, move, placeWall, neighbor, neighbors, canMove, edge, autoDirection, rng, DEFAULTS, PRESETS, START_FISH } from './maze.js';
+const WITH_START = [...SIZE_MIX, ...Array(START_FISH).fill('small')].sort();
 
 test('seeded mazes are connected at every supported board size', () => {
   for (const [cols, rows] of [[10, 8], [14, 10], [20, 12], [28, 18]]) {
     const s = createMaze({ cols, rows });
     assert.equal(reachable(s).size, cols * rows);
     assert.deepEqual([...s.base], [...createMaze({ cols, rows }).base]);
-    assert.equal(new Set(s.items.map(i => i.cell)).size, 12);
-    assert.deepEqual(s.items.map(i => i.size).sort(), [...SIZE_MIX].sort());
+    assert.equal(new Set(s.items.map(i => i.cell)).size, 12 + START_FISH);
+    assert.deepEqual(s.items.map(i => i.size).sort(), WITH_START);
     // Each fish hides a creature of its own size, and its risk is that creature's.
     assert.ok(s.items.every(i => creature(i.creature).size === i.size && creature(i.creature).risk === i.risk));
     // The three maximum-risk values still constrain the hidden creature pool; large fish are always high-risk.
@@ -30,8 +31,8 @@ test('generated fish can be reached without the top-right cell and its zone alwa
     assert.equal(topRightFish.length, 1);
     assert.equal(topRightFish[0].size, 'large');
     assert.equal(reachable(s).size, cols * rows);
-    assert.equal(new Set(s.items.map(item => item.cell)).size, 12);
-    assert.deepEqual(s.items.map(item => item.size).sort(), [...SIZE_MIX].sort());
+    assert.equal(new Set(s.items.map(item => item.cell)).size, 12 + START_FISH);
+    assert.deepEqual(s.items.map(item => item.size).sort(), WITH_START);
     assert.deepEqual(s.items, createMaze({ cols, rows }, seed).items);
   }
 });
@@ -114,9 +115,19 @@ test('the fish count setting places that many fish, spread over distinct cells, 
   const presetFish = PRESETS.find(p => p.key === 'fishCount').options.map(([, , values]) => values.fishCount);
   for (const fishCount of [...presetFish, 4, 8, 16, 24]) for (const [cols, rows] of [[10, 8], [12, 9], [14, 10], [16, 11], [28, 18]]) for (let seed = 1; seed <= 20; seed++) {
     const s = createMaze({ cols, rows, fishCount }, seed), cells = s.items.map(i => i.cell);
-    assert.equal(s.items.length, fishCount, `${fishCount} fish on ${cols}×${rows}`);
+    assert.equal(s.items.length, fishCount + START_FISH, `${fishCount} fish (+ ${START_FISH} by the start) on ${cols}×${rows}`);
     assert.equal(new Set(cells).size, cells.length); assert.ok(cells.every(c => c !== s.goal && c !== s.avatar && c >= 0 && c < cols * rows));
     assert.ok(s.items.some(i => i.size === 'large'));
   }
-  assert.equal(createMaze().items.length, 12, 'twelve by default, as before');
+  assert.equal(createMaze().items.length, 12 + START_FISH, 'twelve by default, plus the start fish');
+});
+
+test('a few small fish wait close to the start', () => {
+  for (let seed = 1; seed <= 30; seed++) {
+    const s = createMaze({}, seed), extra = s.items.slice(-START_FISH);
+    assert.ok(extra.every(item => item.size === 'small'));
+    const steps = new Map([[s.avatar, 0]]), queue = [s.avatar];
+    for (let i = 0; i < queue.length; i++) for (const n of neighbors(s, queue[i])) if (!steps.has(n) && canMove(s, queue[i], n)) { steps.set(n, steps.get(queue[i]) + 1); queue.push(n); }
+    assert.ok(extra.every(item => steps.get(item.cell) >= 2 && steps.get(item.cell) <= 8), `seed ${seed}`);
+  }
 });

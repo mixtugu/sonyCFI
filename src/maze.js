@@ -1,3 +1,5 @@
+// Small fish added around the start on top of the settings' fish count.
+export const START_FISH = 3;
 export const DEFAULTS = Object.freeze({ cols: 14, rows: 10, duration: 30, wallLimit: 8, fishCount: 12, moveMs: 500 });
 export const LIMITS = { cols: [10, 28], rows: [8, 18], duration: [5, 120], wallLimit: [0, 30], fishCount: [4, 24], moveMs: [100, 1200] };
 // One-tap choices for the settings screen: three steps each, the middle one being the default.
@@ -77,6 +79,20 @@ export function createMaze(settings = {}, seed = 260830) {
     // The navigator sees maxRisk; the creature (and its own risk, which sets the damage) stays hidden.
     const maxRisk = maxRiskFor(sizes[i], random), found = pickCreature(sizes[i], random, maxRisk);
     s.items.push({ cell, size: sizes[i], maxRisk, creature: found.id, risk: found.risk, taken: false });
+  }
+  // A few extra small fish near the start (2–5 steps along the maze's paths), so the first moves
+  // already find something. They come on top of the zone fish and never share a cell with one.
+  const steps = new Map([[s.avatar, 0]]), queue = [s.avatar];
+  for (let i = 0; i < queue.length; i++) for (const n of neighbors(s, queue[i])) if (!steps.has(n) && !s.base.has(edge(queue[i], n))) { steps.set(n, steps.get(queue[i]) + 1); queue.push(n); }
+  const used = new Set(s.items.map(item => item.cell));
+  const free = [...steps].filter(([cell, d]) => d >= 2 && cell !== s.goal && !used.has(cell));
+  const near = free.filter(([, d]) => d <= 5).map(([cell]) => cell);
+  // A start in a short dead end may have too few cells that close; the next nearest ones fill in.
+  const farther = free.filter(([, d]) => d > 5).sort((a, b) => a[1] - b[1]).map(([cell]) => cell);
+  for (let i = 0; i < START_FISH && (near.length || farther.length); i++) {
+    const cell = near.length ? near.splice(Math.floor(random() * near.length), 1)[0] : farther.shift();
+    const maxRisk = maxRiskFor('small', random), found = pickCreature('small', random, maxRisk);
+    s.items.push({ cell, size: 'small', maxRisk, creature: found.id, risk: found.risk, taken: false });
   }
   s.trail.push(s.avatar);
   return s;

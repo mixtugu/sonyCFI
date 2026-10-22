@@ -919,7 +919,7 @@ function controllerHints() {
   else if ($('settings-dialog').open) { scope = $('settings-dialog'); hint = menu + padAction('left', '数値は左右で変更'); }
   else if (spectating) hint = '';
   else if ($('players-choice').open) { scope = $('players-choice'); hint = $('players-host').hidden ? '' : padAction('left', '項目を選択') + padAction('cross', '決定'); }
-  else if ($('ending').open) { scope = $('ending'); hint = padAction('dpad', '↑ 長押しではじめに戻る'); }
+  else if ($('ending').open) { scope = $('ending'); hint = ''; }   // no on-screen hint: a hold of ↑ (or W) still returns
   else if ($('countdown').open) { scope = $('countdown'); hint = padAction('prev', '長押しで待機に戻る'); }
   else if ($('result').open) { scope = $('result'); hint = padAction('left', '項目を選択') + padAction('cross', '決定'); }
   else if ($('ready').open) {

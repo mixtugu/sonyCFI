@@ -92,6 +92,8 @@ const DEMO_FISH = [
   { cell: 13, size: 'large', creature: 'shark', maxRisk: 3, risk: 3, damage: 4 },
   { cell: 17, size: 'medium', creature: 'octopus', maxRisk: 2, risk: 2, damage: 2 },
 ];
+// With the wall up, the explorer detours to the fish on the bottom row (there is no goal any more).
+const DETOUR_FISH = 17;
 const DEMO_STEPS = [];
 let arrival = 1;
 for (const cell of DEMO_ROUTE) {
@@ -268,7 +270,8 @@ export function createTutorial(container, { onStep, onFinish, onClose, onSound }
     controls.hidden = true;
     // The controller drawing lights up the buttons this step uses.
     const explorerGuide = explorerStep();
-    const showController = !collectionDemo() && (controller || placingStep() || explorerGuide);
+    // Watch-only demo steps (the navigator's risk and time-limit videos) show no controller drawing.
+    const showController = !collectionDemo() && !riskStep() && !timedDemo() && (controller || placingStep() || explorerGuide);
     find('.briefing-zukan').hidden = !collectionDemo();
     find('.briefing-rarity-bubble').hidden = !collectionDemo();
     find('.briefing-pad').classList.toggle('is-wall-guide', placingStep() || explorerGuide);
@@ -372,12 +375,12 @@ export function createTutorial(container, { onStep, onFinish, onClose, onSound }
     }
     const { x, y } = practice.cursor;
     const reached = x === 2 && y === 0;
-    if (practice.feedback.startsWith('ゴールへの道がふさがっています')) {
+    if (practice.feedback.startsWith('魚への道がふさがっています')) {
       feedback.textContent = practice.feedback;
       return;
     }
     if (detourSteps.length) {
-      feedback.textContent = (performance.now() - startedAt) / 1000 >= detourSteps.at(-1).at + .4 ? 'ゴールに到着！守ってあげられたね。' : '壁をよけて、下の道からゴールへ向かうよ';
+      feedback.textContent = (performance.now() - startedAt) / 1000 >= detourSteps.at(-1).at + .4 ? '魚に出会えた！守ってあげられたね。' : '壁をよけて、別の道へ進もう';
       const pad = find('.briefing-pad');
       find('.wall-guide-hint').hidden = true;
       pad.classList.remove('is-cursor-hint');
@@ -458,7 +461,7 @@ export function createTutorial(container, { onStep, onFinish, onClose, onSound }
       const moves = Math.max(0, Math.min(5, Math.floor((elapsed - 2) / .7)));
       practice.cursor = { x: Math.max(0, moves - 3), y: Math.max(0, ROWS - 1 - moves) };
       if (!detourSteps.length && elapsed >= stopAt + 1) placeWall();
-      feedback.textContent = detourSteps.length ? elapsed >= detourSteps.at(-1).at + .4 ? 'ゴールに到着！守ってあげられたね。' : '壁をよけて、下の道からゴールへ向かうよ' : '時間内にゴールを目指そう';
+      feedback.textContent = detourSteps.length ? elapsed >= detourSteps.at(-1).at + .4 ? '魚に出会えた！守ってあげられたね。' : '壁をよけて、別の道へ進もう' : '時間内に魚を探しに行こう';
     }
     // Once this step's goal is reached, the next button lights up until the step changes (the
     // navigator's demo loops back afterwards, so the highlight is kept rather than re-checked).
@@ -517,7 +520,7 @@ export function createTutorial(container, { onStep, onFinish, onClose, onSound }
     const scene = {
       settings: { ...settings, cols: COLS, rows: ROWS, wallLimit: 20 },
       mode: role, phase: 'playing', time: autoDemo ? demoTime : elapsed, moves: (autoDemo ? demoTrail : trail).length - 1,
-      avatar: autoDemo ? demoTrail.at(-1) : avatar, goal: COLS - 1,
+      avatar: autoDemo ? demoTrail.at(-1) : avatar, goal: -1,
       trail: autoDemo ? demoTrail : trail,
       base: autoDemo ? DEMO_WALLS : convertEdges(fixed()), walls: riskExample ? new Set() : walls,
       secrets: new Set(explorerWallAppeared() ? [edge(7, 12)] : []),
@@ -647,7 +650,7 @@ export function createTutorial(container, { onStep, onFinish, onClose, onSound }
         practice.placed.add(e); practice.feedback = `${direction.name}側に壁を設置しました`;
         if (e === edgeKey(2, 0, 3, 0)) {
           const queue = [2], came = new Map([[2, null]]);
-          for (let i = 0; i < queue.length && !came.has(4); i++) {
+          for (let i = 0; i < queue.length && !came.has(DETOUR_FISH); i++) {
             const cell = queue[i], x = cell % COLS, y = Math.floor(cell / COLS);
             for (const { dx, dy } of DIRECTIONS) {
               const nx = x + dx, ny = y + dy, next = ny * COLS + nx;
@@ -655,16 +658,16 @@ export function createTutorial(container, { onStep, onFinish, onClose, onSound }
               came.set(next, cell); queue.push(next);
             }
           }
-          if (came.has(4)) {
+          if (came.has(DETOUR_FISH)) {
             const path = [];
-            for (let cell = 4; cell !== 2; cell = came.get(cell)) path.unshift(cell);
+            for (let cell = DETOUR_FISH; cell !== 2; cell = came.get(cell)) path.unshift(cell);
             let at = Math.max((performance.now() - startedAt) / 1000, DEMO_STEPS.find(point => point.cell === 2).at) + 1;
             detourSteps = path.map(cell => {
               const point = { cell, at };
               at += .7 + (DEMO_FISH.some(fish => fish.cell === cell && !DEMO_ROUTE.slice(0, DEMO_ROUTE.indexOf(2) + 1).includes(cell)) ? 1.6 : 0);
               return point;
             });
-          } else practice.feedback = 'ゴールへの道がふさがっています。戻る・次へで練習をやり直してください。';
+          } else practice.feedback = '魚への道がふさがっています。もう一度やり直してください。';
         }
       }
     }
